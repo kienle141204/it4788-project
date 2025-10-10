@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -14,21 +15,8 @@ import { UserModule } from './modules/user/user.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const sslCaPath = config.get<string>('DB_SSL_CA_PATH');
-        const extra = sslCaPath
-          ? {
-              ssl: {
-                rejectUnauthorized: true,
-                ca: require('fs').readFileSync(sslCaPath, 'utf8'),
-              },
-            }
-          : {
-              // Tạm thời cho phép nếu chưa có CA (khuyến nghị bật verify ở production)
-              ssl: { rejectUnauthorized: false },
-            };
-
-        return {
-          type: 'mysql',
+        const dbConfig = {
+          type: 'mysql' as const,
           host: config.get<string>('DB_HOST'),
           port: Number(config.get<string>('DB_PORT')),
           username: config.get<string>('DB_USER'),
@@ -36,13 +24,34 @@ import { UserModule } from './modules/user/user.module';
           database: config.get<string>('DB_NAME'),
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: false,
-          ssl: true,
-          extra,
+          logging: true, // Bật logging để debug
+          // Cấu hình timezone
+          timezone: '+07:00', // GMT+7 (Vietnam timezone)
+          // Cấu hình SSL để tắt hoàn toàn
+          extra: {
+            ssl: false,
+            // Connection options hợp lệ cho MySQL2
+            connectionLimit: 10,
+            // Thêm timezone cho MySQL2
+            timezone: '+07:00'
+          },
         };
+        
+        console.log('Database config:', {
+          host: dbConfig.host,
+          port: dbConfig.port,
+          database: dbConfig.database,
+          username: dbConfig.username,
+          timezone: dbConfig.timezone,
+          extra_ssl: dbConfig.extra.ssl
+        });
+        
+        return dbConfig;
       },
     }),
 
     UserModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
