@@ -167,6 +167,14 @@ loginButtonText: {
   fontWeight: 'bold',
   fontSize: 16,
 },
+
+touchAble:{
+  width: '100%',
+  height: 'auto',
+  justifyContent: 'center',
+  alignItems: 'center',
+
+},
 dividerContainer: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -202,4 +210,90 @@ otp: {
     flex : 1
   },
 
+  appNameRegister: {
+    fontSize: 38,
+    fontWeight: "700",
+    fontFamily: "JetBrainsMono-Medium",
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+
+  otpViewTouch:{
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '83%'
+  },
+  touchResend: {
+    width: '40%',
+    height: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    backgroundColor: COLORS.primary
+  },
+
+  touchValidate: {
+    width: '55%',
+    height: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    backgroundColor: COLORS.primary
+  },
+
+  otpButton: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },  
+  resendButton: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+    touchNoResend: {
+    width: '40%',
+    height: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.grey,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    backgroundColor: COLORS.grey
+  },
 });
