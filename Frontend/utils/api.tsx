@@ -1,6 +1,6 @@
-import axios from 'axios'
+import axios from 'axios';
 
-const API_DOMAIN = "http://localhost:8090/"
+const API_DOMAIN = process.env.API || 'http://10.0.2.2:8090/'
 const config = {
     headers: {
         Accept: "application/json",
@@ -22,13 +22,19 @@ export const get = async (path: String) => {
     }
 }
 
-export const post = async (path: String, data: object) => {
-    try {
-        const res = await axios.post(API_DOMAIN + path, data, config);
-        return res;
-    } catch (e) {
-        return ; 
+export const post = async (path: string, data: object) => {
+  try {
+    const res = await axios.post(API_DOMAIN + path, data, config);
+    return res.data; 
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      console.log('API Error:', error.response?.data || error.message);
+      return error.response?.data; 
+    } else {
+      console.error('Unknown error:', error);
+      throw error;
     }
+  }
 };
 
 

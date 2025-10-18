@@ -1,29 +1,60 @@
-import { View, Text } from 'react-native'
+import { View, Text, ActivityIndicator } from 'react-native'
 import React from 'react'
 import { styles } from '@/styles/auth.styles'
 import { TextInput } from 'react-native'
 import { COLORS } from '@/constants/themes'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'expo-router'
 import { TouchableOpacity, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { loginUSer } from '@/service/auth'
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { checkAsyncStorage } from '@/utils/checkAsyncStorage'
 
 export default function login() {
   const [isFocused, setIsFocused] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const route = useRouter()
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin!');
       return;
     }
+    setLoading(true)
+    try {
+      const data = { email, password };
 
-    Alert.alert('Thông tin đăng nhập', `Email: ${email}\nPassword: ${password}`)
-    route.push('/(auth)/verify')
+      const res = await loginUSer(data);
+      let message = res?.message;
+      if (res.statusCode) {
+        if (Array.isArray(message)) {
+          message = message.join('\n'); // Ghép mảng lại thành 1 chuỗi
+        }
+
+        Alert.alert('Lỗi', message);
+        return;
+      }
+
+      const access = res.access_token
+      const refresh = res.refresh_token
+      
+      await AsyncStorage.setItem('access_token', access as any)
+      await AsyncStorage.setItem('refresh_token', refresh as any)
+      const key = await AsyncStorage.getAllKeys()
+      console.log(key)
+      route.push('../(home)');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Lỗi', 'Đăng nhập thất bại, vui lòng thử lại sau.');
+    } finally{
+      setLoading(false)
+    }
   };
+
 
   return (
     <View style={styles.container}>
@@ -71,8 +102,12 @@ export default function login() {
             </Link>
         </View >
         <View style={styles.loginButton}>
-            <TouchableOpacity  onPress={handleLogin}>
-                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            <TouchableOpacity  style={styles.touchAble} onPress={handleLogin}>
+              {loading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : 
+                          (<Text style={styles.loginButtonText}>Đăng nhập</Text>)
+              }
             </TouchableOpacity>
         </View>
 
