@@ -5,6 +5,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { DishModule } from './modules/dish/dish.module';
+import { RecipeModule } from './modules/recipe/recipe.module';
+import { MenuModule } from './modules/menu/menu.module';
+import { IngredientModule } from './modules/ingredient/ingredient.module';
 
 @Module({
   imports: [
@@ -52,6 +56,10 @@ import { AuthModule } from './modules/auth/auth.module';
 
     UserModule,
     AuthModule,
+    DishModule,
+    RecipeModule,
+    MenuModule,
+    IngredientModule,
   ],
   controllers: [AppController],
   providers: [AppService],

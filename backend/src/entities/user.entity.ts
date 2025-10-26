@@ -8,6 +8,9 @@ import {
 import { Exclude } from 'class-transformer';
 import { Family } from './family.entity';
 import { FamilyMember } from './family-member.entity';
+import { Recipe } from './recipe.entity';
+import { ShoppingList } from './shopping-list.entity';
+import { FamilyNote } from './family-note.entity';
 
 @Entity('users')
 export class User {
@@ -55,4 +58,13 @@ export class User {
 
   @OneToMany(() => FamilyMember, (familyMember) => familyMember.user)
   familyMemberships: FamilyMember[];
+
+  @OneToMany(() => Recipe, (recipe) => recipe.owner)
+  recipes: Recipe[];
+
+  @OneToMany(() => ShoppingList, (shoppingList) => shoppingList.owner)
+  shoppingLists: ShoppingList[];
+
+  @OneToMany(() => FamilyNote, (familyNote) => familyNote.owner)
+  familyNotes: FamilyNote[];
 }
