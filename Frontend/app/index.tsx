@@ -9,33 +9,34 @@ export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   console.log('app/index')
 
-  useEffect( () => {
+  // useEffect( () => {
     
-    const checkLogin = async () => {
-      try {
-        await AsyncStorage.removeItem('access_token')
-        await AsyncStorage.removeItem('refresh_token')
-        const key = await AsyncStorage.getItem('access_token')
-        console.log(key)
-        const token = await checkAsyncStorage();
-        setIsLoggedIn(token);
-      } catch (e) {
-        console.error('Lỗi kiểm tra token:', e);
-      } finally {
-        setIsReady(true);
-      }
-    };
-    checkLogin();
-  }, []);
+  //   const checkLogin = async () => {
+  //     try {
+  //       await AsyncStorage.removeItem('access_token')
+  //       await AsyncStorage.removeItem('refresh_token')
+  //       const key = await AsyncStorage.getItem('access_token')
+  //       console.log(key)
+  //       const token = await checkAsyncStorage();
+  //       setIsLoggedIn(token);
+  //     } catch (e) {
+  //       console.error('Lỗi kiểm tra token:', e);
+  //     } finally {
+  //       setIsReady(true);
+  //     }
+  //   };
+  //   checkLogin();
+  // }, []);
 
-  if (!isReady) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  // if (!isReady) {
+  //   return (
+  //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+  //       <ActivityIndicator size="large" />
+  //     </View>
+  //   );
+  // }
 
     
-  return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
+  // return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
+  return <Redirect  href={'/(home)'} />;
 }
