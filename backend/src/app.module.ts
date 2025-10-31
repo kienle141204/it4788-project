@@ -5,6 +5,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { FamilyModule } from './modules/family/family.module';
+import { MemberModule } from './modules/member/member.module';
+import { ShoppingListModule } from './modules/shopping-list/shopping-list.module';
+import { ShoppingItemModule } from './modules/shopping-item/shopping-item.module';
 
 @Module({
   imports: [
@@ -33,27 +37,29 @@ import { AuthModule } from './modules/auth/auth.module';
             // Connection options hợp lệ cho MySQL2
             connectionLimit: 10,
             // Thêm timezone cho MySQL2
-            timezone: '+07:00'
+            timezone: '+07:00',
           },
         };
-        
         console.log('Database config:', {
           host: dbConfig.host,
           port: dbConfig.port,
           database: dbConfig.database,
           username: dbConfig.username,
           timezone: dbConfig.timezone,
-          extra_ssl: dbConfig.extra.ssl
+          extra_ssl: dbConfig.extra.ssl,
         });
-        
         return dbConfig;
       },
     }),
 
     UserModule,
     AuthModule,
+    FamilyModule,
+    MemberModule,
+    ShoppingListModule,
+    ShoppingItemModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

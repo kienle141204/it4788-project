@@ -15,14 +15,12 @@ import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
-import { CreateFamilyDto } from '../dto/create-family.dto';
-import { JoinFamilyDto } from '../dto/join-family.dto';
 import { RegisterUserInfoDto } from '../dto/registerUserInfor.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * API đăng ký tạm thời và gửi OTP
@@ -74,43 +72,6 @@ export class AuthController {
     const { password_hash, refresh_token, ...userWithoutPassword } = req.user;
     return userWithoutPassword;
   }
-
-  /**
-   * API tạo gia đình mới
-   */
-  @UseGuards(JwtAuthGuard)
-  @Post('family/create')
-  async createFamily(@Body(ValidationPipe) createFamilyDto: CreateFamilyDto, @Request() req) {
-    return await this.authService.createFamily(createFamilyDto, req.user.id);
-  }
-
-  /**
-   * API tham gia gia đình
-   */
-  @UseGuards(JwtAuthGuard)
-  @Post('family/join')
-  async joinFamily(@Body(ValidationPipe) joinFamilyDto: JoinFamilyDto, @Request() req) {
-    return await this.authService.joinFamily(joinFamilyDto, req.user.id);
-  }
-
-  /**
-   * API lấy danh sách gia đình của user
-   */
-  @UseGuards(JwtAuthGuard)
-  @Get('family/my-families')
-  async getMyFamilies(@Request() req) {
-    return await this.authService.getUserFamilies(req.user.id);
-  }
-
-  /**
-   * API lấy thông tin gia đình theo ID
-   */
-  @UseGuards(JwtAuthGuard)
-  @Get('family/:id')
-  async getFamilyById(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return await this.authService.getFamilyById(id, req.user.id);
-  }
-
 
   /**
    * API làm mới access token
