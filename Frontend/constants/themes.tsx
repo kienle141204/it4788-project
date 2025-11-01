@@ -14,5 +14,6 @@ export const COLORS = {
   lightPurple: '#A78BFA',
   lightBlue: '#E0F2FE',
   darkGrey: '#374151',
-  lightGrey: '#F3F4F6'
+  lightGrey: '#F3F4F6',
+  shadow: 'rgba(0,0,0,0.4)'
 } as const;

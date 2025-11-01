@@ -54,7 +54,7 @@ export default function Verify() {
       await AsyncStorage.setItem('refresh_key', refresh as any)
       const key = await AsyncStorage.getAllKeys()
       console.log(key)
-      route.replace('../(home)');
+      route.push('/(auth)/updata_profile')
 
     } catch (e) {
       throw e
