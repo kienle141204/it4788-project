@@ -6,8 +6,6 @@ import {
   UseGuards,
   Get,
   Request,
-  Param,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { RegisterTempDto } from '../dto/register-temp.dto';

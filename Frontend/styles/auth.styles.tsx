@@ -126,6 +126,7 @@ labelText: {
 inputContainer: {
   width: '95%',
   paddingHorizontal: 24,
+
 },
 input: {
     marginTop: 10,
@@ -167,6 +168,14 @@ loginButtonText: {
   fontWeight: 'bold',
   fontSize: 16,
 },
+
+touchAble:{
+  width: '100%',
+  height: 'auto',
+  justifyContent: 'center',
+  alignItems: 'center',
+
+},
 dividerContainer: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -202,4 +211,215 @@ otp: {
     flex : 1
   },
 
+  appNameRegister: {
+    fontSize: 38,
+    fontWeight: "700",
+    fontFamily: "JetBrainsMono-Medium",
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+
+  otpViewTouch:{
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '83%',
+    marginTop: 20
+  },
+  touchResend: {
+    width: '40%',
+    height: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    backgroundColor: COLORS.primary
+  },
+
+  touchValidate: {
+    width: '55%',
+    height: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    backgroundColor: COLORS.primary
+  },
+
+  otpButton: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },  
+  resendButton: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+    touchNoResend: {
+    width: '40%',
+    height: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.grey,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    backgroundColor: COLORS.grey
+  },
+
+
+
+  // _________________________________
+   header: {
+    textAlign: "center",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+    color: COLORS.primary
+  },
+  avatarContainer: {
+    alignSelf: "center",
+    position: "relative",
+  },
+  avatar: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  cameraButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 10,
+    backgroundColor: COLORS.orange,
+    borderRadius: 15,
+    padding: 5,
+  },
+  name: {
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor:COLORS.shadow,
+  },
+  modalContainer: {
+    backgroundColor:COLORS.white,
+    borderRadius: 20,
+    padding: 20,
+    width: 300,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  modalOptions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+  },
+  option: {
+    alignItems: "center",
+  },
+  optionText: {
+    marginTop: 5,
+    color: COLORS.surface,
+  },
+
+
+  skip: {
+    width: '40%',
+    height: 'auto',
+    // justifyContent: 'center',
+    // alignItems: 'center',
+    // borderWidth: 1,
+    // borderColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+
+  },
+  skipText: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  inputWrapper: {
+  flexDirection: "row",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: COLORS.primary,
+  borderRadius: 12,
+  paddingHorizontal: 10,
+  marginVertical: 5,
+  backgroundColor: COLORS.white,
+},
+inputIcon: {
+  marginRight: 6,
+},
+inputInner: {
+  flex: 1,
+  paddingVertical: 10,
+  fontSize: 16,
+  color: COLORS.primary,
+},
+searchSection: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+},
+searchIcon: {
+    padding: 10,
+},
+
+inputs: {
+    flex: 1,
+    paddingTop: 10,
+    paddingRight: 10,
+    paddingBottom: 10,
+    paddingLeft: 0,
+    backgroundColor: '#fff',
+    color: '#424242',
+},
 });

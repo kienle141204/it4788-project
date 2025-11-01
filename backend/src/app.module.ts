@@ -9,6 +9,10 @@ import { FamilyModule } from './modules/family/family.module';
 import { MemberModule } from './modules/member/member.module';
 import { ShoppingListModule } from './modules/shopping-list/shopping-list.module';
 import { ShoppingItemModule } from './modules/shopping-item/shopping-item.module';
+import { DishModule } from './modules/dish/dish.module';
+import { RecipeModule } from './modules/recipe/recipe.module';
+import { MenuModule } from './modules/menu/menu.module';
+import { IngredientModule } from './modules/ingredient/ingredient.module';
 
 @Module({
   imports: [
@@ -58,6 +62,10 @@ import { ShoppingItemModule } from './modules/shopping-item/shopping-item.module
     MemberModule,
     ShoppingListModule,
     ShoppingItemModule,
+    DishModule,
+    RecipeModule,
+    MenuModule,
+    IngredientModule,
   ],
   controllers: [AppController],
   providers: [AppService],

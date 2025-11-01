@@ -11,8 +11,6 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../../entities/user.entity';
 import { TempUser } from '../../../entities/temp-user.entity';
-import { Family } from '../../../entities/family.entity';
-import { FamilyMember } from '../../../entities/family-member.entity';
 import { RegisterTempDto } from '../dto/register-temp.dto';
 import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
@@ -38,10 +36,6 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(TempUser)
     private tempUserRepository: Repository<TempUser>,
-    // @InjectRepository(Family)
-    // private familyRepository: Repository<Family>,
-    // @InjectRepository(FamilyMember)
-    // private familyMemberRepository: Repository<FamilyMember>,
     private jwtService: JwtService,
     private emailService: EmailService,
   ) { }
@@ -75,7 +69,7 @@ export class AuthService {
       password_hash: hashedPassword,
       otp_code: otpCode,
       status: 'PENDING',
-      tp_sent_at: vietnamTime, // Sử dụng Vietnam time
+      otp_sent_at: vietnamTime, // Sử dụng Vietnam time
     });
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
@@ -83,8 +77,8 @@ export class AuthService {
     console.log('OTP Created:', {
       email: savedTempUser.email,
       otpCode: savedTempUser.otp_code,
-      tpSentAt: savedTempUser.tp_sent_at,
-      tpSentAtLocal: new Date(savedTempUser.tp_sent_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
+      tpSentAt: savedTempUser.otp_sent_at,
+      tpSentAtLocal: new Date(savedTempUser.otp_sent_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
       status: savedTempUser.status
     });
 
@@ -118,7 +112,7 @@ export class AuthService {
 
     // Kiểm tra OTP có hết hạn không (3 phút)
     const currentTime = new Date(); // Sử dụng thời gian hiện tại
-    const otpSentTime = new Date(tempUser.tp_sent_at);
+    const otpSentTime = new Date(tempUser.otp_sent_at);
     const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000);
 
     console.log('OTP Debug Info:', {
@@ -153,7 +147,7 @@ export class AuthService {
 
     // Tạo access token (hết hạn sau 15 phút)
     const accessPayload = { sub: savedUser.id, email: savedUser.email, type: 'access' };
-    const access_token = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
+    const access_token = this.jwtService.sign(accessPayload, { expiresIn: '3d' });
 
     // Tạo refresh token (hết hạn sau 7 ngày)
     const refreshPayload = { sub: savedUser.id, email: savedUser.email, type: 'refresh' };
@@ -195,7 +189,7 @@ export class AuthService {
     const newSentTime = this.getVietnamTime();
     await this.tempUserRepository.update(tempUser.temp_user_id, {
       otp_code: newOtpCode,
-      tp_sent_at: newSentTime,
+      otp_sent_at: newSentTime,
     });
 
     console.log('OTP Resent:', {

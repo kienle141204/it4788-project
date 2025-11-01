@@ -4,16 +4,31 @@ import { styles } from '@/styles/auth.styles'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import {COLORS} from '@/constants/themes'
-import { Redirect } from 'expo-router'
 import { useRouter } from 'expo-router'
+import { useEffect } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { checkAsyncStorage } from '@/utils/checkAsyncStorage'
 
 export default function login() {
     const route = useRouter()
-
+    console.log('📍 Đang ở AUTH');
     const nextPage = () => {
         route.push('/(auth)/login')
     }
-
+    // Tạm thời cmt để code login 
+    useEffect(() => {
+      const checkToken = async () => {
+        const key = await AsyncStorage.getItem('access_token')
+        console.log(key)
+        const token = await checkAsyncStorage();
+        console.log(token)
+        if (token) {
+          route.replace('/(home)');
+        }
+      };
+      checkToken();
+    }, []);
+    
 
   return (
     <>

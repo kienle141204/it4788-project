@@ -9,6 +9,9 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { FamilyMember } from './family-member.entity';
+import { Menu } from './menu.entity';
+import { ShoppingList } from './shopping-list.entity';
+import { FamilyNote } from './family-note.entity';
 
 @Entity('families')
 export class Family {
@@ -24,13 +27,20 @@ export class Family {
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
-  // Quan hệ với User (chủ sở hữu)
   @ManyToOne(() => User, (user) => user.ownedFamilies)
   @JoinColumn({ name: 'owner_id' })
   owner: User;
 
-  // Quan hệ với FamilyMember (các thành viên trong gia đình)
   @OneToMany(() => FamilyMember, (familyMember) => familyMember.family)
   members: FamilyMember[];
+
+  @OneToMany(() => Menu, (menu) => menu.family)
+  menus: Menu[];
+
+  @OneToMany(() => ShoppingList, (shoppingList) => shoppingList.family)
+  shoppingLists: ShoppingList[];
+
+  @OneToMany(() => FamilyNote, (familyNote) => familyNote.family)
+  notes: FamilyNote[];
 }
 
