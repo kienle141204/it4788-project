@@ -18,7 +18,7 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * API đăng ký tạm thời và gửi OTP
