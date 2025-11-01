@@ -32,8 +32,8 @@ export class TempUser {
   })
   status: string;
 
-  @CreateDateColumn({ name: 'tp_sent_at' })
-  tp_sent_at: Date;
+  @CreateDateColumn({ name: 'otp_sent_at' })
+  otp_sent_at: Date;
 
 }
 

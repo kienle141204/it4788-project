@@ -33,12 +33,10 @@ export class FamilyMember {
   @CreateDateColumn({ name: 'joined_at' })
   joined_at: Date;
 
-  // Quan hệ với Family
   @ManyToOne(() => Family, (family) => family.members)
   @JoinColumn({ name: 'family_id' })
   family: Family;
 
-  // Quan hệ với User
   @ManyToOne(() => User, (user) => user.familyMemberships)
   @JoinColumn({ name: 'user_id' })
   user: User;
