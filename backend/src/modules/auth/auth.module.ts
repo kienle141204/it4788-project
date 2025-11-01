@@ -9,12 +9,10 @@ import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './services/auth.service';
 import { EmailService } from './services/email.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { FamilyModule } from '../family/family.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, TempUser]),
-    FamilyModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

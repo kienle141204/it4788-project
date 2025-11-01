@@ -16,10 +16,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../../common/decorators/user.decorator';
 import type { JwtUser } from '../../common/types/user.type';
-enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
-}
+
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) { }
@@ -34,7 +31,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get()
   async getAllUsers(@User() user: JwtUser) {
-    if (user.role !== UserRole.ADMIN) {
+    if (user.role !== "admin") {
       throw new ForbiddenException('Only admin can view all users');
     }
     return this.userService.getAllUsers();
@@ -44,7 +41,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   async getUser(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
-    if (user.role !== UserRole.ADMIN && user.id !== id) {
+    if (user.role !== "admin" && user.id !== id) {
       throw new ForbiddenException('You can only view your own account');
     }
     return this.userService.getUserById(id);
@@ -58,7 +55,7 @@ export class UserController {
     @Body() dto: UpdateUserDto,
     @User() user: JwtUser,
   ) {
-    if (user.role !== UserRole.ADMIN && user.id !== id) {
+    if (user.role !== "admin" && user.id !== id) {
       throw new ForbiddenException('You can only update your own account');
     }
     return await this.userService.updateUser(id, dto);
@@ -71,7 +68,7 @@ export class UserController {
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,
   ) {
-    if (user.role !== UserRole.ADMIN && user.id !== id) {
+    if (user.role !== "admin" && user.id !== id) {
       throw new ForbiddenException('You can only delete your own account');
     }
 

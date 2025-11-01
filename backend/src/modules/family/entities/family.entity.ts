@@ -3,10 +3,9 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  OneToMany,
 } from 'typeorm';
 
-@Entity('family')
+@Entity('families')
 export class Family {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
