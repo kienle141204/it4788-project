@@ -14,7 +14,7 @@ export class FamilyService {
     @InjectRepository(Family)
     private readonly familyRepository: Repository<Family>,
     private readonly memberService: MemberService,
-  ) {}
+  ) { }
 
   private async findFamilyOrFail(id: number) {
     const family = await this.familyRepository.findOne({
@@ -31,10 +31,15 @@ export class FamilyService {
     }
   }
 
-  async createFamily(name: string, ownerId: number): Promise<Family> {
+  async createFamily(name: string, ownerId: number, user): Promise<Family> {
     const family = this.familyRepository.create({ name, owner_id: ownerId });
     const saved = await this.familyRepository.save(family);
-    await this.memberService.addMember(saved.id, ownerId, 'manager');
+    await this.memberService.addMember(
+      { family_id: saved.id, user_id: ownerId, role: 'manager' },
+      ownerId,
+      user.role,
+    );
+
     return saved;
   }
 

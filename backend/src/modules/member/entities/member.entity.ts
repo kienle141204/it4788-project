@@ -3,11 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Unique,
 } from 'typeorm';
-import { Family } from '../family/family.entity';
 
 @Entity('family_members')
 @Unique(['family_id', 'user_id'])
@@ -16,10 +13,10 @@ export class Member {
   id: number;
 
   @Column({ type: 'bigint' })
-  family_id: number;
+  family_id: number; // chỉ lưu FK, không import Family entity
 
   @Column({ type: 'bigint' })
-  user_id: number;
+  user_id: number; // chỉ lưu FK, không import User entity
 
   @Column({
     type: 'enum',
@@ -30,9 +27,4 @@ export class Member {
 
   @CreateDateColumn({ type: 'timestamp' })
   joined_at: Date;
-
-  // Quan hệ (optional, để join dữ liệu)
-  @ManyToOne(() => Family, (family) => family.id, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'family_id' })
-  family: Family;
 }

@@ -6,9 +6,12 @@ import { FamilyController } from './family.controller';
 import { MemberModule } from '../member/member.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Family]), MemberModule],
+  imports: [
+    TypeOrmModule.forFeature([Family]),
+    MemberModule,
+  ],
   controllers: [FamilyController],
   providers: [FamilyService],
-  exports: [FamilyService],
+  exports: [TypeOrmModule],
 })
-export class FamilyModule {}
+export class FamilyModule { }

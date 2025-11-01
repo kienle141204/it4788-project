@@ -1,57 +1,52 @@
 import {
   Controller,
-  Get,
   Post,
+  Body,
+  Param,
+  ParseIntPipe,
   Put,
   Delete,
-  Param,
-  Body,
-  ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { MemberService } from './member.service';
+import { MemberService, UserRole, FamilyMemberRole } from './member.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
-
-type AuthUser = {
-  id: number;
-  role: string;
-};
+import { User } from '../../common/decorators/user.decorator';
+import type { JwtUser } from '../../common/types/user.type';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('members')
-@UseGuards(JwtAuthGuard) // All endpoints require auth
+@UseGuards(JwtAuthGuard)
 export class MemberController {
-  constructor(private readonly memberService: MemberService) {}
+  constructor(private readonly memberService: MemberService) { }
 
+  /** ➕ Add member */
   @Post()
-  async addMember(@Body() dto: AddMemberDto, user: AuthUser) {
-    return this.memberService.addMember(dto, user);
+  async addMember(@Body() dto: AddMemberDto, @User() user: JwtUser) {
+    return this.memberService.addMember(dto, user.id, user.role as UserRole);
   }
 
-  @Get('family/:family_id')
-  async getMembersByFamily(
-    @Param('family_id', ParseIntPipe) family_id: number,
-  ) {
-    return this.memberService.getMembersByFamily(family_id);
-  }
-
-  @Get(':id')
-  async getMember(@Param('id', ParseIntPipe) id: number) {
-    return this.memberService.getMember(id);
-  }
-
+  /** ✏️ Update member role */
   @Put(':id')
   async updateRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMemberRoleDto,
-    user: AuthUser,
+    @User() user: JwtUser,
   ) {
-    return this.memberService.updateMemberRole(id, dto.role, user);
+    return this.memberService.updateMemberRole(
+      id,
+      dto.role as FamilyMemberRole,
+      user.id,
+      user.role as UserRole,
+    );
   }
 
+  /** ❌ Remove member */
   @Delete(':id')
-  async removeMember(@Param('id', ParseIntPipe) id: number, user: AuthUser) {
-    return this.memberService.removeMember(id, user);
+  async removeMember(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    return this.memberService.removeMember(id, user.id, user.role as UserRole);
   }
 }

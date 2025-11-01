@@ -7,30 +7,45 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Member } from './entities/member.entity';
-import { FamilyService } from '../family/family.service';
+import { Family } from '../family/entities/family.entity';
 import { AddMemberDto } from './dto/add-member.dto';
 
-type AuthUser = {
-  id: number;
-  role: string;
-};
+export enum UserRole {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
+export enum FamilyMemberRole {
+  MEMBER = 'member',
+  MANAGER = 'manager',
+}
 
 @Injectable()
 export class MemberService {
   constructor(
     @InjectRepository(Member)
     private readonly memberRepository: Repository<Member>,
-    private readonly familyService: FamilyService,
-  ) {}
 
-  async addMember(dto: AddMemberDto, user: AuthUser): Promise<Member> {
+    @InjectRepository(Family)
+    private readonly familyRepository: Repository<Family>,
+  ) { }
+
+  /** ➕ Add member */
+  async addMember(
+    dto: AddMemberDto,
+    userId: number,
+    userRole: UserRole,
+  ): Promise<Member> {
     const { family_id, user_id, role } = dto;
 
-    const family = await this.familyService.getFamilyById(family_id);
+    const family = await this.familyRepository.findOne({
+      where: { id: family_id },
+    });
+    if (!family) throw new NotFoundException(`Family ${family_id} not found`);
 
-    // Admin OR family owner can add members
-    if (family.owner_id !== user.id && user.role !== 'admin') {
-      throw new ForbiddenException('Not allowed to add members in this family');
+    // ✅ Only family owner or admin can add members
+    if (family.owner_id !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You cannot add members to this family');
     }
 
     const exists = await this.memberRepository.findOne({
@@ -38,42 +53,64 @@ export class MemberService {
     });
     if (exists) throw new BadRequestException('User already in family');
 
-    const member = this.memberRepository.create({ family_id, user_id, role });
+    const member = this.memberRepository.create({
+      family_id,
+      user_id,
+      role,
+    });
+
     return this.memberRepository.save(member);
   }
 
+  /** 👀 Get all members in a family */
   async getMembersByFamily(family_id: number) {
     return this.memberRepository.find({ where: { family_id } });
   }
 
+  /** 👤 Get one member */
   async getMember(id: number) {
     const member = await this.memberRepository.findOne({ where: { id } });
     if (!member) throw new NotFoundException(`Member ${id} not found`);
     return member;
   }
 
+  /** ✏️ Update member role */
   async updateMemberRole(
     id: number,
-    role: 'member' | 'manager',
-    user: AuthUser,
+    role: FamilyMemberRole,
+    userId: number,
+    userRole: UserRole,
   ) {
     const member = await this.getMember(id);
-    const family = await this.familyService.getFamilyById(member.family_id);
 
-    if (family.owner_id !== user.id && user.role !== 'admin') {
-      throw new ForbiddenException('Not allowed to update member roles');
+    const family = await this.familyRepository.findOne({
+      where: { id: member.family_id },
+    });
+    if (!family) throw new NotFoundException('Family not found');
+
+    // ✅ Only family owner or admin can update
+    if (family.owner_id !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You cannot update roles in this family');
     }
 
     member.role = role;
     return this.memberRepository.save(member);
   }
 
-  async removeMember(id: number, user: AuthUser) {
+  /** ❌ Remove member */
+  async removeMember(id: number, userId: number, userRole: UserRole) {
     const member = await this.getMember(id);
-    const family = await this.familyService.getFamilyById(member.family_id);
 
-    if (family.owner_id !== user.id && user.role !== 'admin') {
-      throw new ForbiddenException('Not allowed to remove member');
+    const family = await this.familyRepository.findOne({
+      where: { id: member.family_id },
+    });
+    if (!family) throw new NotFoundException('Family not found');
+
+    // ✅ Only owner or admin
+    if (family.owner_id !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'You cannot remove members from this family',
+      );
     }
 
     await this.memberRepository.delete(id);

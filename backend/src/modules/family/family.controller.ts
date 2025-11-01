@@ -8,27 +8,25 @@ import {
   Body,
   ParseIntPipe,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FamilyService } from './family.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
+import { User } from '../../common/decorators/user.decorator';
+import type { JwtUser } from '../../common/types/user.type';
 
 @Controller('families')
+@UseGuards(JwtAuthGuard)
 export class FamilyController {
-  constructor(private readonly familyService: FamilyService) {}
+  constructor(private readonly familyService: FamilyService) { }
 
-  /** ✅ Create new family */
+  /** ✅ Create family */
   @Post()
-  @UseGuards(JwtAuthGuard)
-  async createFamily(@Body() dto: CreateFamilyDto, @Req() req) {
-    const userId = req.user.id;
-    const role = req.user.role;
+  async createFamily(@Body() dto: CreateFamilyDto, @User() user: JwtUser) {
+    const ownerId = user.role === 'admin' ? (dto.owner_id ?? user.id) : user.id;
 
-    const ownerId = role === 'admin' ? (dto.owner_id ?? userId) : userId;
-
-    return this.familyService.createFamily(dto.name, ownerId);
+    return this.familyService.createFamily(dto.name, ownerId, user);
   }
 
   /** 📄 Get all families */
@@ -45,20 +43,21 @@ export class FamilyController {
 
   /** ✏️ Update family */
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
   async updateFamily(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateFamilyDto,
-    @Req() req,
+    @User() user: JwtUser,
   ) {
-    return this.familyService.updateFamily(id, dto, req.user.id, req.user.role);
+    return this.familyService.updateFamily(id, dto, user.id, user.role);
   }
 
   /** 🗑️ Delete family */
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  async deleteFamily(@Param('id', ParseIntPipe) id: number, @Req() req) {
-    await this.familyService.deleteFamily(id, req.user.id, req.user.role);
+  async deleteFamily(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    await this.familyService.deleteFamily(id, user.id, user.role);
     return { message: `Family ${id} deleted successfully` };
   }
 }

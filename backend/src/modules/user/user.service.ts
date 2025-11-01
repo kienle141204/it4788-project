@@ -12,7 +12,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
@@ -20,7 +21,9 @@ export class UserService {
       where: [{ email: dto.email }, { phone: dto.phone }],
     });
 
-    if (exists) throw new BadRequestException('Email or phone already exists');
+    if (exists) {
+      throw new BadRequestException('Email or phone already exists');
+    }
 
     const user = this.userRepository.create(dto);
     return await this.userRepository.save(user);
@@ -44,7 +47,8 @@ export class UserService {
 
   async deleteUser(id: number): Promise<void> {
     const result = await this.userRepository.delete(id);
-    if (result.affected === 0)
+    if (!result.affected) {
       throw new NotFoundException(`User ${id} not found`);
+    }
   }
 }

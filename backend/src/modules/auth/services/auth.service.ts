@@ -18,14 +18,12 @@ import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
-import { CreateFamilyDto } from '../dto/create-family.dto';
-import { JoinFamilyDto } from '../dto/join-family.dto';
 import { RegisterUserInfoDto } from '../dto/registerUserInfor.dto';
 import { EmailService } from './email.service';
 
 @Injectable()
 export class AuthService {
-  
+
   /**
    * Chuyển đổi thời gian hiện tại thành Vietnam timezone
    */
@@ -40,13 +38,13 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(TempUser)
     private tempUserRepository: Repository<TempUser>,
-    @InjectRepository(Family)
-    private familyRepository: Repository<Family>,
-    @InjectRepository(FamilyMember)
-    private familyMemberRepository: Repository<FamilyMember>,
+    // @InjectRepository(Family)
+    // private familyRepository: Repository<Family>,
+    // @InjectRepository(FamilyMember)
+    // private familyMemberRepository: Repository<FamilyMember>,
     private jwtService: JwtService,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Đăng ký tạm thời và gửi OTP
@@ -81,7 +79,7 @@ export class AuthService {
     });
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
-    
+
     console.log('OTP Created:', {
       email: savedTempUser.email,
       otpCode: savedTempUser.otp_code,
@@ -105,8 +103,8 @@ export class AuthService {
     const { email, otp_code } = verifyOtpDto;
 
     // Tìm temp_user
-    const tempUser = await this.tempUserRepository.findOne({ 
-      where: { email, status: 'PENDING' } 
+    const tempUser = await this.tempUserRepository.findOne({
+      where: { email, status: 'PENDING' }
     });
 
     if (!tempUser) {
@@ -122,7 +120,7 @@ export class AuthService {
     const currentTime = new Date(); // Sử dụng thời gian hiện tại
     const otpSentTime = new Date(tempUser.tp_sent_at);
     const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000);
-    
+
     console.log('OTP Debug Info:', {
       currentTime: currentTime.toISOString(),
       currentTimeLocal: currentTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
@@ -133,7 +131,7 @@ export class AuthService {
       timeDiff: (currentTime.getTime() - otpSentTime.getTime()) / 1000 / 60, // phút
       isExpired: currentTime > otpExpiryTime
     });
-    
+
     if (currentTime > otpExpiryTime) {
       // Đánh dấu OTP hết hạn
       await this.tempUserRepository.update(tempUser.temp_user_id, { status: 'EXPIRED' });
@@ -182,8 +180,8 @@ export class AuthService {
     const { email } = resendOtpDto;
 
     // Tìm temp_user
-    const tempUser = await this.tempUserRepository.findOne({ 
-      where: { email, status: 'PENDING' } 
+    const tempUser = await this.tempUserRepository.findOne({
+      where: { email, status: 'PENDING' }
     });
 
     if (!tempUser) {
@@ -220,15 +218,15 @@ export class AuthService {
   /**
    * Đăng ký thêm thông tin người dùng
    */
-  async registerUserInfo(registerUserInfoDto: RegisterUserInfoDto, userId: number): Promise<{ 
-    message: string; 
-    user: Partial<User> 
+  async registerUserInfo(registerUserInfoDto: RegisterUserInfoDto, userId: number): Promise<{
+    message: string;
+    user: Partial<User>
   }> {
     const { fullname, avatar_url, address } = registerUserInfoDto;
 
     // Tìm user hiện tại
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    
+
     if (!user) {
       throw new NotFoundException('Không tìm thấy người dùng');
     }
@@ -256,10 +254,10 @@ export class AuthService {
   /**
    * Đăng nhập người dùng
    */
-  async login(loginDto: LoginDto): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
-    user: Partial<User> 
+  async login(loginDto: LoginDto): Promise<{
+    access_token: string;
+    refresh_token: string;
+    user: Partial<User>
   }> {
     const { email, password } = loginDto;
 
@@ -300,109 +298,6 @@ export class AuthService {
       user: userWithoutPassword,
     };
   }
-
-  /**
-   * Tạo gia đình mới
-   */
-  async createFamily(createFamilyDto: CreateFamilyDto, userId: number): Promise<{ message: string; family: Family }> {
-    const { name } = createFamilyDto;
-
-    // Tạo gia đình mới
-    const family = this.familyRepository.create({
-      name,
-      owner_id: userId,
-    });
-
-    const savedFamily = await this.familyRepository.save(family);
-
-    // Tự động thêm owner làm member với role manager
-    const familyMember = this.familyMemberRepository.create({
-      family_id: savedFamily.id,
-      user_id: userId,
-      role: 'manager',
-    });
-
-    await this.familyMemberRepository.save(familyMember);
-
-    return {
-      message: 'Tạo gia đình thành công',
-      family: savedFamily,
-    };
-  }
-
-  /**
-   * Tham gia gia đình
-   */
-  async joinFamily(joinFamilyDto: JoinFamilyDto, userId: number): Promise<{ message: string }> {
-    const { family_id } = joinFamilyDto;
-
-    // Kiểm tra gia đình có tồn tại không
-    const family = await this.familyRepository.findOne({ where: { id: family_id } });
-    if (!family) {
-      throw new NotFoundException('Không tìm thấy gia đình');
-    }
-
-    // Kiểm tra user đã là member chưa
-    const existingMember = await this.familyMemberRepository.findOne({
-      where: { family_id, user_id: userId },
-    });
-
-    if (existingMember) {
-      throw new ConflictException('Bạn đã là thành viên của gia đình này');
-    }
-
-    // Thêm user vào gia đình với role member
-    const familyMember = this.familyMemberRepository.create({
-      family_id,
-      user_id: userId,
-      role: 'member',
-    });
-
-    await this.familyMemberRepository.save(familyMember);
-
-    return {
-      message: 'Tham gia gia đình thành công',
-    };
-  }
-
-  /**
-   * Lấy danh sách gia đình của user
-   */
-  async getUserFamilies(userId: number): Promise<Family[]> {
-    const families = await this.familyRepository
-      .createQueryBuilder('family')
-      .leftJoinAndSelect('family.members', 'member')
-      .leftJoinAndSelect('member.user', 'user')
-      .where('family.owner_id = :userId', { userId })
-      .orWhere('member.user_id = :userId', { userId })
-      .getMany();
-
-    return families;
-  }
-
-  /**
-   * Lấy thông tin gia đình theo ID
-   */
-  async getFamilyById(familyId: number, userId: number): Promise<Family> {
-    const family = await this.familyRepository
-      .createQueryBuilder('family')
-      .leftJoinAndSelect('family.members', 'member')
-      .leftJoinAndSelect('member.user', 'user')
-      .leftJoinAndSelect('family.owner', 'owner')
-      .where('family.id = :familyId', { familyId })
-      .andWhere(
-        '(family.owner_id = :userId OR member.user_id = :userId)',
-        { userId }
-      )
-      .getOne();
-
-    if (!family) {
-      throw new NotFoundException('Không tìm thấy gia đình hoặc bạn không có quyền truy cập');
-    }
-
-    return family;
-  }
-
   /**
    * Lấy thông tin người dùng từ JWT
    */
@@ -422,16 +317,16 @@ export class AuthService {
   /**
    * Làm mới access token
    */
-  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
+  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{
+    access_token: string;
+    refresh_token: string;
   }> {
     const { refresh_token } = refreshTokenDto;
 
     try {
       // Xác minh refresh token
       const payload = this.jwtService.verify(refresh_token);
-      
+
       if (payload.type !== 'refresh') {
         throw new UnauthorizedException('Token không hợp lệ');
       }
