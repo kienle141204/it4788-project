@@ -9,7 +9,7 @@ export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   console.log('app/index')
 
-  useEffect( () => {
+  // useEffect( () => {
     
     const checkLogin = async () => {
       try {
@@ -28,14 +28,15 @@ export default function Index() {
     checkLogin();
   }, []);
 
-  if (!isReady) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  // if (!isReady) {
+  //   return (
+  //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+  //       <ActivityIndicator size="large" />
+  //     </View>
+  //   );
+  // }
 
     
-  return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
+  // return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
+  return <Redirect  href={'/(home)'} />;
 }
