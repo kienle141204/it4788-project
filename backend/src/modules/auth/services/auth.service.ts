@@ -11,15 +11,11 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../../entities/user.entity';
 import { TempUser } from '../../../entities/temp-user.entity';
-import { Family } from '../../../entities/family.entity';
-import { FamilyMember } from '../../../entities/family-member.entity';
 import { RegisterTempDto } from '../dto/register-temp.dto';
 import { LoginDto } from '../dto/login.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
-import { CreateFamilyDto } from '../dto/create-family.dto';
-import { JoinFamilyDto } from '../dto/join-family.dto';
 import { RegisterUserInfoDto } from '../dto/registerUserInfor.dto';
 import { EmailService } from './email.service';
 
@@ -40,10 +36,6 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(TempUser)
     private tempUserRepository: Repository<TempUser>,
-    @InjectRepository(Family)
-    private familyRepository: Repository<Family>,
-    @InjectRepository(FamilyMember)
-    private familyMemberRepository: Repository<FamilyMember>,
     private jwtService: JwtService,
     private emailService: EmailService,
   ) {}
@@ -77,7 +69,7 @@ export class AuthService {
       password_hash: hashedPassword,
       otp_code: otpCode,
       status: 'PENDING',
-      tp_sent_at: vietnamTime, // Sử dụng Vietnam time
+      otp_sent_at: vietnamTime, // Sử dụng Vietnam time
     });
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
@@ -85,8 +77,8 @@ export class AuthService {
     console.log('OTP Created:', {
       email: savedTempUser.email,
       otpCode: savedTempUser.otp_code,
-      tpSentAt: savedTempUser.tp_sent_at,
-      tpSentAtLocal: new Date(savedTempUser.tp_sent_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
+      tpSentAt: savedTempUser.otp_sent_at,
+      tpSentAtLocal: new Date(savedTempUser.otp_sent_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
       status: savedTempUser.status
     });
 
@@ -120,7 +112,7 @@ export class AuthService {
 
     // Kiểm tra OTP có hết hạn không (3 phút)
     const currentTime = new Date(); // Sử dụng thời gian hiện tại
-    const otpSentTime = new Date(tempUser.tp_sent_at);
+    const otpSentTime = new Date(tempUser.otp_sent_at);
     const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000);
     
     console.log('OTP Debug Info:', {
@@ -155,7 +147,7 @@ export class AuthService {
 
     // Tạo access token (hết hạn sau 15 phút)
     const accessPayload = { sub: savedUser.id, email: savedUser.email, type: 'access' };
-    const access_token = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
+    const access_token = this.jwtService.sign(accessPayload, { expiresIn: '3d' });
 
     // Tạo refresh token (hết hạn sau 7 ngày)
     const refreshPayload = { sub: savedUser.id, email: savedUser.email, type: 'refresh' };
@@ -197,7 +189,7 @@ export class AuthService {
     const newSentTime = this.getVietnamTime();
     await this.tempUserRepository.update(tempUser.temp_user_id, {
       otp_code: newOtpCode,
-      tp_sent_at: newSentTime,
+      otp_sent_at: newSentTime,
     });
 
     console.log('OTP Resent:', {
@@ -299,108 +291,6 @@ export class AuthService {
       refresh_token,
       user: userWithoutPassword,
     };
-  }
-
-  /**
-   * Tạo gia đình mới
-   */
-  async createFamily(createFamilyDto: CreateFamilyDto, userId: number): Promise<{ message: string; family: Family }> {
-    const { name } = createFamilyDto;
-
-    // Tạo gia đình mới
-    const family = this.familyRepository.create({
-      name,
-      owner_id: userId,
-    });
-
-    const savedFamily = await this.familyRepository.save(family);
-
-    // Tự động thêm owner làm member với role manager
-    const familyMember = this.familyMemberRepository.create({
-      family_id: savedFamily.id,
-      user_id: userId,
-      role: 'manager',
-    });
-
-    await this.familyMemberRepository.save(familyMember);
-
-    return {
-      message: 'Tạo gia đình thành công',
-      family: savedFamily,
-    };
-  }
-
-  /**
-   * Tham gia gia đình
-   */
-  async joinFamily(joinFamilyDto: JoinFamilyDto, userId: number): Promise<{ message: string }> {
-    const { family_id } = joinFamilyDto;
-
-    // Kiểm tra gia đình có tồn tại không
-    const family = await this.familyRepository.findOne({ where: { id: family_id } });
-    if (!family) {
-      throw new NotFoundException('Không tìm thấy gia đình');
-    }
-
-    // Kiểm tra user đã là member chưa
-    const existingMember = await this.familyMemberRepository.findOne({
-      where: { family_id, user_id: userId },
-    });
-
-    if (existingMember) {
-      throw new ConflictException('Bạn đã là thành viên của gia đình này');
-    }
-
-    // Thêm user vào gia đình với role member
-    const familyMember = this.familyMemberRepository.create({
-      family_id,
-      user_id: userId,
-      role: 'member',
-    });
-
-    await this.familyMemberRepository.save(familyMember);
-
-    return {
-      message: 'Tham gia gia đình thành công',
-    };
-  }
-
-  /**
-   * Lấy danh sách gia đình của user
-   */
-  async getUserFamilies(userId: number): Promise<Family[]> {
-    const families = await this.familyRepository
-      .createQueryBuilder('family')
-      .leftJoinAndSelect('family.members', 'member')
-      .leftJoinAndSelect('member.user', 'user')
-      .where('family.owner_id = :userId', { userId })
-      .orWhere('member.user_id = :userId', { userId })
-      .getMany();
-
-    return families;
-  }
-
-  /**
-   * Lấy thông tin gia đình theo ID
-   */
-  async getFamilyById(familyId: number, userId: number): Promise<Family> {
-    const family = await this.familyRepository
-      .createQueryBuilder('family')
-      .leftJoinAndSelect('family.members', 'member')
-      .leftJoinAndSelect('member.user', 'user')
-      .leftJoinAndSelect('family.owner', 'owner')
-      .where('family.id = :familyId', { familyId })
-      .andWhere(
-        '(family.owner_id = :userId OR member.user_id = :userId)',
-        { userId }
-      )
-      .getOne();
-
-    if (!family) {
-      throw new NotFoundException('Không tìm thấy gia đình hoặc bạn không có quyền truy cập');
-    }
-
-    return family;
   }
 
   /**
