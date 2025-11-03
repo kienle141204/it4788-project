@@ -223,6 +223,23 @@ export class IngredientController {
   }
 
   /**
+   * Lấy danh sách nguyên liệu theo dish_id
+   * GET /api/ingredients/by-dish/:dishId
+   * Cần authentication
+   */
+  @Get('by-dish/:dishId')
+  @UseGuards(JwtAuthGuard)
+  async findByDishId(@Param('dishId', ParseIntPipe) dishId: number) {
+    const ingredients = await this.ingredientService.findIngredientsWithDetailsByDishId(dishId);
+    return {
+      success: true,
+      message: `Lấy danh sách nguyên liệu của món ăn ID ${dishId} thành công`,
+      data: ingredients,
+      total: ingredients.length,
+    };
+  }
+
+  /**
    * Lấy nguyên liệu theo ID (phải đặt cuối cùng để tránh conflict với các route khác)
    * GET /api/ingredients/:id
    */
