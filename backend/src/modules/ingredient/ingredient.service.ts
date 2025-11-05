@@ -362,13 +362,19 @@ export class IngredientService {
         ing => ing.name === dishIngredient.ingredient_name
       );
 
-      return {
+      // Chỉ trả về ingredient nếu tìm thấy
+      const resultItem: any = {
         id: dishIngredient.id,
         dish_id: dishIngredient.dish_id,
         ingredient_name: dishIngredient.ingredient_name,
         quantity: dishIngredient.quantity,
-        ingredient: matchedIngredient || null, // Thông tin chi tiết nếu tìm thấy
       };
+
+      if (matchedIngredient) {
+        resultItem.ingredient = matchedIngredient;
+      }
+
+      return resultItem;
     });
 
     return result;

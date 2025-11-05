@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { MemberService, UserRole, FamilyMemberRole } from './member.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
@@ -15,7 +16,9 @@ import { User } from '../../common/decorators/user.decorator';
 import type { JwtUser } from '../../common/types/user.type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+@ApiTags('Members')
 @Controller('members')
+@ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 export class MemberController {
   constructor(private readonly memberService: MemberService) { }

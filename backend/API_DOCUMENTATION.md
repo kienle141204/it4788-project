@@ -896,7 +896,61 @@ Tìm kiếm nguyên liệu theo danh mục.
   }
 }
 ```
+### GET /api/ingredients/by-dish/{dishId}
+Lấy nguyên liệu của 1 món ăn nào đó 
+ví dụ : http://localhost:8090/api/ingredients/by-dish/1
 
+response 
+
+{
+    "success": true,
+    "message": "Lấy danh sách nguyên liệu của món ăn ID 1 thành công",
+    "data": [
+        {
+            "id": 1,
+            "dish_id": "1",
+            "ingredient_name": "cá chim",
+            "quantity": "500 g"
+        },
+        {
+            "id": 2,
+            "dish_id": "1",
+            "ingredient_name": "Hỗn hợp mắm tỏi",
+            "quantity": null
+        },
+        {
+            "id": 3,
+            "dish_id": "1",
+            "ingredient_name": "tỏi",
+            "quantity": "1/2 củ"
+        },
+        {
+            "id": 4,
+            "dish_id": "1",
+            "ingredient_name": "ớt sừng xay nhuyễn",
+            "quantity": "1/2 quả"
+        },
+        {
+            "id": 5,
+            "dish_id": "1",
+            "ingredient_name": "mắm",
+            "quantity": "1,5 thìa canh"
+        },
+        {
+            "id": 6,
+            "dish_id": "1",
+            "ingredient_name": "đường",
+            "quantity": "1/2 thìa canh"
+        },
+        {
+            "id": 7,
+            "dish_id": "1",
+            "ingredient_name": "nước",
+            "quantity": "2 thìa canh"
+        }
+    ],
+    "total": 7
+}
 ---
 http://localhost:8090/api/ingredients/search
 
@@ -1292,9 +1346,11 @@ Xóa công thức.
 
 ## Menu APIs
 
-### GET /menus
+### GET api/menus
 
 Lấy danh sách menu.
+
+http://localhost:8090/api/menus
 
 **Authentication:** Cần (JWT Token)
 
@@ -1305,7 +1361,89 @@ Lấy danh sách menu.
 
 ---
 
-### POST /menus
+{
+    "success": true,
+    "message": "Lấy danh sách menu trang 1 thành công",
+    "data": [
+        {
+            "id": "1",
+            "family_id": "1",
+            "created_at": "2025-10-31T17:00:00.000Z",
+            "description": "Thực đơn cho ngày 01/11/2025",
+            "family": {
+                "id": "1",
+                "name": "gia đình văn hóa",
+                "owner_id": "1",
+                "created_at": "2025-11-03T09:28:07.000Z"
+            },
+            "menuDishes": [
+                {
+                    "id": "1",
+                    "menu_id": "1",
+                    "dish_id": "1",
+                    "stock": 1,
+                    "price": "100000.00",
+                    "created_at": "2025-11-03T09:29:04.000Z",
+                    "dish": {
+                        "id": "1",
+                        "name": "Cá chim chiên mắm tỏi",
+                        "description": "Thời gian nấu: 40 phút\nKhẩu phần: 4 người\n\nNguyên liệu:\n- 500 g cá chim\n- Hỗn hợp mắm tỏi:\n- 1/2 củ tỏi\n- 1/2 quả ớt sừng xay nhuyễn\n- 1,5 thìa canh mắm\n- 1/2 thìa canh đường\n- 2 thìa canh nước",
+                        "image_url": "https://img-global.cpcdn.com/steps/4788e2f27ea70815/160x128cq80/ca-chim-chien-m%E1%BA%AFm-t%E1%BB%8Fi-recipe-step-3-photo.jpg",
+                        "created_at": "2025-10-24T22:15:08.000Z"
+                    }
+                },
+                {
+                    "id": "2",
+                    "menu_id": "1",
+                    "dish_id": "2",
+                    "stock": 2,
+                    "price": "50000.00",
+                    "created_at": "2025-11-03T09:29:04.000Z",
+                    "dish": {
+                        "id": "2",
+                        "name": "Cá Linh Kho Nước Dừa",
+                        "description": "Thời gian nấu: 60 phút\nKhẩu phần: 4 người\n\nNguyên liệu:\n- 300 gam cá Linh\n- 1 trái dừa xiêm\n- 1 tbsp hành tím băm\n- 1 tbsp tỏi băm\n- 2 tbsp nước mắm\n- 1/4 tsp muối\n- 1/2 tsp tiêu\n- 1 tsp đường vàng\n- 1/2 trái ớt sừng băm\n- 2-3 trái ớt mỏ chim\n- 3 nhánh hành lá",
+                        "image_url": "https://img-global.cpcdn.com/steps/2ab5f45c03498712/160x128cq80/ca-linh-kho-n%C6%B0%E1%BB%9Bc-d%E1%BB%ABa-recipe-step-4-photo.jpg",
+                        "created_at": "2025-10-24T22:15:09.000Z"
+                    }
+                }
+            ]
+        }
+    ],
+    "pagination": {
+        "currentPage": 1,
+        "totalPages": 1,
+        "totalItems": 1,
+        "itemsPerPage": 10,
+        "hasNextPage": false,
+        "hasPrevPage": false
+    }
+}
+
+### POST api/menus
+
+http://localhost:8090/api/menus/1/dishes
+
+request
+{
+  "dish_id": 5,
+  "stock": 11,
+  "price":20000
+}
+
+response 
+{
+    "success": true,
+    "message": "Thêm món ăn vào menu thành công",
+    "data": {
+        "id": "3",
+        "menu_id": 1,
+        "dish_id": 5,
+        "stock": 11,
+        "price": 20000,
+        "created_at": "2025-11-03T09:40:28.000Z"
+    }
+}
 
 Tạo menu mới.
 
@@ -1324,11 +1462,38 @@ Tạo menu mới.
 
 ### GET /dishes/:dishId/reviews
 
+http://localhost:8090/api/dishes/1/reviews
+
 Lấy đánh giá món ăn.
 
 **Authentication:** Cần (JWT Token)
 
----
+{
+    "success": true,
+    "message": "Lấy danh sách đánh giá món ăn thành công",
+    "data": [
+        {
+            "id": "1",
+            "dish_id": "1",
+            "user_id": "1",
+            "rating": 5,
+            "comment": "Món ăn rất ngon!",
+            "created_at": "2025-11-03T09:13:54.000Z",
+            "user": {
+                "id": "1",
+                "email": "Quydang16012004@gmail.com",
+                "phone": "0936797592",
+                "password_hash": "$2b$12$U9iWvphqPBGpIGmo3JzEee91qHhPT.kX7/1ychWJlefHVYx5C6zT6",
+                "full_name": "Đặng Ngọc Quý",
+                "avatar_url": "https://www.jwt.io/",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJRdXlkYW5nMTYwMTIwMDRAZ21haWwuY29tIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE3NjIxODYzOTIsImV4cCI6MTc2Mjc5MTE5Mn0.qtMYJDG9_PT6IhyUL35fAl_sTlOKYUT2wUksQF2rA3c",
+                "created_at": "2025-10-09T09:29:30.000Z",
+                "role": "user",
+                "address": "174 Giải Phóng"
+            }
+        }
+    ]
+}
 
 ### GET /dishes/:dishId/reviews/stats
 
@@ -1358,7 +1523,7 @@ Lấy thống kê đánh giá.
 
 ### POST /dishes/:dishId/reviews
 
-Tạo đánh giá mới.
+Tạo đánh giá mới. http://localhost:8090/api/dishes/1/reviews
 
 **Authentication:** Cần
 
@@ -1368,24 +1533,24 @@ Tạo đánh giá mới.
   "rating": 5,
   "comment": "Món ăn rất ngon!"
 }
-```
 
----
+response 
+{
+    "success": true,
+    "message": "Tạo đánh giá thành công",
+    "data": {
+        "id": "1",
+        "dish_id": 1,
+        "user_id": "1",
+        "rating": 5,
+        "comment": "Món ăn rất ngon!",
+        "created_at": "2025-11-03T09:13:54.000Z"
+    }
+}
 
-## Quyền Truy Cập
 
-### Authentication Required
-- Tạo/sửa/xóa món ăn
-- Quản lý công thức
-- Quản lý menu
-- Đánh giá món ăn
 
-### Public
-- Xem danh sách món ăn
-- Tìm kiếm
-- Xem chi tiết
-- Đăng ký/đăng nhập
 
----
 
-*Tài liệu cập nhật: Tháng 1, 2024*
+
+

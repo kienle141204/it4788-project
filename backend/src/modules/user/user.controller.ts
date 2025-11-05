@@ -8,15 +8,19 @@ import {
   Body,
   ParseIntPipe,
   UseGuards,
-  ForbiddenException,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { SelfOrAdminGuard } from '../auth/guards/self-or-admin.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../../common/decorators/user.decorator';
 import type { JwtUser } from '../../common/types/user.type';
 
+@ApiTags('Users')
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) { }
@@ -28,50 +32,42 @@ export class UserController {
   }
 
   /** 📄 Admin: get all users */
-  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Get()
   async getAllUsers(@User() user: JwtUser) {
-    if (user.role !== "admin") {
-      throw new ForbiddenException('Only admin can view all users');
-    }
     return this.userService.getAllUsers();
   }
 
   /** 👀 Get user by ID */
-  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
   @Get(':id')
   async getUser(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
-    if (user.role !== "admin" && user.id !== id) {
-      throw new ForbiddenException('You can only view your own account');
-    }
     return this.userService.getUserById(id);
   }
 
   /** ✏️ Update user */
-  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
   @Put(':id')
   async updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
     @User() user: JwtUser,
   ) {
-    if (user.role !== "admin" && user.id !== id) {
-      throw new ForbiddenException('You can only update your own account');
-    }
     return await this.userService.updateUser(id, dto);
   }
 
   /** ❌ Delete user */
-  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
   @Delete(':id')
   async deleteUser(
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,
   ) {
-    if (user.role !== "admin" && user.id !== id) {
-      throw new ForbiddenException('You can only delete your own account');
-    }
-
     await this.userService.deleteUser(id);
     return { message: `User ${id} deleted successfully` };
   }

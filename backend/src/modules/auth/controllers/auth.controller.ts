@@ -7,6 +7,7 @@ import {
   Get,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { RegisterTempDto } from '../dto/register-temp.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -16,6 +17,7 @@ import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { RegisterUserInfoDto } from '../dto/registerUserInfor.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
+@ApiTags('Authentication')
 @Controller('api/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
@@ -48,6 +50,7 @@ export class AuthController {
   /** 
    * API đăng kí thêm thông tin người dùng
    */
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   @Post('register-user-info')
   async registerUserInfo(@Body(ValidationPipe) registerUserInfoDto: RegisterUserInfoDto, @Request() req) {
@@ -64,6 +67,7 @@ export class AuthController {
   /**
    * API lấy thông tin profile người dùng hiện tại
    */
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Request() req) {
@@ -82,6 +86,7 @@ export class AuthController {
   /**
    * API đăng xuất
    */
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(@Request() req) {

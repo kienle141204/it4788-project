@@ -9,17 +9,21 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DishService } from './dish.service';
 import { CreateDishDto } from './dto/create-dish.dto';
 import { PaginationDto, SearchDishDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../../entities/user.entity';
 
+@ApiTags('Dishes')
 @Controller('api/dishes')
 export class DishController {
   constructor(private readonly dishService: DishService) {}
 
   @Get('get-all-info-dish')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async findAll() {
     const dishes = await this.dishService.findAll();
     return {
@@ -30,6 +34,8 @@ export class DishController {
   }
 
   @Get('get-paginated')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async findAllWithPagination(@Query() paginationDto: PaginationDto) {
     const result = await this.dishService.findAllWithPagination(paginationDto);
     return {
@@ -48,6 +54,8 @@ export class DishController {
   }
 
   @Get('search-paginated')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async searchByNameWithPagination(@Query() searchDto: SearchDishDto) {
     const result = await this.dishService.searchByNameWithPagination(searchDto);
     
@@ -72,6 +80,8 @@ export class DishController {
   }
 
   @Get('get-info-dish-by-id/:id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const dish = await this.dishService.findOne(id);
     return {
@@ -82,6 +92,7 @@ export class DishController {
   }
 
   @Post('create-dish')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async create(@Body() createDishDto: CreateDishDto, @Request() req) {
     const user: User = req.user;

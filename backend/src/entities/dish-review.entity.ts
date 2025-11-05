@@ -20,7 +20,7 @@ export class DishReview {
   @Column({ name: 'user_id', type: 'bigint' })
   user_id: number;
 
-  @Column({ name: 'rating', type: 'int' })
+  @Column({ name: 'rating', type: 'tinyint' })
   rating: number;
 
   @Column({ name: 'comment', type: 'text', nullable: true })

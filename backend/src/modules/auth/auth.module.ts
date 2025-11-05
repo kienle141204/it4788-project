@@ -9,6 +9,9 @@ import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './services/auth.service';
 import { EmailService } from './services/email.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { OwnerGuard } from './guards/owner.guard';
 
 @Module({
   imports: [
@@ -17,14 +20,18 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = config.get<string>('JWT_SECRET') || 'default-secret';
+        console.log('JWT Module initialized with secret:', secret ? `${secret.substring(0, 10)}...` : 'undefined');
+        return {
+          secret: secret,
+          signOptions: { expiresIn: '7d' },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, EmailService, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, EmailService, JwtStrategy, JwtAuthGuard, RolesGuard, OwnerGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, OwnerGuard],
 })
 export class AuthModule { }
