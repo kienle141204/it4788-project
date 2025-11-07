@@ -32,21 +32,21 @@ export interface ResenResponse{
 
 
 export const loginUSer = async (data : object) :Promise<LoginResponse>=> {
-    const res = await post('api/auth/login', data)
+    const res = await post('auth/login', data)
     return res
 }
 
 export const registerUser = async (data: object) : Promise<RegisterResponse>=> {
-  const res = await post('api/auth/register-temp', data)
+  const res = await post('auth/register-temp', data)
   return res
 }
 
 export const OTPValidate = async (data: object) : Promise<OTPResponse> => {
-  const res = await post('api/auth/verify-otp', data)
+  const res = await post('auth/verify-otp', data)
   return res
 }
 
 export const resendEmail =async (data: object) : Promise<ResenResponse> => {
-  const res = await post('api/auth/resend-otp', data)
+  const res = await post('auth/resend-otp', data)
   return res
 }

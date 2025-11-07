@@ -37,5 +37,6 @@ export default function Index() {
   }
 
     
-  return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
+  return <Redirect  href={isLoggedIn ? '/(market)/market_screen' : '/(auth)'} />;
+  // return <Redirect  href={isLoggedIn ? '/(auth)' : '/(auth)'} />;
 }

@@ -1,0 +1,239 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  ParseIntPipe,
+  UseGuards,
+  ValidationPipe,
+} from '@nestjs/common';
+import { IngredientService } from './ingredient.service';
+import { 
+  PaginationDto, 
+  SearchByNameDto, 
+  SearchByPlaceDto, 
+  SearchByCategoryDto,
+  SearchIngredientDto 
+} from './dto/search-ingredient.dto';
+import { CreateIngredientDto } from './dto/create-ingredient.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+@Controller('api/ingredients')
+export class IngredientController {
+  constructor(private readonly ingredientService: IngredientService) {}
+
+  /**
+   * Tạo nguyên liệu mới
+   * POST /api/ingredients
+   * Cần authentication
+   */
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  async create(@Body(ValidationPipe) createIngredientDto: CreateIngredientDto) {
+    const ingredient = await this.ingredientService.create(createIngredientDto);
+    return {
+      success: true,
+      message: 'Tạo nguyên liệu thành công',
+      data: ingredient,
+    };
+  }
+
+  /**
+   * Lấy tất cả nguyên liệu (không phân trang)
+   * GET /api/ingredients
+   */
+  @Get()
+  // @UseGuards(JwtAuthGuard)
+  async findAll() {
+    const ingredients = await this.ingredientService.findAll();
+    return {
+      success: true,
+      message: 'Lấy danh sách nguyên liệu thành công',
+      data: ingredients,
+    };
+  }
+
+  /**
+   * Lấy nguyên liệu với phân trang
+   * GET /api/ingredients/paginated?page=1&limit=10
+   */
+  @Get('paginated')
+  // @UseGuards(JwtAuthGuard)
+  async findAllWithPagination(@Query() paginationDto: PaginationDto) {
+    const result = await this.ingredientService.findAllWithPagination(paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách nguyên liệu trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
+  }
+
+  /**
+   * Lấy nguyên liệu theo danh sách ID
+   * GET /api/ingredients/by-ids?ids=1,2,3
+   * Cần authentication
+   */
+  @Get('by-ids')
+  // @UseGuards(JwtAuthGuard)
+  async findByIds(@Query('ids') ids: string) {
+    const idArray = ids.split(',').map(id => parseInt(id.trim()));
+    const ingredients = await this.ingredientService.findByIds(idArray);
+    return {
+      success: true,
+      message: 'Lấy danh sách nguyên liệu theo ID thành công',
+      data: ingredients,
+    };
+  }
+
+  /**
+   * Tìm kiếm nguyên liệu theo tên với phân trang
+   * GET /api/ingredients/search/name?name=thịt&page=1&limit=10
+   * Cần authentication
+   */
+  @Get('search/name')
+  // @UseGuards(JwtAuthGuard)
+  async searchByName(@Query() searchDto: SearchByNameDto) {
+    const result = await this.ingredientService.searchByName(searchDto);
+    
+    const message = result.searchTerm 
+      ? `Tìm thấy ${result.total} nguyên liệu với từ khóa "${result.searchTerm}"`
+      : `Lấy danh sách nguyên liệu trang ${result.page}`;
+
+    return {
+      success: true,
+      message,
+      data: result.data,
+      searchTerm: result.searchTerm,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
+  }
+
+  /**
+   * Tìm kiếm nguyên liệu theo địa chỉ với phân trang
+   * GET /api/ingredients/search/place?place_id=1&page=1&limit=10
+   * Cần authentication
+   */
+  @Get('search/place')
+  // @UseGuards(JwtAuthGuard)
+  async searchByPlace(@Query() searchDto: SearchByPlaceDto) {
+    const result = await this.ingredientService.searchByPlace(searchDto);
+    
+    const message = result.placeId 
+      ? `Tìm thấy ${result.total} nguyên liệu tại địa chỉ ID ${result.placeId}`
+      : `Lấy danh sách nguyên liệu trang ${result.page}`;
+
+    return {
+      success: true,
+      message,
+      data: result.data,
+      placeId: result.placeId,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
+  }
+
+  /**
+   * Tìm kiếm nguyên liệu theo danh mục với phân trang
+   * GET /api/ingredients/search/category?category_id=1&page=1&limit=10
+   * Cần authentication
+   */
+  @Get('search/category')
+  // @UseGuards(JwtAuthGuard)
+  async searchByCategory(@Query() searchDto: SearchByCategoryDto) {
+    const result = await this.ingredientService.searchByCategory(searchDto);
+    
+    const message = result.categoryId 
+      ? `Tìm thấy ${result.total} nguyên liệu trong danh mục ID ${result.categoryId}`
+      : `Lấy danh sách nguyên liệu trang ${result.page}`;
+
+    return {
+      success: true,
+      message,
+      data: result.data,
+      categoryId: result.categoryId,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
+  }
+
+  /**
+   * Tìm kiếm nguyên liệu với nhiều bộ lọc
+   * GET /api/ingredients/search?name=thịt&place_id=1&category_id=2&page=1&limit=10
+   */
+  @Get('search')
+  // @UseGuards(JwtAuthGuard)
+  async searchWithFilters(@Query() searchDto: SearchIngredientDto) {
+    const result = await this.ingredientService.searchWithFilters(searchDto);
+    
+    let message = 'Lấy danh sách nguyên liệu';
+    if (result.filters.name || result.filters.place_id || result.filters.category_id) {
+      message = `Tìm thấy ${result.total} nguyên liệu`;
+      const filters: string[] = [];
+      if (result.filters.name) filters.push(`tên: "${result.filters.name}"`);
+      if (result.filters.place_id) filters.push(`địa chỉ: ${result.filters.place_id}`);
+      if (result.filters.category_id) filters.push(`danh mục: ${result.filters.category_id}`);
+      if (filters.length > 0) message += ` với ${filters.join(', ')}`;
+    } else {
+      message += ` trang ${result.page}`;
+    }
+
+    return {
+      success: true,
+      message,
+      data: result.data,
+      filters: result.filters,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
+  }
+
+  /**
+   * Lấy nguyên liệu theo ID (phải đặt cuối cùng để tránh conflict với các route khác)
+   * GET /api/ingredients/:id
+   */
+  @Get(':id')
+  // @UseGuards(JwtAuthGuard)
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    const ingredient = await this.ingredientService.findOne(id);
+    return {
+      success: true,
+      message: 'Lấy thông tin nguyên liệu thành công',
+      data: ingredient,
+    };
+  }
+}
