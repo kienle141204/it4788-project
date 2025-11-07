@@ -1,12 +1,13 @@
-// app/index.tsx
 import React, { useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Navbar from '../../components/Navbar';
 import DateSelector from '../../components/DateSelector';
 import FilterTabs from '../../components/FilterTabs';
 import TaskCard from '../../components/TaskCard';
 import { taskStyles } from '../../styles/task.styles';
+
+import BottomNavigation from '../../components/BottomNavigation';
 
 interface Task {
   id: number;
@@ -17,10 +18,10 @@ interface Task {
   category: 'shopping' | 'design' | 'sprint';
 }
 
-export default function Index() {
+export default function TaskPage() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<number>(25);
-  const [activeTab, setActiveTab] = useState<string>('All');
+  const [activeTab, setActiveTab] = useState('task');
 
   // Sample tasks data
   const tasks: Task[] = [
@@ -65,6 +66,12 @@ export default function Index() {
       console.log('No previous screen');
     }
   };
+    const handleTabPress = (tab: string) => {
+        setActiveTab(tab);
+        if (tab === 'add') {
+        Alert.alert('Thêm mới', 'Tạo nội dung mới');
+        }
+    };
 
   const handleNotificationPress = () => {
     console.log('Notification pressed');
@@ -116,6 +123,11 @@ export default function Index() {
           ))}
         </View>
       </ScrollView>
+      {/* Bottom Navigation */}
+        <BottomNavigation
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+        />
     </View>
   );
 }
