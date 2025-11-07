@@ -18,13 +18,13 @@ import { User } from '../../common/decorators/user.decorator';
 import type { JwtUser } from '../../common/types/user.type';
 
 @ApiTags('Families')
-@Controller('families')
+@Controller('api/families')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 export class FamilyController {
   constructor(private readonly familyService: FamilyService) { }
 
-  /** ✅ Create family */
+  /** Create family */
   @Post()
   async createFamily(@Body() dto: CreateFamilyDto, @User() user: JwtUser) {
     const ownerId = user.role === 'admin' ? (dto.owner_id ?? user.id) : user.id;
@@ -32,19 +32,19 @@ export class FamilyController {
     return this.familyService.createFamily(dto.name, ownerId, user);
   }
 
-  /** 📄 Get all families */
+  /** Get all families */
   @Get()
   async getAllFamilies() {
     return this.familyService.getAllFamilies();
   }
 
-  /** 👀 Get family by ID */
+  /** Get family by ID */
   @Get(':id')
   async getFamilyById(@Param('id', ParseIntPipe) id: number) {
     return this.familyService.getFamilyById(id);
   }
 
-  /** ✏️ Update family */
+  /** Update family */
   @Put(':id')
   async updateFamily(
     @Param('id', ParseIntPipe) id: number,
@@ -54,7 +54,7 @@ export class FamilyController {
     return this.familyService.updateFamily(id, dto, user.id, user.role);
   }
 
-  /** 🗑️ Delete family */
+  /** Delete family */
   @Delete(':id')
   async deleteFamily(
     @Param('id', ParseIntPipe) id: number,
