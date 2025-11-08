@@ -1,11 +1,12 @@
 import React from 'react';
 import { Users, Package, Utensils, BookOpen, Menu, X } from 'lucide-react';
 
-const Sidebar = ({ 
-  currentPage, 
-  onPageChange, 
-  isOpen, 
-  onToggle 
+const Sidebar = ({
+  currentPage,
+  onPageChange,
+  isOpen,
+  onToggle,
+  user
 }) => {
   const menuItems = [
     { id: 'users', label: 'Người dùng', icon: Users },
@@ -18,14 +19,14 @@ const Sidebar = ({
     <aside className={`${isOpen ? 'w-64' : 'w-20'} bg-emerald-800 text-white transition-all duration-300 flex flex-col`}>
       <div className="p-4 flex items-center justify-between border-b border-emerald-700">
         {isOpen && <h2 className="text-xl font-bold">Đi Chợ Admin</h2>}
-        <button 
-          onClick={onToggle} 
+        <button
+          onClick={onToggle}
           className="p-2 hover:bg-emerald-700 rounded transition-colors"
         >
           {isOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
-      
+
       <nav className="flex-1 p-4">
         {menuItems.map(item => (
           <button
@@ -45,11 +46,11 @@ const Sidebar = ({
         <div className="p-4 border-t border-emerald-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center font-bold">
-              A
+              {user?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'A'}
             </div>
             <div>
-              <p className="font-medium">Admin User</p>
-              <p className="text-xs text-emerald-200">admin@dicho.com</p>
+              <p className="font-medium">{user?.full_name || user?.email || 'Admin User'}</p>
+              <p className="text-xs text-emerald-200">{user?.email || 'admin@dicho.com'}</p>
             </div>
           </div>
         </div>
