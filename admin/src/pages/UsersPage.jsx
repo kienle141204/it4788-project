@@ -16,11 +16,11 @@ const UsersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
-    name: '',
+    full_name: '',
     email: '',
     phone: '',
     group: '',
-    status: 'Hoạt động'
+    address: ''
   });
 
   // Load users on component mount
@@ -44,31 +44,28 @@ const UsersPage = () => {
 
   const columns = [
     { header: 'ID', key: 'id' },
-    { header: 'Họ tên', key: 'name' },
+    { header: 'Họ tên', key: 'full_name' },
     { header: 'Email', key: 'email' },
     { header: 'Số điện thoại', key: 'phone' },
     { header: 'Nhóm', key: 'group' },
-    {
-      header: 'Trạng thái',
-      key: 'status',
-      render: (value) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          value === 'Hoạt động' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
-          {value}
-        </span>
-      )
-    },
+    { header: 'Địa chỉ', key: 'address' },
   ];
 
   const handleEdit = (user) => {
     setEditingUser(user);
-    setFormData(user);
+    // Map the user data to match form field names
+    setFormData({
+      full_name: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      group: user.group,
+      address: user.address
+    });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (user) => {
-    if (window.confirm(`Bạn có chắc muốn xóa người dùng "${user.name}"?`)) {
+    if (window.confirm(`Bạn có chắc muốn xóa người dùng "${user.full_name}"?`)) {
       try {
         await deleteUser(user.id);
         // Remove user from local state after successful deletion
@@ -104,12 +101,12 @@ const UsersPage = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingUser(null);
-    setFormData({ name: '', email: '', phone: '', group: '', status: 'Hoạt động' });
+    setFormData({ full_name: '', email: '', phone: '', group: '', address: '' });
   };
 
   const handleOpenModal = () => {
     setEditingUser(null);
-    setFormData({ name: '', email: '', phone: '', group: '', status: 'Hoạt động' });
+    setFormData({ full_name: '', email: '', phone: '', group: '', address: '' });
     setIsModalOpen(true);
   };
 
@@ -130,7 +127,7 @@ const UsersPage = () => {
       console.error('Error searching users:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = users.filter(u =>
-        u.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+        u.full_name.toLowerCase().includes(searchValue.toLowerCase()) ||
         u.email.toLowerCase().includes(searchValue.toLowerCase())
       );
       setUsers(filtered);
@@ -193,8 +190,8 @@ const UsersPage = () => {
         <form onSubmit={handleSubmit}>
           <Input
             label="Họ tên"
-            value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            value={formData.full_name}
+            onChange={(e) => setFormData({...formData, full_name: e.target.value})}
             required
           />
           <Input
@@ -221,14 +218,10 @@ const UsersPage = () => {
             ]}
             required
           />
-          <Select
-            label="Trạng thái"
-            value={formData.status}
-            onChange={(e) => setFormData({...formData, status: e.target.value})}
-            options={[
-              { value: 'Hoạt động', label: 'Hoạt động' },
-              { value: 'Tạm khóa', label: 'Tạm khóa' }
-            ]}
+          <Input
+            label="Địa chỉ"
+            value={formData.address}
+            onChange={(e) => setFormData({...formData, address: e.target.value})}
             required
           />
           <div className="flex gap-2 justify-end mt-6">
