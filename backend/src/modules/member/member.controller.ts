@@ -17,19 +17,19 @@ import type { JwtUser } from '../../common/types/user.type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Members')
-@Controller('members')
+@Controller('api/members')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 export class MemberController {
   constructor(private readonly memberService: MemberService) { }
 
-  /** ➕ Add member */
+  /** Add member */
   @Post()
   async addMember(@Body() dto: AddMemberDto, @User() user: JwtUser) {
     return this.memberService.addMember(dto, user.id, user.role as UserRole);
   }
 
-  /** ✏️ Update member role */
+  /** Update member role */
   @Put(':id')
   async updateRole(
     @Param('id', ParseIntPipe) id: number,
@@ -44,7 +44,7 @@ export class MemberController {
     );
   }
 
-  /** ❌ Remove member */
+  /** Remove member */
   @Delete(':id')
   async removeMember(
     @Param('id', ParseIntPipe) id: number,

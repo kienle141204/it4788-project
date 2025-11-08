@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Member } from './entities/member.entity';
-import { Family } from '../family/entities/family.entity';
+import { FamilyMember } from '../../entities/family-member.entity';
+import { Family } from '../../entities/family.entity';
 import { AddMemberDto } from './dto/add-member.dto';
 
 export enum UserRole {
@@ -23,8 +23,8 @@ export enum FamilyMemberRole {
 @Injectable()
 export class MemberService {
   constructor(
-    @InjectRepository(Member)
-    private readonly memberRepository: Repository<Member>,
+    @InjectRepository(FamilyMember)
+    private readonly memberRepository: Repository<FamilyMember>,
 
     @InjectRepository(Family)
     private readonly familyRepository: Repository<Family>,
@@ -35,7 +35,7 @@ export class MemberService {
     dto: AddMemberDto,
     userId: number,
     userRole: UserRole,
-  ): Promise<Member> {
+  ): Promise<FamilyMember> {
     const { family_id, user_id, role } = dto;
 
     const family = await this.familyRepository.findOne({
