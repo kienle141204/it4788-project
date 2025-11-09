@@ -8,7 +8,7 @@ export const fetchDishes = async (params = {}) => {
   
   try {
     // Real API call:
-    return await get(`/dishes`, params);
+    return await get(`/dishes/get-all-info-dish`, params);
   } catch (error) {
     console.error('Error fetching dishes:', error);
     throw error;

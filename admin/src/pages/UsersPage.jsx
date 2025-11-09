@@ -6,6 +6,7 @@ import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
+import Pagination from '../components/common/Pagination';
 import { fetchUsers, createUser, updateUser, deleteUser, searchUsers } from '../api/userAPI';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,6 +14,8 @@ const UsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Maximum 10 records per page
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -33,7 +36,14 @@ const UsersPage = () => {
     try {
       setLoading(true);
       const response = await fetchUsers();
-      setUsers(response.data || response); // Handle both paginated and non-paginated responses
+      let usersData = response.data || response; // Handle both paginated and non-paginated responses
+      
+      // Sort users by ID from smallest to largest
+      usersData = Array.isArray(usersData) 
+        ? [...usersData].sort((a, b) => a.id - b.id)
+        : usersData;
+        
+      setUsers(usersData);
     } catch (error) {
       console.error('Error loading users:', error);
       // In a real app, you might want to show an error message to the user
@@ -118,7 +128,7 @@ const UsersPage = () => {
       loadUsers();
       return;
     }
-    
+
     try {
       setLoading(true);
       const response = await searchUsers(searchValue);
@@ -139,7 +149,7 @@ const UsersPage = () => {
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
-    
+
     // Debounce search to avoid too many API calls
     clearTimeout(window.searchTimeout);
     window.searchTimeout = setTimeout(() => {
@@ -147,7 +157,11 @@ const UsersPage = () => {
     }, 300);
   };
 
-  const filteredUsers = users; // Now filtered by API
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = users.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(users.length / itemsPerPage);
 
   // Show loading indicator while data is being fetched
   if (loading && users.length === 0) {
@@ -177,10 +191,18 @@ const UsersPage = () => {
 
       <Table
         columns={columns}
-        data={filteredUsers}
+        data={currentUsers}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Modal
         isOpen={isModalOpen}
