@@ -19,68 +19,6 @@ export const AuthProvider = ({ children }) => {
     refresh_token: localStorage.getItem('refresh_token')
   });
 
-  // Check if user is logged in on app start
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
-  }, []);
-
-  // Login function
-  const login = async (email, password) => {
-    try {
-      const response = await fetch('http://localhost:8090/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      // Check if user role is admin
-      if (data.user?.role !== 'admin') {
-        throw new Error('Access denied. Admin role required.');
-      }
-
-      // Store tokens and user info in localStorage
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      setTokens({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token
-      });
-      setUser(data.user);
-      
-      return { success: true };
-    } catch (error) {
-      return { success: false, message: error.message };
-    }
-  };
-
-  // Logout function
-  const logout = () => {
-    // Clear all stored data
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    
-    setTokens({ access_token: null, refresh_token: null });
-    setUser(null);
-    
-    // Navigate to login by updating window location instead of using useNavigate
-    window.location.href = '/login';
-  };
-
   // Check if token is expired
   const isTokenExpired = (token) => {
     if (!token) return true;
@@ -125,6 +63,12 @@ export const AuthProvider = ({ children }) => {
         access_token: data.access_token
       }));
 
+      // Update user info if it's available in refresh response
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+      }
+
       return data.access_token;
     } catch (error) {
       console.error('Error refreshing token:', error);
@@ -133,49 +77,92 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Make authenticated API request with token handling
-  const apiRequest = async (endpoint, options = {}) => {
-    let token = tokens.access_token;
+  // Check if user is logged in on app start
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const storedUser = localStorage.getItem('user');
+      const accessToken = localStorage.getItem('access_token');
 
-    // Check if token is expired and refresh if needed
-    if (token && isTokenExpired(token)) {
-      token = await refreshToken();
-      if (!token) {
-        // Token refresh failed, let the app handle the logout
-        return Promise.reject(new Error('Authentication required'));
-      }
-    }
-
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const response = await fetch(`${endpoint}`, config);
-
-      if (response.status === 401) {
-        // Token might be invalid, try to refresh
-        const newToken = await refreshToken();
-        if (newToken) {
-          // Retry the request with new token
-          config.headers.Authorization = `Bearer ${newToken}`;
-          return fetch(endpoint, config);
+      if (storedUser && accessToken) {
+        // Check if token is expired
+        if (isTokenExpired(accessToken)) {
+          // Attempt to refresh the token
+          const newToken = await refreshToken();
+          if (newToken) {
+            // Token was refreshed successfully, set the user
+            setUser(JSON.parse(storedUser));
+          }
+          // If refresh failed, the refreshToken function already cleared the data and logged out the user
         } else {
-          logout();
-          throw new Error('Authentication required');
+          // Token is still valid, set the user
+          setUser(JSON.parse(storedUser));
         }
       }
+      setLoading(false);
+    };
 
-      return response;
+    initializeAuth();
+  }, []);
+
+  // Login function
+  const login = async (email, password) => {
+    try {
+      const response = await fetch('http://localhost:8090/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Check if user role is admin
+      if (data.user?.role !== 'admin') {
+        throw new Error('Access denied. Admin role required.');
+      }
+
+      // Store tokens and user info in localStorage
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      setTokens({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
+      setUser(data.user);
+
+      return { success: true };
     } catch (error) {
-      console.error('API request error:', error);
-      throw error;
+      return { success: false, message: error.message };
     }
+  };
+
+  // Logout function
+  const logout = () => {
+    // Clear all stored data
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+
+    setTokens({ access_token: null, refresh_token: null });
+    setUser(null);
+
+    // Navigate to login by updating window location instead of using useNavigate
+    window.location.href = '/login';
+  };
+
+  // Make authenticated API request with token handling
+  const apiRequest = async (endpoint, options = {}) => {
+    // This function is not needed since we use the authFetch utility
+    // The authFetch utility handles token refresh automatically
+    console.warn('apiRequest is deprecated. Use the API services that use authFetch instead.');
+    return Promise.reject(new Error('Use API services that use authFetch instead of apiRequest'));
   };
 
   // Check if user is authenticated and has admin role

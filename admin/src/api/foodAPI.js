@@ -1,81 +1,81 @@
-// Foods API Service - Using centralized auth fetch utility
+// Ingredients API Service - Using centralized auth fetch utility
 
 import { get, post, put, del } from './authFetch';
 
-// Get foods with optional pagination and filtering
-export const fetchFoods = async (params = {}) => {
-  console.log('API call: fetchFoods', params);
-  
+// Get ingredients 
+export const fetchIngredients = async (params = {}) => {
+  console.log('API call: fetchIngredients', params);
+
   try {
-    // Real API call:
-    return await get(`/foods`, params);
+    // Real API call to get ingredients:
+    return await get(`/ingredients`, params);
   } catch (error) {
-    console.error('Error fetching foods:', error);
+    console.error('Error fetching ingredients:', error);
     throw error;
   }
 };
 
-// Create a new food
-export const createFood = async (foodData) => {
-  console.log('API call: createFood', foodData);
-  
+// Create a new ingredient
+export const createIngredient = async (ingredientData) => {
+  console.log('API call: createIngredient', ingredientData);
+
   try {
     // Real API call:
-    return await post('/foods', foodData);
+    return await post('/ingredients', ingredientData);
   } catch (error) {
-    console.error('Error creating food:', error);
+    console.error('Error creating ingredient:', error);
     throw error;
   }
 };
 
-// Update an existing food
-export const updateFood = async (id, foodData) => {
-  console.log('API call: updateFood', id, foodData);
-  
+// Update an existing ingredient
+export const updateIngredient = async (id, ingredientData) => {
+  console.log('API call: updateIngredient', id, ingredientData);
+
   try {
     // Real API call:
-    return await put(`/foods/${id}`, foodData);
+    return await put(`/ingredients/${id}`, ingredientData);
   } catch (error) {
-    console.error('Error updating food:', error);
+    console.error('Error updating ingredient:', error);
     throw error;
   }
 };
 
-// Delete a food
-export const deleteFood = async (id) => {
-  console.log('API call: deleteFood', id);
-  
+// Delete an ingredient
+export const deleteIngredient = async (id) => {
+  console.log('API call: deleteIngredient', id);
+
   try {
     // Real API call:
-    return await del(`/foods/${id}`);
+    return await del(`/ingredients/${id}`);
   } catch (error) {
-    console.error('Error deleting food:', error);
+    console.error('Error deleting ingredient:', error);
     throw error;
   }
 };
 
-// Search foods
-export const searchFoods = async (searchTerm) => {
-  console.log('API call: searchFoods', searchTerm);
-  
+// Search ingredients
+export const searchIngredients = async (searchTerm) => {
+  console.log('API call: searchIngredients', searchTerm);
+
   try {
     // Real API call:
-    return await get(`/foods/search`, { q: searchTerm });
+    return await get(`/ingredients/search/name`, { name: searchTerm });
   } catch (error) {
-    console.error('Error searching foods:', error);
+    console.error('Error searching ingredients:', error);
     throw error;
   }
 };
 
-// Get a single food by ID
-export const getFoodById = async (id) => {
-  console.log('API call: getFoodById', id);
-  
+// Get a single ingredient by ID
+export const getIngredientById = async (id) => {
+  console.log('API call: getIngredientById', id);
+
   try {
     // Real API call:
-    return await get(`/foods/${id}`);
+    return await get(`/ingredients/${id}`);
   } catch (error) {
-    console.error('Error getting food by ID:', error);
+    console.error('Error getting ingredient by ID:', error);
     throw error;
   }
 };

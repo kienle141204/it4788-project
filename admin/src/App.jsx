@@ -11,9 +11,14 @@ import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import { useAuth } from './contexts/AuthContext';
 
-// Main layout component for authenticated users
-const MainLayout = () => {
-  const [currentPage, setCurrentPage] = React.useState('users');
+// Individual layout pages that match each route
+const UsersLayout = () => <LayoutComponent page="users" />;
+const FoodsLayout = () => <LayoutComponent page="foods" />;
+const DishesLayout = () => <LayoutComponent page="dishes" />;
+const RecipesLayout = () => <LayoutComponent page="recipes" />;
+
+// Main layout component with page prop
+const LayoutComponent = ({ page }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const { user } = useAuth();
 
@@ -24,22 +29,12 @@ const MainLayout = () => {
     recipes: { component: RecipesPage, title: 'Công thức' },
   };
 
-  // Auto set current page based on route if needed
-  React.useEffect(() => {
-    const path = window.location.pathname.replace('/', '');
-    if (pageConfig[path]) {
-      setCurrentPage(path);
-    }
-  }, []);
-
-  const CurrentPageComponent = pageConfig[currentPage]?.component || UsersPage;
-  const pageTitle = pageConfig[currentPage]?.title || 'Người dùng';
+  const CurrentPageComponent = pageConfig[page]?.component || UsersPage;
+  const pageTitle = pageConfig[page]?.title || 'Người dùng';
 
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         user={user}
@@ -62,48 +57,41 @@ const App = () => {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route 
-            path="/" 
+          <Route path="/" element={<Navigate to="/users" replace />} />
+          <Route
+            path="/users"
             element={
               <PrivateRoute>
-                <MainLayout />
+                <UsersLayout />
               </PrivateRoute>
-            } 
+            }
           />
-          <Route 
-            path="/users" 
+          <Route
+            path="/foods"
             element={
               <PrivateRoute>
-                <MainLayout />
+                <FoodsLayout />
               </PrivateRoute>
-            } 
+            }
           />
-          <Route 
-            path="/foods" 
+          <Route
+            path="/dishes"
             element={
               <PrivateRoute>
-                <MainLayout />
+                <DishesLayout />
               </PrivateRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dishes" 
+          <Route
+            path="/recipes"
             element={
               <PrivateRoute>
-                <MainLayout />
+                <RecipesLayout />
               </PrivateRoute>
-            } 
+            }
           />
-          <Route 
-            path="/recipes" 
-            element={
-              <PrivateRoute>
-                <MainLayout />
-              </PrivateRoute>
-            } 
-          />
-          {/* Redirect any other route to main page */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Redirect any other route to users page */}
+          <Route path="*" element={<Navigate to="/users" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
