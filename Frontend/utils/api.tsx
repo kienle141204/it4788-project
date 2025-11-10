@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_DOMAIN = process.env.API || 'http://10.0.2.2:8090/'
+const API_DOMAIN = process.env.API || 'http://localhost:8090/'
 const config = {
     headers: {
         Accept: "application/json",
