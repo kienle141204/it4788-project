@@ -13,7 +13,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ShoppingListService } from './shopping-list.service';
 import { CreateShoppingListDto } from './dto/create-shopping-list.dto';
 import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 
 @ApiTags('Shopping Lists')
 @ApiBearerAuth('JWT-auth')

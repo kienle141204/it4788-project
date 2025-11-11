@@ -9,12 +9,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { MemberService, UserRole, FamilyMemberRole } from './member.service';
+import { MemberService } from './member.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
-import { User } from '../../common/decorators/user.decorator';
+import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Members')
 @Controller('api/members')
@@ -26,7 +25,7 @@ export class MemberController {
   /** Add member */
   @Post()
   async addMember(@Body() dto: AddMemberDto, @User() user: JwtUser) {
-    return this.memberService.addMember(dto, user.id, user.role as UserRole);
+    return this.memberService.addMember(dto, user);
   }
 
   /** Update member role */
@@ -38,9 +37,8 @@ export class MemberController {
   ) {
     return this.memberService.updateMemberRole(
       id,
-      dto.role as FamilyMemberRole,
-      user.id,
-      user.role as UserRole,
+      dto.role,
+      user
     );
   }
 
@@ -50,6 +48,6 @@ export class MemberController {
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,
   ) {
-    return this.memberService.removeMember(id, user.id, user.role as UserRole);
+    return this.memberService.removeMember(id, user);
   }
 }

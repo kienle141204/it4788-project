@@ -12,8 +12,8 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { ShoppingItemService } from './shopping-item.service';
 import { CreateShoppingItemDto } from './dto/create-shopping-item.dto';
 import { UpdateShoppingItemDto } from './dto/update-shopping-item.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShoppingItem } from '../../entities/shopping-item.entity';
+import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 
 @ApiTags('Shopping Items')
 @ApiBearerAuth('JWT-auth')

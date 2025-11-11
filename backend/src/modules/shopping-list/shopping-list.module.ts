@@ -9,6 +9,6 @@ import { ShoppingListController } from './shopping-list.controller';
   imports: [TypeOrmModule.forFeature([ShoppingList, ShoppingItem])],
   controllers: [ShoppingListController],
   providers: [ShoppingListService],
-  exports: [TypeOrmModule],
+  exports: [ShoppingListService],
 })
 export class ShoppingListModule { }

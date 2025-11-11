@@ -1,4 +1,4 @@
-import { IsString, IsInt, MinLength } from 'class-validator';
+import { IsString, IsInt, MinLength, IsOptional } from 'class-validator';
 
 export class CreateFamilyDto {
   @IsString()
@@ -6,5 +6,6 @@ export class CreateFamilyDto {
   name: string;
 
   @IsInt()
+  @IsOptional()
   owner_id: number;
 }

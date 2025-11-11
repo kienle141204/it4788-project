@@ -12,6 +12,6 @@ import { MemberModule } from '../member/member.module';
   ],
   controllers: [FamilyController],
   providers: [FamilyService],
-  exports: [TypeOrmModule],
+  exports: [FamilyService],
 })
 export class FamilyModule { }
