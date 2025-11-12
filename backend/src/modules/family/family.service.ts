@@ -15,6 +15,7 @@ export class FamilyService {
   constructor(
     @InjectRepository(Family)
     private readonly familyRepository: Repository<Family>,
+
     private readonly memberService: MemberService,
   ) { }
 

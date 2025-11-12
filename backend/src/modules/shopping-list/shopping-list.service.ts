@@ -26,7 +26,8 @@ export class ShoppingListService {
     // Nếu không chỉ định owner_id thì tự tạo
     if (!data.owner_id) {
       data.owner_id = user.id;
-      return await this.shoppingListRepo.save(data);
+      const list = this.shoppingListRepo.create(data);
+      return this.shoppingListRepo.save(list);
     }
 
     // Nếu chỉ định owner khác user
@@ -41,7 +42,8 @@ export class ShoppingListService {
       }
     }
 
-    return await this.shoppingListRepo.save(data);
+    const list = this.shoppingListRepo.create(data);
+    return this.shoppingListRepo.save(data);
   }
 
   /** Lấy toàn bộ danh sách (kèm owner, family, items) */

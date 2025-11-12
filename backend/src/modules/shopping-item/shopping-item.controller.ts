@@ -14,6 +14,7 @@ import { CreateShoppingItemDto } from './dto/create-shopping-item.dto';
 import { UpdateShoppingItemDto } from './dto/update-shopping-item.dto';
 import { ShoppingItem } from '../../entities/shopping-item.entity';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
+import type { JwtUser } from 'src/common/types/user.type';
 
 @ApiTags('Shopping Items')
 @ApiBearerAuth('JWT-auth')
@@ -25,31 +26,39 @@ export class ShoppingItemController {
   @Post()
   @ApiOperation({ summary: 'Tạo item mới trong danh sách mua sắm' })
   @ApiResponse({ status: 201, type: ShoppingItem })
-  create(@Body() dto: CreateShoppingItemDto) {
-    return this.shoppingItemService.create(dto);
+  async create(@Body() dto: CreateShoppingItemDto, @User() user: JwtUser) {
+    return await this.shoppingItemService.create(dto, user);
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'Lấy tất cả item' })
-  findAll() {
-    return this.shoppingItemService.findAll();
+  async findAll() {
+    return await this.shoppingItemService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Xem chi tiết 1 item' })
-  findOne(@Param('id') id: string) {
-    return this.shoppingItemService.findOne(+id);
+  async findOne(@Param('id') id: string, @User() user: JwtUser) {
+    return await this.shoppingItemService.findOne(+id, user);
+  }
+
+  @Patch('check/:id')
+  @ApiOperation({ summary: 'Tick đã mua item' })
+  async check(@Param('id') id: string, @User() user: JwtUser) {
+    return await this.shoppingItemService.check(+id, user);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Cập nhật item' })
-  update(@Param('id') id: string, @Body() dto: UpdateShoppingItemDto) {
-    return this.shoppingItemService.update(+id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateShoppingItemDto, @User() user: JwtUser) {
+    return await this.shoppingItemService.update(+id, dto, user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa item' })
-  remove(@Param('id') id: string) {
-    return this.shoppingItemService.remove(+id);
+  async remove(@Param('id') id: string, @User() user: JwtUser) {
+    return await this.shoppingItemService.remove(+id, user);
   }
 }
