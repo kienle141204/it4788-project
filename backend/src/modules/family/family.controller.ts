@@ -15,13 +15,16 @@ import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
+import { FirebaseService } from '../../firebase/firebase.service';
 
 @ApiTags('Families')
 @Controller('api/families')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FamilyController {
-  constructor(private readonly familyService: FamilyService) { }
+  constructor(private readonly familyService: FamilyService,
+    private readonly firebaseService: FirebaseService,
+  ) { }
   /** Create family */
   @Post()
   async createFamily(@Body() dto: CreateFamilyDto, @User() user: JwtUser) {
@@ -33,6 +36,14 @@ export class FamilyController {
   async addMember(@Body() req: any, @User() user: JwtUser) {
     const member = this.familyService.addMember(req.family_id, req.member_id, req.role, user)
     return member
+  }
+  @Post('test-push')
+  async sendTestPush(@Body() body: { token: string }) {
+    return this.firebaseService.sendNotification(
+      body.token,
+      'Test Notification',
+      'Hello from NestJS Firebase!'
+    );
   }
 
   /** Get all families */
