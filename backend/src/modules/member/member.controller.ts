@@ -8,7 +8,7 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MemberService } from './member.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
@@ -24,12 +24,14 @@ export class MemberController {
 
   /** Add member */
   @Post()
+  @ApiOperation({ summary: 'Thêm thành viên vào gia đình' })
   async addMember(@Body() dto: AddMemberDto, @User() user: JwtUser) {
     return this.memberService.addMember(dto, user);
   }
 
   /** Update member role */
   @Put(':id')
+  @ApiOperation({ summary: 'Cập nhật vai trò cho người trong gia đình' })
   async updateRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMemberRoleDto,
@@ -44,6 +46,7 @@ export class MemberController {
 
   /** Remove member */
   @Delete(':id')
+  @ApiOperation({ summary: 'Xóa thành viên khỏi gia đình' })
   async removeMember(
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,
