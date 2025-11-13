@@ -22,26 +22,37 @@ export class FridgeIngredientService {
   ) { }
 
   /** Tạo mới nguyên liệu trong tủ lạnh */
-  async create(dto: CreateFridgeIngredientDto, user: JwtUser): Promise<FridgeIngredient> {
-    const { refrigerator_id, ingredient_id, ...data } = dto;
+  async create(
+    refrigerator_id: number,
+    dto: CreateFridgeIngredientDto,
+    user: JwtUser
+  ): Promise<FridgeIngredient> {
+    const { ingredient_id, ...data } = dto;
 
-    // Kiểm tra refrigerator tồn tại
+    // Kiểm tra refrigerator tồn tại và load owner + family + members
     const fridge = await this.refrigeratorRepo.findOne({
       where: { id: refrigerator_id },
-      relations: ['owner', 'family'],
+      relations: ['owner', 'family', 'family.members'],
     });
     if (!fridge) throw new NotFoundException(`Không tìm thấy refrigerator ${refrigerator_id}`);
 
-    // Kiểm tra quyền: chủ tủ, chủ family, hoặc admin
-    const isFamilyOwner = fridge.family && fridge.family.owner_id === user.id;
-    if (fridge.owner_id !== user.id && user.role !== 'admin' && !isFamilyOwner) {
-      throw new UnauthorizedException('Bạn không có quyền thêm nguyên liệu vào tủ lạnh này');
+    // Kiểm tra quyền: admin, owner, family owner, hoặc member trong family
+    const isOwner = fridge.owner_id === user.id;
+    const isAdmin = user.role === 'admin';
+    const isFamilyOwner = fridge.family?.owner_id === user.id;
+    const isFamilyMember = fridge.family?.members?.some(member => member.id === user.id) ?? false;
+
+    if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
+      throw new UnauthorizedException(
+        'Bạn không có quyền thêm nguyên liệu vào tủ lạnh này'
+      );
     }
 
     // Kiểm tra nguyên liệu tồn tại
     const ingredient = await this.ingredientRepo.findOne({ where: { id: ingredient_id } });
     if (!ingredient) throw new NotFoundException(`Không tìm thấy nguyên liệu ${ingredient_id}`);
 
+    // Tạo FridgeIngredient
     const fridgeIngredient = this.fridgeIngredientRepo.create({
       refrigerator_id,
       ingredient_id,
@@ -63,47 +74,55 @@ export class FridgeIngredientService {
   async findOne(id: number, user: JwtUser): Promise<FridgeIngredient> {
     const item = await this.fridgeIngredientRepo.findOne({
       where: { id },
-      relations: ['refrigerator', 'ingredient', 'refrigerator.family'],
+      relations: ['refrigerator', 'ingredient', 'refrigerator.family', 'refrigerator.family.members'],
     });
     if (!item) throw new NotFoundException(`FridgeIngredient ${id} not found`);
 
     const fridge = item.refrigerator;
-    const isFamilyOwner = fridge.family && fridge.family.owner_id === user.id;
+    const isOwner = fridge.owner_id === user.id;
+    const isAdmin = user.role === 'admin';
+    const isFamilyOwner = fridge.family?.owner_id === user.id;
+    const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
 
-    if (fridge.owner_id !== user.id && user.role !== 'admin' && !isFamilyOwner) {
+    if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
       throw new UnauthorizedException('Bạn không có quyền truy cập nguyên liệu này');
     }
 
     return item;
   }
 
-  async findByRefrigerator(id: number, user: JwtUser): Promise<FridgeIngredient> {
-    const item = await this.fridgeIngredientRepo.findOne({
-      where: { id },
-      relations: ['refrigerator', 'ingredient', 'refrigerator.family'],
+  /** Lấy tất cả nguyên liệu trong tủ lạnh */
+  async findByRefrigerator(fridge_id: number, user: JwtUser): Promise<FridgeIngredient[]> {
+    const items = await this.fridgeIngredientRepo.find({
+      where: { refrigerator_id: fridge_id },
+      relations: ['refrigerator', 'ingredient', 'refrigerator.family', 'refrigerator.family.members'],
     });
-    if (!item) throw new NotFoundException(`FridgeIngredient ${id} not found`);
 
-    const fridge = item.refrigerator;
-    const isFamilyOwner = fridge.family && fridge.family.owner_id === user.id;
+    if (!items.length) throw new NotFoundException(`Không tìm thấy nguyên liệu trong tủ lạnh`);
 
-    if (fridge.owner_id !== user.id && user.role !== 'admin' && !isFamilyOwner) {
+    const fridge = items[0].refrigerator;
+    const isOwner = fridge.owner_id === user.id;
+    const isAdmin = user.role === 'admin';
+    const isFamilyOwner = fridge.family?.owner_id === user.id;
+    const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
+
+    if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
       throw new UnauthorizedException('Bạn không có quyền truy cập nguyên liệu này');
     }
 
-    return item;
+    return items;
   }
 
   /** Cập nhật nguyên liệu */
   async update(id: number, dto: UpdateFridgeIngredientDto, user: JwtUser): Promise<FridgeIngredient> {
-    const item = await this.findOne(id, user);
+    const item = await this.findOne(id, user); // đã check quyền
     Object.assign(item, dto);
     return await this.fridgeIngredientRepo.save(item);
   }
 
   /** Xóa nguyên liệu khỏi tủ */
   async remove(id: number, user: JwtUser): Promise<void> {
-    const item = await this.findOne(id, user);
+    const item = await this.findOne(id, user); // đã check quyền
     await this.fridgeIngredientRepo.remove(item);
   }
 }
