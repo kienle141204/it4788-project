@@ -10,26 +10,40 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FamilyService } from './family.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
-import { User } from '../../common/decorators/user.decorator';
+import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
+import { FirebaseService } from '../../firebase/firebase.service';
 
 @ApiTags('Families')
 @Controller('api/families')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class FamilyController {
-  constructor(private readonly familyService: FamilyService) { }
-
+  constructor(private readonly familyService: FamilyService,
+    private readonly firebaseService: FirebaseService,
+  ) { }
   /** Create family */
   @Post()
   async createFamily(@Body() dto: CreateFamilyDto, @User() user: JwtUser) {
     const ownerId = user.role === 'admin' ? (dto.owner_id ?? user.id) : user.id;
-
     return this.familyService.createFamily(dto.name, ownerId, user);
+  }
+
+  @Post('add-member')
+  async addMember(@Body() req: any, @User() user: JwtUser) {
+    const member = this.familyService.addMember(req.family_id, req.member_id, req.role, user)
+    return member
+  }
+  @Post('test-push')
+  async sendTestPush(@Body() body: { token: string }) {
+    return this.firebaseService.sendNotification(
+      body.token,
+      'Test Notification',
+      'Hello from NestJS Firebase!'
+    );
   }
 
   /** Get all families */
@@ -42,6 +56,11 @@ export class FamilyController {
   @Get(':id')
   async getFamilyById(@Param('id', ParseIntPipe) id: number) {
     return this.familyService.getFamilyById(id);
+  }
+
+  @Get('my-family')
+  async getMyFamily(@User() user: JwtUser) {
+    return this.familyService.getMyFamily(user.id)
   }
 
   /** Update family */

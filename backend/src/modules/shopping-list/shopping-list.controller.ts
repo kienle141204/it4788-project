@@ -13,7 +13,8 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ShoppingListService } from './shopping-list.service';
 import { CreateShoppingListDto } from './dto/create-shopping-list.dto';
 import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
+import type { JwtUser } from 'src/common/types/user.type';
 
 @ApiTags('Shopping Lists')
 @ApiBearerAuth('JWT-auth')
@@ -24,31 +25,51 @@ export class ShoppingListController {
 
   /** POST /shopping-lists */
   @Post()
-  create(@Body() dto: CreateShoppingListDto) {
-    return this.shoppingListService.create(dto);
+  async create(@Body() dto: CreateShoppingListDto, @User() user: JwtUser) {
+    return await this.shoppingListService.create(dto, user);
   }
 
   /** GET /shopping-lists */
   @Get()
-  findAll() {
-    return this.shoppingListService.findAll();
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async findAll() {
+    return await this.shoppingListService.findAll();
+  }
+
+  /** GET /shopping-lists/my-list */
+  @Get('my-list')
+  async myShoppingList(@User() user: JwtUser) {
+    return await this.shoppingListService.myShoppingList(user);
   }
 
   /** GET /shopping-lists/:id */
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.shoppingListService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.shoppingListService.findOne(id, user);
+  }
+
+  // Lấy ra danh sách các list mua sắm được share trong gia đình
+  @Get('my-family-shared/:id')
+  async myFamilyShared(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.shoppingListService.myFamilyShared(id, user);
+  }
+
+  /** PATCH /shopping-lists/:id */
+  @Patch('share/:id')
+  async shareShoppingList(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.shoppingListService.shareShoppingList(id, user);
   }
 
   /** PATCH /shopping-lists/:id */
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateShoppingListDto) {
-    return this.shoppingListService.update(id, dto);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateShoppingListDto, @User() user: JwtUser) {
+    return await this.shoppingListService.update(id, dto, user);
   }
 
   /** DELETE /shopping-lists/:id */
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.shoppingListService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.shoppingListService.remove(id, user);
   }
 }

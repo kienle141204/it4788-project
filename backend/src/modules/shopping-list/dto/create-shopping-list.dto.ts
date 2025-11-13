@@ -1,10 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsOptional, ValidateNested } from 'class-validator';
-import { CreateShoppingItemDto } from '../../shopping-item/dto/create-shopping-item.dto';
+import { IsBoolean, IsNumber, IsOptional, ValidateNested } from 'class-validator';
 
 export class CreateShoppingListDto {
     @ApiProperty()
+    @IsOptional()
     @IsNumber()
     owner_id: number;
 
@@ -22,10 +21,4 @@ export class CreateShoppingListDto {
     @IsOptional()
     @IsBoolean()
     is_shared?: boolean;
-
-    @ApiProperty({ type: [CreateShoppingItemDto], required: false })
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => CreateShoppingItemDto)
-    items?: CreateShoppingItemDto[];
 }
