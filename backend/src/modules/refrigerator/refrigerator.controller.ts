@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { RefrigeratorService } from './refrigerator.service';
 import { FridgeDishService } from './services/fridge-dish.service';
@@ -21,6 +22,7 @@ import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGu
 import type { JwtUser } from '../../common/types/user.type';
 
 @Controller('api/fridge')
+@UseGuards(JwtAuthGuard)
 export class RefrigeratorController {
   constructor(
     private readonly refrigeratorService: RefrigeratorService,
@@ -30,81 +32,93 @@ export class RefrigeratorController {
 
   // ---------------- Refrigerator ----------------
   @Post()
-  create(@Body() dto: CreateRefrigeratorDto) {
-    return this.refrigeratorService.create(dto);
+  async create(@Body() dto: CreateRefrigeratorDto, @User() user: JwtUser) {
+    return await this.refrigeratorService.create(dto, user);
   }
 
   @Get()
-  findAll() {
-    return this.refrigeratorService.findAll();
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async findAll() {
+    return await this.refrigeratorService.findAll();
+  }
+
+  @Get('my-frifge')
+  async myFridge(@User() user: JwtUser) {
+    return await this.refrigeratorService.myFridge(user);
+  }
+
+  @Get('my-family/:id')
+  async myFamilyFridge(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.refrigeratorService.myFamilyFridge(id, user);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.refrigeratorService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.refrigeratorService.findOne(id, user);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRefrigeratorDto) {
-    return this.refrigeratorService.update(id, dto);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRefrigeratorDto, @User() user: JwtUser) {
+    return await this.refrigeratorService.update(id, dto, user);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.refrigeratorService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.refrigeratorService.remove(id, user);
   }
 
   // ---------------- Fridge Dishes ----------------
   @Post(':id/dishes')
-  addDish(@Param('id', ParseIntPipe) refrigerator_id: number, @Body() dto: CreateFridgeDishDto, @User() user: JwtUser) {
-    return this.fridgeDishService.create({ ...dto, refrigerator_id }, user);
+  async addDish(@Param('id', ParseIntPipe) refrigerator_id: number, @Body() dto: CreateFridgeDishDto, @User() user: JwtUser) {
+    return await this.fridgeDishService.create(refrigerator_id, dto, user);
   }
 
   @Get(':id/dishes')
-  getDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
-    return this.fridgeDishService.findByRefrigerator(refrigerator_id, user);
+  async getDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
+    return await this.fridgeDishService.findByRefrigerator(refrigerator_id, user);
   }
 
   @Patch('dishes/:dishId')
-  updateDish(
+  async updateDish(
     @Param('dishId', ParseIntPipe) id: number,
     @Body() dto: UpdateFridgeDishDto,
     @User() user: JwtUser
   ) {
-    return this.fridgeDishService.update(id, dto, user);
+    return await this.fridgeDishService.update(id, dto, user);
   }
 
   @Delete('dishes/:dishId')
-  removeDish(@Param('dishId', ParseIntPipe) id: number, @User() user: JwtUser) {
-    return this.fridgeDishService.remove(id, user);
+  async removeDish(@Param('dishId', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.fridgeDishService.remove(id, user);
   }
 
   // ---------------- Fridge Ingredients ----------------
   @Post(':id/ingredients')
-  addIngredient(
+  async addIngredient(
     @Param('id', ParseIntPipe) refrigerator_id: number,
     @Body() dto: CreateFridgeIngredientDto,
     @User() user: JwtUser
   ) {
-    return this.fridgeIngredientService.create({ ...dto, refrigerator_id }, user);
+    return await this.fridgeIngredientService.create(refrigerator_id, dto, user);
   }
 
   @Get(':id/ingredients')
-  getIngredients(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
-    return this.fridgeIngredientService.findByRefrigerator(refrigerator_id, user);
+  async getIngredients(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
+    return await this.fridgeIngredientService.findByRefrigerator(refrigerator_id, user);
   }
 
   @Patch('ingredients/:ingredientId')
-  updateIngredient(
+  async updateIngredient(
     @Param('ingredientId', ParseIntPipe) id: number,
     @Body() dto: UpdateFridgeIngredientDto,
     @User() user: JwtUser
   ) {
-    return this.fridgeIngredientService.update(id, dto, user);
+    return await this.fridgeIngredientService.update(id, dto, user);
   }
 
   @Delete('ingredients/:ingredientId')
-  removeIngredient(@Param('ingredientId', ParseIntPipe) id: number, @User() user: JwtUser) {
-    return this.fridgeIngredientService.remove(id, user);
+  async removeIngredient(@Param('ingredientId', ParseIntPipe) id: number, @User() user: JwtUser) {
+    return await this.fridgeIngredientService.remove(id, user);
   }
 }

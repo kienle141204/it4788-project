@@ -5,7 +5,7 @@ export class CreateRefrigeratorDto {
     @IsNumber()
     owner_id: number;
 
-    @IsOptional() // family_id có thể null
+    @IsOptional() // Nếu family_id là null thì tự tạo tủ lạnh cho bản thân
     @IsNumber()
     family_id?: number;
 }
