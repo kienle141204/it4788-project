@@ -21,17 +21,17 @@ import { User } from '../../common/decorators/user.decorator';
 import type { JwtUser } from '../../common/types/user.type';
 
 @ApiTags('Users')
-@Controller('users')
+@Controller('api/users')
 export class UserController {
   constructor(private readonly userService: UserService) { }
 
-  /** 👤 Public create user */
+  /** Public create user */
   @Post()
   async createUser(@Body() dto: CreateUserDto) {
     return await this.userService.createUser(dto);
   }
 
-  /** 📄 Admin: get all users */
+  /** Admin: get all users */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -40,7 +40,7 @@ export class UserController {
     return this.userService.getAllUsers();
   }
 
-  /** 👀 Get user by ID */
+  /** Get user by ID */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
   @Get(':id')
@@ -48,7 +48,7 @@ export class UserController {
     return this.userService.getUserById(id);
   }
 
-  /** ✏️ Update user */
+  /** Update user */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
   @Put(':id')
@@ -60,7 +60,7 @@ export class UserController {
     return await this.userService.updateUser(id, dto);
   }
 
-  /** ❌ Delete user */
+  /** Delete user */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
   @Delete(':id')

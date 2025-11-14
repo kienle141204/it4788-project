@@ -24,7 +24,7 @@ export class ShoppingItem {
   stock: number;
 
   @Column({ name: 'price', type: 'decimal', precision: 10, scale: 2, nullable: true })
-  price: number;
+  price: number | null;
 
   @Column({ name: 'is_checked', type: 'boolean', nullable: true })
   is_checked: boolean;
