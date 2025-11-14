@@ -55,7 +55,7 @@ import { IngredientModule } from './modules/ingredient/ingredient.module';
         return dbConfig;
       },
     }),
-
+    
     UserModule,
     AuthModule,
     FamilyModule,

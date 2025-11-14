@@ -1,7 +1,27 @@
-import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, Max, IsEnum } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { MenuTime } from '../../../entities/menu.entity';
 
 export class CreateMenuDto {
+  @IsOptional()
+  @IsEnum(MenuTime, {
+    message: 'Time must be one of: breakfast, morning_snack, lunch, afternoon_snack, dinner, late_night',
+  })
+  time?: MenuTime;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class UpdateMenuDto {
+  @IsOptional()
+  @IsEnum(MenuTime, {
+    message: 'Time must be one of: breakfast, morning_snack, lunch, afternoon_snack, dinner, late_night',
+  })
+  time?: MenuTime;
+
+  @IsOptional()
   @IsString()
   description?: string;
 }
@@ -47,6 +67,12 @@ export class GetMenusDto {
   @Transform(({ value }) => parseInt(value))
   @IsInt()
   familyId?: number;
+
+  @IsOptional()
+  @IsEnum(MenuTime, {
+    message: 'Time must be one of: breakfast, morning_snack, lunch, afternoon_snack, dinner, late_night',
+  })
+  time?: MenuTime;
 }
 
 export class GetMenuDishesByDateDto {

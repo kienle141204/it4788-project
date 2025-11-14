@@ -54,3 +54,7 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+
+#firebase
+push-notification-it4788-firebase-adminsdk-fbsvc-12dc0d0ddf.json

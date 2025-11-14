@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { MenuService } from './menu.service';
-import { CreateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
+import { CreateMenuDto, UpdateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Menus')
@@ -23,17 +23,30 @@ export class MenuController {
 
   /**
    * Lấy danh sách menu với phân trang
-   * GET /menus?page=1&limit=10&familyId=1
+   * GET /api/menus?page=1&limit=10&familyId=1
    */
   @Get()
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  async findAll(@Query() getMenusDto: GetMenusDto) {
-    const result = await this.menuService.findAllWithPagination(getMenusDto);
+  async findAll(@Query() getMenusDto: GetMenusDto, @Request() req: any) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const result = await this.menuService.findAllWithPagination(getMenusDto, userId, userRole);
     
     let message = `Lấy danh sách menu trang ${result.page} thành công`;
     if (getMenusDto.familyId) {
       message += ` của gia đình ID ${getMenusDto.familyId}`;
+    }
+    if (getMenusDto.time) {
+      const timeLabels: Record<string, string> = {
+        breakfast: 'Bữa sáng',
+        morning_snack: 'Bữa phụ sáng',
+        lunch: 'Bữa trưa',
+        afternoon_snack: 'Bữa phụ chiều',
+        dinner: 'Bữa tối',
+        late_night: 'Bữa khuya',
+      };
+      message += ` - ${timeLabels[getMenusDto.time] || getMenusDto.time}`;
     }
 
     return {
@@ -58,8 +71,13 @@ export class MenuController {
   @Get('dishes/by-date')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  async getMenuDishesByDate(@Query() getMenuDishesByDateDto: GetMenuDishesByDateDto) {
-    const dishes = await this.menuService.getMenuDishesByDate(getMenuDishesByDateDto);
+  async getMenuDishesByDate(
+    @Query() getMenuDishesByDateDto: GetMenuDishesByDateDto,
+    @Request() req: any,
+  ) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const dishes = await this.menuService.getMenuDishesByDate(getMenuDishesByDateDto, userId, userRole);
     
     let message = 'Lấy danh sách món ăn trong menu thành công';
     if (getMenuDishesByDateDto.date) {
@@ -81,8 +99,13 @@ export class MenuController {
   @Get(':menuId/total')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  async calculateMenuTotal(@Param('menuId', ParseIntPipe) menuId: number) {
-    const result = await this.menuService.calculateMenuTotal(menuId);
+  async calculateMenuTotal(
+    @Param('menuId', ParseIntPipe) menuId: number,
+    @Request() req: any,
+  ) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const result = await this.menuService.calculateMenuTotal(menuId, userId, userRole);
     return {
       success: true,
       message: `Tính tổng tiền menu ID ${menuId} thành công`,
@@ -97,8 +120,10 @@ export class MenuController {
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const menu = await this.menuService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const menu = await this.menuService.findOne(id, userId, userRole);
     return {
       success: true,
       message: 'Lấy thông tin menu thành công',
@@ -108,7 +133,7 @@ export class MenuController {
 
   /**
    * Tạo menu mới
-   * POST /menus?familyId=1
+   * POST /api/menus?familyId=1
    */
   @Post()
   @ApiBearerAuth('JWT-auth')
@@ -119,7 +144,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const menu = await this.menuService.createMenu(createMenuDto, familyId, userId);
+    const userRole = req.user.role;
+    const menu = await this.menuService.createMenu(createMenuDto, familyId, userId, userRole);
     
     return {
       success: true,
@@ -129,8 +155,31 @@ export class MenuController {
   }
 
   /**
+   * Cập nhật menu
+   * PUT /api/menus/:id
+   */
+  @Put(':id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async updateMenu(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateMenuDto: UpdateMenuDto,
+    @Request() req: any,
+  ) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const menu = await this.menuService.updateMenu(id, updateMenuDto, userId, userRole);
+    
+    return {
+      success: true,
+      message: 'Cập nhật menu thành công',
+      data: menu,
+    };
+  }
+
+  /**
    * Thêm món ăn vào menu
-   * POST /menus/:menuId/dishes
+   * POST /api/menus/:menuId/dishes
    */
   @Post(':menuId/dishes')
   @ApiBearerAuth('JWT-auth')
@@ -141,7 +190,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const menuDish = await this.menuService.addDishToMenu(menuId, createMenuDishDto, userId);
+    const userRole = req.user.role;
+    const menuDish = await this.menuService.addDishToMenu(menuId, createMenuDishDto, userId, userRole);
     
     return {
       success: true,
@@ -163,7 +213,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const menuDish = await this.menuService.updateMenuDish(menuDishId, updateMenuDishDto, userId);
+    const userRole = req.user.role;
+    const menuDish = await this.menuService.updateMenuDish(menuDishId, updateMenuDishDto, userId, userRole);
     
     return {
       success: true,
@@ -184,7 +235,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    await this.menuService.removeDishFromMenu(menuDishId, userId);
+    const userRole = req.user.role;
+    await this.menuService.removeDishFromMenu(menuDishId, userId, userRole);
     
     return {
       success: true,
@@ -204,7 +256,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    await this.menuService.deleteMenu(id, userId);
+    const userRole = req.user.role;
+    await this.menuService.deleteMenu(id, userId, userRole);
     
     return {
       success: true,
