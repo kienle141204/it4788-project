@@ -43,7 +43,7 @@ export class AuthService {
   /**
    * Đăng ký tạm thời và gửi OTP
    */
-  async registerTemp(registerTempDto: RegisterTempDto): Promise<{ message: string }> {
+  async registerTemp(registerTempDto: RegisterTempDto): Promise<{ message: string ,note: string}> {
     const { email, phone_number, password } = registerTempDto;
 
     // Kiểm tra email đã tồn tại trong bảng users chưa
@@ -87,6 +87,7 @@ export class AuthService {
 
     return {
       message: 'Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP xác minh.',
+      note: 'Vui lòng kiểm tra email để lấy mã OTP xác minh.',
     };
   }
 

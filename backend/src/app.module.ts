@@ -56,7 +56,7 @@ import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
         return dbConfig;
       },
     }),
-
+    
     UserModule,
     AuthModule,
     FamilyModule,

@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { MenuService } from './menu.service';
-import { CreateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
+import { CreateMenuDto, UpdateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Menus')
@@ -23,17 +23,30 @@ export class MenuController {
 
   /**
    * Lấy danh sách menu với phân trang
-   * GET /menus?page=1&limit=10&familyId=1
+   * GET /api/menus?page=1&limit=10&familyId=1
    */
   @Get()
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  async findAll(@Query() getMenusDto: GetMenusDto) {
-    const result = await this.menuService.findAllWithPagination(getMenusDto);
+  async findAll(@Query() getMenusDto: GetMenusDto, @Request() req: any) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const result = await this.menuService.findAllWithPagination(getMenusDto, userId, userRole);
     
     let message = `Lấy danh sách menu trang ${result.page} thành công`;
     if (getMenusDto.familyId) {
       message += ` của gia đình ID ${getMenusDto.familyId}`;
+    }
+    if (getMenusDto.time) {
+      const timeLabels: Record<string, string> = {
+        breakfast: 'Bữa sáng',
+        morning_snack: 'Bữa phụ sáng',
+        lunch: 'Bữa trưa',
+        afternoon_snack: 'Bữa phụ chiều',
+        dinner: 'Bữa tối',
+        late_night: 'Bữa khuya',
+      };
+      message += ` - ${timeLabels[getMenusDto.time] || getMenusDto.time}`;
     }
 
     return {
@@ -58,22 +71,25 @@ export class MenuController {
   @Get('dishes/by-date')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
-    summary: 'Lấy món ăn trong menu theo ngày',
-    description: 'API này trả về danh sách món ăn trong menu của một ngày cụ thể.'
-  })
-  @ApiQuery({ name: 'date', required: false, type: String, example: '2024-01-20', description: 'Ngày cần lấy menu (format: YYYY-MM-DD)' })
-  @ApiQuery({ name: 'familyId', required: false, type: Number, example: 1, description: 'ID của gia đình' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lấy danh sách món ăn thành công',
-    example: {
-      success: true,
-      message: 'Lấy danh sách món ăn trong menu thành công cho ngày 2024-01-20',
-      data: [],
-      total: 0
-    }
-  })
+// <<<<<<< frontend/market
+//   @ApiOperation({ 
+//     summary: 'Lấy món ăn trong menu theo ngày',
+//     description: 'API này trả về danh sách món ăn trong menu của một ngày cụ thể.'
+//   })
+//   @ApiQuery({ name: 'date', required: false, type: String, example: '2024-01-20', description: 'Ngày cần lấy menu (format: YYYY-MM-DD)' })
+//   @ApiQuery({ name: 'familyId', required: false, type: Number, example: 1, description: 'ID của gia đình' })
+//   @ApiResponse({ 
+//     status: 200, 
+//     description: 'Lấy danh sách món ăn thành công',
+//     example: {
+//       success: true,
+//       message: 'Lấy danh sách món ăn trong menu thành công cho ngày 2024-01-20',
+//       data: [],
+//       total: 0
+//     }
+//   })
+// =======
+// >>>>>>> main
   async getMenuDishesByDate(
     @Query() getMenuDishesByDateDto: GetMenuDishesByDateDto,
     @Request() req: any,
@@ -102,23 +118,26 @@ export class MenuController {
   @Get(':menuId/total')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
-    summary: 'Tính tổng tiền menu',
-    description: 'API này tính tổng tiền của tất cả các món ăn trong menu.'
-  })
-  @ApiParam({ name: 'menuId', type: 'number', example: 1, description: 'ID của menu' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Tính tổng tiền thành công',
-    example: {
-      success: true,
-      message: 'Tính tổng tiền menu ID 1 thành công',
-      data: {
-        total: 500000,
-        currency: 'VND'
-      }
-    }
-  })
+// <<<<<<< frontend/market
+//   @ApiOperation({ 
+//     summary: 'Tính tổng tiền menu',
+//     description: 'API này tính tổng tiền của tất cả các món ăn trong menu.'
+//   })
+//   @ApiParam({ name: 'menuId', type: 'number', example: 1, description: 'ID của menu' })
+//   @ApiResponse({ 
+//     status: 200, 
+//     description: 'Tính tổng tiền thành công',
+//     example: {
+//       success: true,
+//       message: 'Tính tổng tiền menu ID 1 thành công',
+//       data: {
+//         total: 500000,
+//         currency: 'VND'
+//       }
+//     }
+//   })
+// =======
+// >>>>>>> main
   async calculateMenuTotal(
     @Param('menuId', ParseIntPipe) menuId: number,
     @Request() req: any,
@@ -140,26 +159,29 @@ export class MenuController {
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
-    summary: 'Lấy menu theo ID',
-    description: 'API này trả về thông tin chi tiết của một menu theo ID.'
-  })
-  @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của menu' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lấy thông tin menu thành công',
-    example: {
-      success: true,
-      message: 'Lấy thông tin menu thành công',
-      data: {
-        id: 1,
-        family_id: 1,
-        date: '2024-01-01',
-        meal_type: 'breakfast'
-      }
-    }
-  })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy menu' })
+// <<<<<<< frontend/market
+//   @ApiOperation({ 
+//     summary: 'Lấy menu theo ID',
+//     description: 'API này trả về thông tin chi tiết của một menu theo ID.'
+//   })
+//   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của menu' })
+//   @ApiResponse({ 
+//     status: 200, 
+//     description: 'Lấy thông tin menu thành công',
+//     example: {
+//       success: true,
+//       message: 'Lấy thông tin menu thành công',
+//       data: {
+//         id: 1,
+//         family_id: 1,
+//         date: '2024-01-01',
+//         meal_type: 'breakfast'
+//       }
+//     }
+//   })
+//   @ApiResponse({ status: 404, description: 'Không tìm thấy menu' })
+// =======
+// >>>>>>> main
   async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userId = req.user.id;
     const userRole = req.user.role;
@@ -173,7 +195,7 @@ export class MenuController {
 
   /**
    * Tạo menu mới
-   * POST /menus?familyId=1
+   * POST /api/menus?familyId=1
    */
   @Post()
   @ApiBearerAuth('JWT-auth')
@@ -184,7 +206,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const menu = await this.menuService.createMenu(createMenuDto, familyId, userId);
+    const userRole = req.user.role;
+    const menu = await this.menuService.createMenu(createMenuDto, familyId, userId, userRole);
     
     return {
       success: true,
@@ -194,8 +217,31 @@ export class MenuController {
   }
 
   /**
+   * Cập nhật menu
+   * PUT /api/menus/:id
+   */
+  @Put(':id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async updateMenu(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateMenuDto: UpdateMenuDto,
+    @Request() req: any,
+  ) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const menu = await this.menuService.updateMenu(id, updateMenuDto, userId, userRole);
+    
+    return {
+      success: true,
+      message: 'Cập nhật menu thành công',
+      data: menu,
+    };
+  }
+
+  /**
    * Thêm món ăn vào menu
-   * POST /menus/:menuId/dishes
+   * POST /api/menus/:menuId/dishes
    */
   @Post(':menuId/dishes')
   @ApiBearerAuth('JWT-auth')
@@ -239,7 +285,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const menuDish = await this.menuService.addDishToMenu(menuId, createMenuDishDto, userId);
+    const userRole = req.user.role;
+    const menuDish = await this.menuService.addDishToMenu(menuId, createMenuDishDto, userId, userRole);
     
     return {
       success: true,
@@ -291,7 +338,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const menuDish = await this.menuService.updateMenuDish(menuDishId, updateMenuDishDto, userId);
+    const userRole = req.user.role;
+    const menuDish = await this.menuService.updateMenuDish(menuDishId, updateMenuDishDto, userId, userRole);
     
     return {
       success: true,
@@ -326,7 +374,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    await this.menuService.removeDishFromMenu(menuDishId, userId);
+    const userRole = req.user.role;
+    await this.menuService.removeDishFromMenu(menuDishId, userId, userRole);
     
     return {
       success: true,
@@ -361,7 +410,8 @@ export class MenuController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    await this.menuService.deleteMenu(id, userId);
+    const userRole = req.user.role;
+    await this.menuService.deleteMenu(id, userId, userRole);
     
     return {
       success: true,
