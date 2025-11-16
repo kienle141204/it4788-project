@@ -4,13 +4,13 @@ import { Family } from '../../entities/family.entity';
 import { FamilyService } from './family.service';
 import { FamilyController } from './family.controller';
 import { MemberModule } from '../member/member.module';
-import { FirebaseModule } from '../../firebase/firebase.module';
+// import { FirebaseModule } from '../../firebase/firebase.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Family]),
     MemberModule,
-    FirebaseModule,
+    // FirebaseModule,
   ],
   controllers: [FamilyController],
   providers: [FamilyService],

@@ -11,14 +11,16 @@ export const homeStyles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 0,
     paddingBottom: 20,
+    marginTop: 30,
   },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    width: '100%',
   },
   homeTitle: {
     fontSize: 18,
@@ -28,10 +30,12 @@ export const homeStyles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0, // Không cho phép co lại
   },
   notificationButton: {
-    marginRight: 15,
+    marginRight: 12,
     position: 'relative',
+    padding: 4, // Thêm padding để dễ nhấn
   },
   notificationBadge: {
     position: 'absolute',
@@ -45,12 +49,24 @@ export const homeStyles = StyleSheet.create({
   userProfile: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    flexShrink: 1, // Cho phép co lại nếu cần
+    minWidth: 0, // Cho phép text truncate
   },
   profileImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     marginRight: 15,
+  },
+  profileImageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.lightBlue, // Light blue background
+    marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userInfo: {
     flex: 1,

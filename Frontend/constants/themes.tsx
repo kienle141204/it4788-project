@@ -1,6 +1,6 @@
 export const COLORS = {
-  primary: "#298d4eff",
-  secondary: "#175536ff",
+  primary: "#8B5CF6", // Màu tím như home
+  secondary: "#A78BFA", // Light purple
   background: "#fff",
   backgroundLight: "#eee9ff",
   surface: "#1A1A1A",

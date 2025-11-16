@@ -23,7 +23,7 @@ export default function login() {
         const token = await checkAsyncStorage();
         console.log(token)
         if (token) {
-          route.replace('/(home)');
+          route.replace('/(market)/market_screen');
         }
       };
       checkToken();
@@ -48,13 +48,11 @@ export default function login() {
             />
         </View>
 
-        <View >
-            <TouchableOpacity style={styles.nextStepButton} onPress={nextPage} activeOpacity={0.9}>
-            <Text style={styles.nextStepText}>Tiếp theo</Text>
-            <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8, marginTop: 2 }} />
+        <View style={styles.loginSection}>
+            <TouchableOpacity style={styles.nextStepButton} onPress={nextPage} activeOpacity={0.8}>
+                <Text style={styles.nextStepText}>Tiếp theo</Text>
+                <Ionicons name="arrow-forward" size={18} color={COLORS.white} style={{ marginLeft: 8 }} />
             </TouchableOpacity>
-
-
         </View>
     </View>
     </>

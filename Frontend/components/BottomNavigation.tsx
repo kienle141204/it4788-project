@@ -46,7 +46,7 @@ export default function BottomNavigation({ activeTab, onTabPress }: BottomNaviga
               <Ionicons
                 name={activeTab === tab.id ? tab.activeIcon as any : tab.icon as any}
                 size={24}
-                color={activeTab === tab.id ? COLORS.purple : '#A0A0C0'}
+                color={activeTab === tab.id ? COLORS.purple : COLORS.grey}
               />
             </TouchableOpacity>
           );
@@ -66,14 +66,14 @@ const styles = StyleSheet.create({
     zIndex: 999, 
   },
   navigation: {
-    backgroundColor: '#F5F5FF',
+    backgroundColor: COLORS.backgroundLight || COLORS.white,
     paddingHorizontal: 5,
     paddingVertical: 5,
     paddingBottom: 5,
     flexDirection: 'row',
     justifyContent: 'space-around', 
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: COLORS.shadow || '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -96,9 +96,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: COLORS.purple,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    // marginTop: -20, 
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
+    marginTop: -50, // Nhô lên so với các nút khác
+    zIndex: 10,
   },
 });
