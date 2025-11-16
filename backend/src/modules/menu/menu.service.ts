@@ -66,7 +66,7 @@ export class MenuService {
   /**
    * Lấy menu theo ID
    */
-  async findOne(id: number): Promise<Menu> {
+  async findOne(id: number, userId: number, userRole: string): Promise<Menu> {
     const menu = await this.menuRepository.findOne({
       where: { id },
       relations: ['family', 'menuDishes', 'menuDishes.dish'],
@@ -74,6 +74,17 @@ export class MenuService {
 
     if (!menu) {
       throw new NotFoundException('Không tìm thấy menu');
+    }
+
+    // Nếu user không phải admin, kiểm tra quyền truy cập
+    if (userRole !== 'admin') {
+      const isMember = await this.familyMemberRepository.findOne({
+        where: { family_id: menu.family_id, user_id: userId },
+      });
+
+      if (!isMember && menu.family.owner_id !== userId) {
+        throw new ForbiddenException('Bạn không có quyền xem menu này');
+      }
     }
 
     return menu;
@@ -261,18 +272,35 @@ export class MenuService {
   /**
    * Lấy danh sách menu dishes theo ngày (từ created_at của menu)
    */
-  async getMenuDishesByDate(getMenuDishesByDateDto: GetMenuDishesByDateDto): Promise<any[]> {
+  async getMenuDishesByDate(
+    getMenuDishesByDateDto: GetMenuDishesByDateDto,
+    userId: number,
+    userRole: string,
+  ): Promise<any[]> {
     const { date } = getMenuDishesByDateDto;
 
     const queryBuilder = this.menuDishRepository
       .createQueryBuilder('menuDish')
       .leftJoinAndSelect('menuDish.dish', 'dish')
       .leftJoin('menuDish.menu', 'menu')
+      .leftJoin('menu.family', 'family')
       .orderBy('menuDish.created_at', 'ASC');
 
-    // Nếu có date, lọc theo ngày của menu.created_at
-    if (date) {
-      queryBuilder.where('DATE(menu.created_at) = :date', { date });
+    // Nếu user không phải admin, chỉ lấy menu dishes của các family mà user là member
+    if (userRole !== 'admin') {
+      queryBuilder
+        .leftJoin('family.familyMembers', 'familyMember')
+        .where('(familyMember.user_id = :userId OR family.owner_id = :userId)', { userId });
+      
+      // Nếu có date, thêm điều kiện lọc theo ngày
+      if (date) {
+        queryBuilder.andWhere('DATE(menu.created_at) = :date', { date });
+      }
+    } else {
+      // Admin có thể xem tất cả, chỉ cần lọc theo date nếu có
+      if (date) {
+        queryBuilder.where('DATE(menu.created_at) = :date', { date });
+      }
     }
 
     const menuDishes = await queryBuilder.getMany();
@@ -294,25 +322,42 @@ export class MenuService {
   /**
    * Tính tổng tiền bữa ăn cho một menu
    */
-  async calculateMenuTotal(menuId: number): Promise<{
+  async calculateMenuTotal(
+    menuId: number,
+    userId: number,
+    userRole: string,
+  ): Promise<{
     menu_id: number;
     total_amount: number;
     items_count: number;
     items: any[];
   }> {
+    // Kiểm tra menu có tồn tại không
+    const menu = await this.menuRepository.findOne({
+      where: { id: menuId },
+      relations: ['family'],
+    });
+    
+    if (!menu) {
+      throw new NotFoundException('Không tìm thấy menu');
+    }
+
+    // Nếu user không phải admin, kiểm tra quyền truy cập
+    if (userRole !== 'admin') {
+      const isMember = await this.familyMemberRepository.findOne({
+        where: { family_id: menu.family_id, user_id: userId },
+      });
+
+      if (!isMember && menu.family.owner_id !== userId) {
+        throw new ForbiddenException('Bạn không có quyền xem menu này');
+      }
+    }
+
     // Lấy tất cả menu dishes của menu
     const menuDishes = await this.menuDishRepository.find({
       where: { menu_id: menuId },
       relations: ['dish'],
     });
-
-    // Kiểm tra menu có tồn tại không
-    if (menuDishes.length === 0) {
-      const menu = await this.menuRepository.findOne({ where: { id: menuId } });
-      if (!menu) {
-        throw new NotFoundException('Không tìm thấy menu');
-      }
-    }
 
     // Tính tổng: stock * price
     let totalAmount = 0;

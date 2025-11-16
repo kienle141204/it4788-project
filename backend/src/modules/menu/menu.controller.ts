@@ -74,8 +74,13 @@ export class MenuController {
       total: 0
     }
   })
-  async getMenuDishesByDate(@Query() getMenuDishesByDateDto: GetMenuDishesByDateDto) {
-    const dishes = await this.menuService.getMenuDishesByDate(getMenuDishesByDateDto);
+  async getMenuDishesByDate(
+    @Query() getMenuDishesByDateDto: GetMenuDishesByDateDto,
+    @Request() req: any,
+  ) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const dishes = await this.menuService.getMenuDishesByDate(getMenuDishesByDateDto, userId, userRole);
     
     let message = 'Lấy danh sách món ăn trong menu thành công';
     if (getMenuDishesByDateDto.date) {
@@ -114,8 +119,13 @@ export class MenuController {
       }
     }
   })
-  async calculateMenuTotal(@Param('menuId', ParseIntPipe) menuId: number) {
-    const result = await this.menuService.calculateMenuTotal(menuId);
+  async calculateMenuTotal(
+    @Param('menuId', ParseIntPipe) menuId: number,
+    @Request() req: any,
+  ) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const result = await this.menuService.calculateMenuTotal(menuId, userId, userRole);
     return {
       success: true,
       message: `Tính tổng tiền menu ID ${menuId} thành công`,
@@ -150,8 +160,10 @@ export class MenuController {
     }
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy menu' })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const menu = await this.menuService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const menu = await this.menuService.findOne(id, userId, userRole);
     return {
       success: true,
       message: 'Lấy thông tin menu thành công',
