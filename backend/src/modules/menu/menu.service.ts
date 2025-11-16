@@ -76,13 +76,17 @@ export class MenuService {
       throw new NotFoundException('Không tìm thấy menu');
     }
 
-    // Nếu user không phải admin, kiểm tra quyền truy cập
-    if (userRole !== 'admin') {
+    // Nếu role là user, kiểm tra quyền truy cập
+    if (userRole === 'user') {
+      // Kiểm tra user có phải owner của family không
+      const isOwner = menu.family.owner_id === userId;
+
+      // Kiểm tra user có phải member của family không
       const isMember = await this.familyMemberRepository.findOne({
         where: { family_id: menu.family_id, user_id: userId },
       });
 
-      if (!isMember && menu.family.owner_id !== userId) {
+      if (!isOwner && !isMember) {
         throw new ForbiddenException('Bạn không có quyền xem menu này');
       }
     }
@@ -282,25 +286,48 @@ export class MenuService {
     const queryBuilder = this.menuDishRepository
       .createQueryBuilder('menuDish')
       .leftJoinAndSelect('menuDish.dish', 'dish')
-      .leftJoin('menuDish.menu', 'menu')
-      .leftJoin('menu.family', 'family')
+      .leftJoinAndSelect('menuDish.menu', 'menu')
+      .leftJoinAndSelect('menu.family', 'family')
       .orderBy('menuDish.created_at', 'ASC');
 
-    // Nếu user không phải admin, chỉ lấy menu dishes của các family mà user là member
-    if (userRole !== 'admin') {
-      queryBuilder
-        .leftJoin('family.familyMembers', 'familyMember')
-        .where('(familyMember.user_id = :userId OR family.owner_id = :userId)', { userId });
-      
+    // Nếu role là user, chỉ cho xem menu dishes của các family mà user là owner hoặc member
+    if (userRole === 'user') {
+      // Lấy danh sách family_id mà user là owner hoặc member
+      const ownedFamilies = await this.familyRepository.find({
+        where: { owner_id: userId },
+        select: ['id'],
+      });
+      const ownedFamilyIds = ownedFamilies.map(f => f.id);
+
+      const memberFamilies = await this.familyMemberRepository.find({
+        where: { user_id: userId },
+        select: ['family_id'],
+      });
+      const memberFamilyIds = memberFamilies.map(fm => fm.family_id);
+
+      // Gộp danh sách family_id mà user có quyền truy cập
+      const accessibleFamilyIds = [...new Set([...ownedFamilyIds, ...memberFamilyIds])];
+
+      if (accessibleFamilyIds.length === 0) {
+        // User không có quyền truy cập family nào, trả về empty
+        return [];
+      }
+
+      // Chỉ lấy menu dishes của các menu thuộc các family mà user có quyền truy cập
+      queryBuilder.where('family.id IN (:...accessibleFamilyIds)', {
+        accessibleFamilyIds,
+      });
+
       // Nếu có date, thêm điều kiện lọc theo ngày
       if (date) {
         queryBuilder.andWhere('DATE(menu.created_at) = :date', { date });
       }
     } else {
-      // Admin có thể xem tất cả, chỉ cần lọc theo date nếu có
+      // Nếu role là admin và có date, lọc theo ngày
       if (date) {
         queryBuilder.where('DATE(menu.created_at) = :date', { date });
       }
+      // Nếu admin và không có date, xem tất cả menu dishes
     }
 
     const menuDishes = await queryBuilder.getMany();
@@ -332,23 +359,27 @@ export class MenuService {
     items_count: number;
     items: any[];
   }> {
-    // Kiểm tra menu có tồn tại không
+    // Tìm menu và kiểm tra quyền truy cập
     const menu = await this.menuRepository.findOne({
       where: { id: menuId },
       relations: ['family'],
     });
-    
+
     if (!menu) {
       throw new NotFoundException('Không tìm thấy menu');
     }
 
-    // Nếu user không phải admin, kiểm tra quyền truy cập
-    if (userRole !== 'admin') {
+    // Nếu role là user, kiểm tra quyền truy cập
+    if (userRole === 'user') {
+      // Kiểm tra user có phải owner của family không
+      const isOwner = menu.family.owner_id === userId;
+
+      // Kiểm tra user có phải member của family không
       const isMember = await this.familyMemberRepository.findOne({
         where: { family_id: menu.family_id, user_id: userId },
       });
 
-      if (!isMember && menu.family.owner_id !== userId) {
+      if (!isOwner && !isMember) {
         throw new ForbiddenException('Bạn không có quyền xem menu này');
       }
     }
