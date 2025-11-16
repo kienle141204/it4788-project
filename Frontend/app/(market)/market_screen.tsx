@@ -9,182 +9,373 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
+  BackHandler,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { commonStyles } from "@/styles/common.styles";
 import { marketStyles } from "@/styles/market.styles";
-import { ingredientPagination } from "@/service/market";
+import { ingredientPagination, searchIngredients } from "@/service/market";
 import { COLORS } from "@/constants/themes";
 
-const categories = ["Thịt", "Cá", "Rau Củ", "Hải Sản"];
+// Mapping category names to IDs (có thể lấy từ API sau)
+const categoryMap: { [key: string]: number } = {
+  "Thịt": 1,
+  "Rau củ": 2,
+  "Hoa quả": 3,
+  "Tôm Ốc": 4,
+  "Cá": 5,
+};
+
+const categories = ["Thịt", "Rau củ", "Hoa quả", "Tôm Ốc", "Cá"];
 
 export default function MarketScreen() {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [data, setData] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [prev, setPrev] = useState(false)
-  const [next, setNext] = useState(true)
+  const [refreshing, setRefreshing] = useState(false);
+  const [prev, setPrev] = useState(false);
+  const [next, setNext] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  // Xử lý nút back trên điện thoại - quay về home
+  useEffect(() => {
+    const backAction = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push('/(home)');
+      }
+      return true; // Ngăn hành vi mặc định (không hiện thông báo thoát)
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [router]);
 
   useEffect(() => {
-    const handlePagination = async () => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 500); 
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await ingredientPagination({ page: currentPage, limit: 5 });
+        let res;
+
+        if (debouncedSearchQuery.trim() || selectedCategory) {
+          const searchParams: any = {
+            page: currentPage,
+            limit: 8,
+          };
+
+          if (debouncedSearchQuery.trim()) {
+            searchParams.name = debouncedSearchQuery.trim();
+          }
+
+          if (selectedCategory && categoryMap[selectedCategory]) {
+            searchParams.category_id = categoryMap[selectedCategory];
+          }
+
+          res = await searchIngredients(searchParams);
+        } else {
+          res = await ingredientPagination({ page: currentPage, limit: 8 });
+        }
 
         if (res?.data) {
           setData(res.data);
-          setTotalPages(res.pagination.totalPages); 
-          setPrev(res.pagination.hasPrevPage)
-          setNext(res.pagination.hasNextPage)
-          console.log(prev, next)
+          setTotalPages(res.pagination?.totalPages || 1);
+          setPrev(res.pagination?.hasPrevPage || false);
+          setNext(res.pagination?.hasNextPage || false);
         }
       } catch (e) {
-        console.error(e);
+        console.error("Error fetching data:", e);
       } finally {
         setLoading(false);
       }
     };
 
-    handlePagination();
-  }, [currentPage]);
+    fetchData();
+  }, [currentPage, debouncedSearchQuery, selectedCategory]);
 
-  return (
-    <View style={commonStyles.container}>
-      {/* Header */}
-      <View style={marketStyles.header}>
-        <Text style={marketStyles.title}>Chợ nông sản</Text>
-        <View style={marketStyles.iconGroup}>
-          <Ionicons name="notifications-outline" size={22} color="black" />
-          <Ionicons name="person-circle-outline" size={28} color="black" />
-        </View>
-      </View>
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setCurrentPage(1);
+    try {
+      let res;
+      
+      if (debouncedSearchQuery.trim() || selectedCategory) {
+        const searchParams: any = {
+          page: 1,
+          limit: 8,
+        };
 
-      {/* Search Bar */}
-      <View style={marketStyles.searchContainer}>
-        <Ionicons name="search" size={20} color="#aaa" />
-        <TextInput placeholder="Tìm kiếm sản phẩm" style={marketStyles.searchInput} />
-      </View>
-
-      {/* Categories */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginVertical: 10, marginLeft: 10, height: 'auto' }}
-      >
-        {categories.map((cat, index) => (
-          <TouchableOpacity key={index} style={marketStyles.categoryBtn}>
-            <Text style={{ color: COLORS.primary }}>{cat}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Product List */}
-      {loading ? (
-        <ActivityIndicator size="large" color="#4CAF50" style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList
-          data={data}
-          numColumns={2}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={marketStyles.card}>
-              <Image source={{ uri: item.image_url }} style={marketStyles.image} />
-              <Text style={marketStyles.name}>{item.name}</Text>
-              <Text style={marketStyles.price}>{parseInt(item.price).toLocaleString()} VND</Text>
-              <TouchableOpacity style={marketStyles.addBtn}>
-                <Text style={marketStyles.addText}>Thêm vào giỏ</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
-      )}
-
-      {/* Pagination */}
-     <View style={marketStyles.paginationContainer}>
-      {/* Nút Prev */}
-      <TouchableOpacity
-        onPress={() => setCurrentPage(currentPage - 1)}
-        disabled={!prev}
-        style={[
-          marketStyles.pageButton,
-          currentPage === 1 && { opacity: 0.5 }, // làm mờ khi disable
-        ]}
-      >
-        <Text style={{ color: "#333", fontWeight: "500" }}>Prev</Text>
-      </TouchableOpacity>
-
-     
-  {/* Logic hiển thị trang */}
-  {(() => {
-    const pages: (number | string)[] = [];
-
-    // Nếu tổng trang <= 6, hiển thị tất cả
-    if (totalPages <= 6) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-        // Luôn có trang 1
-        pages.push(1);
-
-        // Nếu ở gần đầu
-        if (currentPage <= 3) {
-          pages.push(2, 3, 4, "...", totalPages);
+        if (debouncedSearchQuery.trim()) {
+          searchParams.name = debouncedSearchQuery.trim();
         }
-        // Nếu ở gần cuối
-        else if (currentPage >= totalPages - 2) {
-          pages.push("...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+
+        if (selectedCategory && categoryMap[selectedCategory]) {
+          searchParams.category_id = categoryMap[selectedCategory];
         }
-        // Nếu ở giữa
-        else {
-          pages.push("...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
-        }
+
+        res = await searchIngredients(searchParams);
+      } else {
+        res = await ingredientPagination({ page: 1, limit: 8 });
       }
 
-      return pages.map((page, index) => {
-        if (page === "...") {
-          return (
-            <Text key={`dot-${index}`} style={{ marginHorizontal: 6, color: "#999" }}>
-              ...
-            </Text>
-          );
-        }
+      if (res?.data) {
+        setData(res.data);
+        setTotalPages(res.pagination?.totalPages || 1);
+        setPrev(res.pagination?.hasPrevPage || false);
+        setNext(res.pagination?.hasNextPage || false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-        return (
-          <TouchableOpacity
-            key={page}
-            onPress={() => setCurrentPage(page as number)}
-            style={[
-              marketStyles.pageButton,
-              currentPage === page && marketStyles.activePage,
-            ]}
-          >
-            <Text
-              style={{
-                color: currentPage === page ? "#fff" : "#333",
-                fontWeight: "500",
-              }}
+  return (
+    <View style={marketStyles.safeArea}>
+      <View style={marketStyles.container}>
+    
+        <View style={marketStyles.header}>
+          <View style={marketStyles.headerTop}>
+            <TouchableOpacity 
+              style={marketStyles.backButton}
+              onPress={() => router.back()}
             >
-              {page}
-            </Text>
+              <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
+            </TouchableOpacity>
+            <View style={marketStyles.headerContent}>
+              <Text style={marketStyles.greeting}>Xin chào! 👋</Text>
+              <Text style={marketStyles.title}>Chợ của người Việt</Text>
+            </View>
+            <View style={marketStyles.iconGroup}>
+              <TouchableOpacity style={marketStyles.iconButton}>
+                <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
+                <View style={marketStyles.badge} />
+              </TouchableOpacity>
+              <TouchableOpacity style={marketStyles.iconButton}>
+                <Ionicons name="person-circle-outline" size={28} color={COLORS.darkGrey} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+   
+        <View style={marketStyles.searchContainer}>
+          <Ionicons name="search" size={20} color={COLORS.grey} style={marketStyles.searchIcon} />
+          <TextInput 
+            placeholder="Tìm kiếm sản phẩm..." 
+            placeholderTextColor={COLORS.grey}
+            style={marketStyles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={20} color={COLORS.grey} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+
+        <View style={marketStyles.categoriesWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={marketStyles.categoriesContainer}
+          >
+          <TouchableOpacity 
+            key="all"
+            style={[
+              marketStyles.categoryBtn,
+              selectedCategory === null && marketStyles.categoryBtnActive
+            ]}
+            onPress={() => setSelectedCategory(null)}
+          >
+            <Text style={[
+              marketStyles.categoryText,
+              selectedCategory === null && marketStyles.categoryTextActive
+            ]}>Tất cả</Text>
           </TouchableOpacity>
-        );
-      });
-    })()}
+          {categories.map((cat, index) => (
+            <TouchableOpacity 
+              key={index} 
+              style={[
+                marketStyles.categoryBtn,
+                selectedCategory === cat && marketStyles.categoryBtnActive
+              ]}
+              onPress={() => setSelectedCategory(cat)}
+            >
+              <Text style={[
+                marketStyles.categoryText,
+                selectedCategory === cat && marketStyles.categoryTextActive
+              ]}>{cat}</Text>
+            </TouchableOpacity>
+          ))}
+          </ScrollView>
+        </View>
 
-      {/* Nút Next */}
-      <TouchableOpacity
-        onPress={() => setCurrentPage(currentPage + 1)}
-        disabled={!next}
-        style={[
-          marketStyles.pageButton,
-          currentPage === totalPages && { opacity: 0.5 },
-        ]}
-      >
-        <Text style={{ color: "#333", fontWeight: "500" }}>Next</Text>
-      </TouchableOpacity>
-    </View>
+  
+        {loading && !refreshing ? (
+          <View style={marketStyles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={marketStyles.loadingText}>Đang tải sản phẩm...</Text>
+          </View>
+        ) : data.length === 0 ? (
+          <View style={marketStyles.emptyContainer}>
+            <Ionicons name="basket-outline" size={64} color={COLORS.grey} />
+            <Text style={marketStyles.emptyText}>Không có sản phẩm nào</Text>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={data}
+              numColumns={2}
+              keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={marketStyles.card} 
+                activeOpacity={0.8}
+                onPress={() => router.push({
+                  pathname: '/(market)/ingredient-detail',
+                  params: { id: item.id.toString() }
+                })}
+              >
+                  <View style={marketStyles.imageContainer}>
+                    <Image 
+                      source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} 
+                      style={marketStyles.image}
+                      defaultSource={require('../../assets/images/logo.png')}
+                    />
+                    <View style={marketStyles.favoriteButton}>
+                      <Ionicons name="heart-outline" size={18} color={COLORS.darkGrey} />
+                    </View>
+                  </View>
+                  <View style={marketStyles.cardContent}>
+                    <Text style={marketStyles.name} numberOfLines={2}>{item.name}</Text>
+                    <Text style={marketStyles.price}>
+                      {item.price ? parseInt(item.price).toLocaleString('vi-VN') : '0'} ₫
+                    </Text>
+                    <TouchableOpacity 
+                      style={marketStyles.addBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="cart-outline" size={16} color={COLORS.white} />
+                      <Text style={marketStyles.addText}>Thêm vào giỏ</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={marketStyles.listContent}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+              }
+              showsVerticalScrollIndicator={false}
+            />
+            
 
+            {totalPages > 1 && (
+              <View style={marketStyles.paginationContainerFixed}>
+                <TouchableOpacity
+                  onPress={() => setCurrentPage(currentPage - 1)}
+                  disabled={!prev}
+                  style={[
+                    marketStyles.pageButton,
+                    marketStyles.pageButtonNav,
+                    !prev && marketStyles.pageButtonDisabled,
+                  ]}
+                >
+                  <Ionicons 
+                    name="chevron-back" 
+                    size={18} 
+                    color={prev ? COLORS.darkGrey : COLORS.grey} 
+                  />
+                </TouchableOpacity>
+
+                {(() => {
+                  const pages: (number | string)[] = [];
+
+                  if (totalPages <= 6) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (currentPage <= 3) {
+                      pages.push(2, 3, 4, "...", totalPages);
+                    } else if (currentPage >= totalPages - 2) {
+                      pages.push("...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                      pages.push("...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+                    }
+                  }
+
+                  return pages.map((page, index) => {
+                    if (page === "...") {
+                      return (
+                        <Text key={`dot-${index}`} style={marketStyles.pageDots}>
+                          ...
+                        </Text>
+                      );
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={page}
+                        onPress={() => setCurrentPage(page as number)}
+                        style={[
+                          marketStyles.pageButton,
+                          currentPage === page && marketStyles.activePage,
+                        ]}
+                      >
+                        <Text style={[
+                          marketStyles.pageButtonText,
+                          currentPage === page && marketStyles.activePageText
+                        ]}>
+                          {page}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  });
+                })()}
+
+                <TouchableOpacity
+                  onPress={() => setCurrentPage(currentPage + 1)}
+                  disabled={!next}
+                  style={[
+                    marketStyles.pageButton,
+                    marketStyles.pageButtonNav,
+                    !next && marketStyles.pageButtonDisabled,
+                  ]}
+                >
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={18} 
+                    color={next ? COLORS.darkGrey : COLORS.grey} 
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
     </View>
   );
 }

@@ -9,6 +9,7 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { IngredientService } from './ingredient.service';
 import { 
   PaginationDto, 
@@ -19,7 +20,9 @@ import {
 } from './dto/search-ingredient.dto';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
 
+@ApiTags('Ingredients')
 @Controller('api/ingredients')
 export class IngredientController {
   constructor(private readonly ingredientService: IngredientService) {}
@@ -30,6 +33,8 @@ export class IngredientController {
    * Cần authentication
    */
   @Post()
+  @Public()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async create(@Body(ValidationPipe) createIngredientDto: CreateIngredientDto) {
     const ingredient = await this.ingredientService.create(createIngredientDto);
@@ -45,7 +50,8 @@ export class IngredientController {
    * GET /api/ingredients
    */
   @Get()
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
   async findAll() {
     const ingredients = await this.ingredientService.findAll();
     return {
@@ -60,7 +66,31 @@ export class IngredientController {
    * GET /api/ingredients/paginated?page=1&limit=10
    */
   @Get('paginated')
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ 
+    summary: 'Lấy nguyên liệu với phân trang',
+    description: 'API này trả về danh sách nguyên liệu với phân trang.'
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng nguyên liệu mỗi trang (mặc định: 10)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Lấy danh sách nguyên liệu thành công',
+    example: {
+      success: true,
+      message: 'Lấy danh sách nguyên liệu trang 1 thành công',
+      data: [],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
+      }
+    }
+  })
   async findAllWithPagination(@Query() paginationDto: PaginationDto) {
     const result = await this.ingredientService.findAllWithPagination(paginationDto);
     return {
@@ -84,7 +114,22 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('by-ids')
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ 
+    summary: 'Lấy nguyên liệu theo danh sách ID',
+    description: 'API này trả về danh sách nguyên liệu theo danh sách ID được cung cấp.'
+  })
+  @ApiQuery({ name: 'ids', required: true, type: String, example: '1,2,3', description: 'Danh sách ID nguyên liệu, phân cách bằng dấu phẩy' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Lấy danh sách nguyên liệu thành công',
+    example: {
+      success: true,
+      message: 'Lấy danh sách nguyên liệu theo ID thành công',
+      data: []
+    }
+  })
   async findByIds(@Query('ids') ids: string) {
     const idArray = ids.split(',').map(id => parseInt(id.trim()));
     const ingredients = await this.ingredientService.findByIds(idArray);
@@ -101,7 +146,33 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('search/name')
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ 
+    summary: 'Tìm kiếm nguyên liệu theo tên',
+    description: 'API này cho phép tìm kiếm nguyên liệu theo tên với phân trang.'
+  })
+  @ApiQuery({ name: 'name', required: false, type: String, example: 'thịt', description: 'Từ khóa tìm kiếm' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Tìm kiếm thành công',
+    example: {
+      success: true,
+      message: 'Tìm thấy 5 nguyên liệu với từ khóa "thịt"',
+      data: [],
+      searchTerm: 'thịt',
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 5,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
+      }
+    }
+  })
   async searchByName(@Query() searchDto: SearchByNameDto) {
     const result = await this.ingredientService.searchByName(searchDto);
     
@@ -131,7 +202,8 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('search/place')
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
   async searchByPlace(@Query() searchDto: SearchByPlaceDto) {
     const result = await this.ingredientService.searchByPlace(searchDto);
     
@@ -157,12 +229,62 @@ export class IngredientController {
 
   /**
    * Tìm kiếm nguyên liệu theo danh mục với phân trang
-   * GET /api/ingredients/search/category?category_id=1&page=1&limit=10
+   * POST /api/ingredients/search/category
    * Cần authentication
    */
-  @Get('search/category')
-  // @UseGuards(JwtAuthGuard)
-  async searchByCategory(@Query() searchDto: SearchByCategoryDto) {
+  @Post('search/category')
+  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ 
+    summary: 'Tìm kiếm nguyên liệu theo danh mục',
+    description: 'API này cho phép tìm kiếm nguyên liệu theo danh mục (category) với phân trang. Người dùng có thể tìm kiếm nguyên liệu trong một danh mục cụ thể hoặc lấy tất cả nguyên liệu với phân trang.'
+  })
+  @ApiBody({
+    type: SearchByCategoryDto,
+    examples: {
+      example1: {
+        summary: 'Tìm kiếm theo danh mục cụ thể',
+        value: {
+          category_id: 1,
+          page: 1,
+          limit: 10
+        }
+      },
+      example2: {
+        summary: 'Lấy tất cả nguyên liệu với phân trang (không có category_id)',
+        value: {
+          page: 1,
+          limit: 20
+        }
+      },
+      example3: {
+        summary: 'Tìm kiếm với các tham số mặc định',
+        value: {
+          category_id: 2
+        }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Tìm kiếm thành công',
+    example: {
+      success: true,
+      message: 'Tìm thấy 15 nguyên liệu trong danh mục ID 1',
+      data: [],
+      categoryId: 1,
+      pagination: {
+        currentPage: 1,
+        totalPages: 2,
+        totalItems: 15,
+        itemsPerPage: 10,
+        hasNextPage: true,
+        hasPrevPage: false
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ (category_id không phải số, page/limit không hợp lệ)' })
+  async searchByCategory(@Body(ValidationPipe) searchDto: SearchByCategoryDto) {
     const result = await this.ingredientService.searchByCategory(searchDto);
     
     const message = result.categoryId 
@@ -190,7 +312,8 @@ export class IngredientController {
    * GET /api/ingredients/search?name=thịt&place_id=1&category_id=2&page=1&limit=10
    */
   @Get('search')
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
   async searchWithFilters(@Query() searchDto: SearchIngredientDto) {
     const result = await this.ingredientService.searchWithFilters(searchDto);
     
@@ -223,11 +346,46 @@ export class IngredientController {
   }
 
   /**
+   * Lấy danh sách nguyên liệu theo dish_id
+   * GET /api/ingredients/by-dish/:dishId
+   * Cần authentication
+   */
+  @Get('by-dish/:dishId')
+  @Public()
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ 
+    summary: 'Lấy nguyên liệu theo dish ID',
+    description: 'API này trả về danh sách nguyên liệu của một món ăn cụ thể.'
+  })
+  @ApiParam({ name: 'dishId', type: 'number', example: 1, description: 'ID của món ăn' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Lấy danh sách nguyên liệu thành công',
+    example: {
+      success: true,
+      message: 'Lấy danh sách nguyên liệu của món ăn ID 1 thành công',
+      data: [],
+      total: 0
+    }
+  })
+  async findByDishId(@Param('dishId', ParseIntPipe) dishId: number) {
+    const ingredients = await this.ingredientService.findIngredientsWithDetailsByDishId(dishId);
+    return {
+      success: true,
+      message: `Lấy danh sách nguyên liệu của món ăn ID ${dishId} thành công`,
+      data: ingredients,
+      total: ingredients.length,
+    };
+  }
+
+  /**
    * Lấy nguyên liệu theo ID (phải đặt cuối cùng để tránh conflict với các route khác)
    * GET /api/ingredients/:id
    */
   @Get(':id')
-  // @UseGuards(JwtAuthGuard)
+  @Public()
+  @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const ingredient = await this.ingredientService.findOne(id);
     return {

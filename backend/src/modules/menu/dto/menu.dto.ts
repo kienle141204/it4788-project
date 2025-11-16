@@ -49,4 +49,10 @@ export class GetMenusDto {
   familyId?: number;
 }
 
+export class GetMenuDishesByDateDto {
+  @IsOptional()
+  @IsString()
+  date?: string;
+}
+
 

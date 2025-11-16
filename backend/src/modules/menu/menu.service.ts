@@ -6,7 +6,7 @@ import { MenuDish } from '../../entities/menu-dish.entity';
 import { Family } from '../../entities/family.entity';
 import { Dish } from '../../entities/dish.entity';
 import { FamilyMember } from '../../entities/family-member.entity';
-import { CreateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto } from './dto/menu.dto';
+import { CreateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
 
 @Injectable()
 export class MenuService {
@@ -256,5 +256,85 @@ export class MenuService {
     }
 
     await this.menuRepository.delete(menuId);
+  }
+
+  /**
+   * Lấy danh sách menu dishes theo ngày (từ created_at của menu)
+   */
+  async getMenuDishesByDate(getMenuDishesByDateDto: GetMenuDishesByDateDto): Promise<any[]> {
+    const { date } = getMenuDishesByDateDto;
+
+    const queryBuilder = this.menuDishRepository
+      .createQueryBuilder('menuDish')
+      .leftJoinAndSelect('menuDish.dish', 'dish')
+      .leftJoin('menuDish.menu', 'menu')
+      .orderBy('menuDish.created_at', 'ASC');
+
+    // Nếu có date, lọc theo ngày của menu.created_at
+    if (date) {
+      queryBuilder.where('DATE(menu.created_at) = :date', { date });
+    }
+
+    const menuDishes = await queryBuilder.getMany();
+
+    // Format lại response để bao gồm tên món ăn
+    const result = menuDishes.map(menuDish => ({
+      id: menuDish.id,
+      menu_id: menuDish.menu_id,
+      dish_id: menuDish.dish_id,
+      stock: menuDish.stock,
+      price: menuDish.price,
+      created_at: menuDish.created_at,
+      dish_name: menuDish.dish ? menuDish.dish.name : null,
+    }));
+
+    return result;
+  }
+
+  /**
+   * Tính tổng tiền bữa ăn cho một menu
+   */
+  async calculateMenuTotal(menuId: number): Promise<{
+    menu_id: number;
+    total_amount: number;
+    items_count: number;
+    items: any[];
+  }> {
+    // Lấy tất cả menu dishes của menu
+    const menuDishes = await this.menuDishRepository.find({
+      where: { menu_id: menuId },
+      relations: ['dish'],
+    });
+
+    // Kiểm tra menu có tồn tại không
+    if (menuDishes.length === 0) {
+      const menu = await this.menuRepository.findOne({ where: { id: menuId } });
+      if (!menu) {
+        throw new NotFoundException('Không tìm thấy menu');
+      }
+    }
+
+    // Tính tổng: stock * price
+    let totalAmount = 0;
+    const items = menuDishes.map(menuDish => {
+      const itemTotal = (menuDish.stock || 0) * (parseFloat(menuDish.price?.toString() || '0'));
+      totalAmount += itemTotal;
+
+      return {
+        id: menuDish.id,
+        dish_id: menuDish.dish_id,
+        dish_name: menuDish.dish ? menuDish.dish.name : null,
+        stock: menuDish.stock,
+        price: menuDish.price,
+        item_total: itemTotal,
+      };
+    });
+
+    return {
+      menu_id: menuId,
+      total_amount: Math.round(totalAmount * 100) / 100, // Làm tròn 2 chữ số thập phân
+      items_count: items.length,
+      items,
+    };
   }
 }

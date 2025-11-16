@@ -83,7 +83,7 @@ export default function Verify() {
       <View style={styles.otpSection}>
         <Text style={styles.appName}>Nhập mã OTP</Text>
 
-        <Text style={{ color: COLORS.primary, marginTop: 10 }}>
+        <Text style={styles.verifySubtext}>
           Chúng tôi đã gửi mã đến địa chỉ {maskEmail(email as string)}
         </Text>
 
@@ -106,9 +106,9 @@ export default function Verify() {
             style={canResend ? styles.touchResend : styles.touchNoResend}
           >
             {
-              loading ? (<ActivityIndicator size="small" color="#fff" />) :
+              loading ? (<ActivityIndicator size="small" color={canResend ? COLORS.white : COLORS.grey} />) :
                 (
-                  <Text style={styles.resendButton}>
+                  <Text style={canResend ? styles.resendButton : styles.resendButtonDisabled}>
                     {canResend ? 'Gửi lại' : `Gửi lại (${counter}s)`}
                   </Text>
                 )
@@ -116,7 +116,7 @@ export default function Verify() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.touchValidate} onPress={handleSendOTP}>
-            {loadingValidate ? (<ActivityIndicator size="small" color="#fff" />) : (
+            {loadingValidate ? (<ActivityIndicator size="small" color={COLORS.white} />) : (
               <Text style={styles.otpButton}>Xác thực</Text>)}
           </TouchableOpacity>
         </View>

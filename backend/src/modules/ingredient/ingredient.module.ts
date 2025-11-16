@@ -5,9 +5,10 @@ import { IngredientService } from './ingredient.service';
 import { Ingredient } from '../../entities/ingredient.entity';
 import { IngredientCategory } from '../../entities/ingredient-category.entity';
 import { Place } from '../../entities/place.entity';
+import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Ingredient, IngredientCategory, Place])],
+  imports: [TypeOrmModule.forFeature([Ingredient, IngredientCategory, Place, DishesIngredients])],
   controllers: [IngredientController],
   providers: [IngredientService],
   exports: [IngredientService],

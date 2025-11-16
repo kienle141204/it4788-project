@@ -4,6 +4,7 @@ import { Repository, In } from 'typeorm';
 import { Ingredient } from '../../entities/ingredient.entity';
 import { IngredientCategory } from '../../entities/ingredient-category.entity';
 import { Place } from '../../entities/place.entity';
+import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
 import {
   PaginationDto,
   SearchByNameDto,
@@ -22,6 +23,8 @@ export class IngredientService {
     private categoryRepository: Repository<IngredientCategory>,
     @InjectRepository(Place)
     private placeRepository: Repository<Place>,
+    @InjectRepository(DishesIngredients)
+    private dishesIngredientsRepository: Repository<DishesIngredients>,
   ) {}
 
   /**
@@ -316,5 +319,64 @@ export class IngredientService {
         category_id,
       },
     };
+  }
+
+  /**
+   * Lấy danh sách nguyên liệu theo dish_id từ bảng dishes_ingredients
+   */
+  async findIngredientsByDishId(dishId: number): Promise<DishesIngredients[]> {
+    const ingredients = await this.dishesIngredientsRepository.find({
+      where: { dish_id: dishId },
+      order: { id: 'ASC' },
+    });
+
+    return ingredients;
+  }
+
+  /**
+   * Tìm kiếm nguyên liệu thực tế dựa trên ingredient_name từ dishes_ingredients
+   * JOIN với bảng ingredients để lấy thông tin chi tiết
+   */
+  async findIngredientsWithDetailsByDishId(dishId: number): Promise<any[]> {
+    const dishIngredients = await this.dishesIngredientsRepository.find({
+      where: { dish_id: dishId },
+    });
+
+    // Nếu không có nguyên liệu, trả về mảng rỗng
+    if (dishIngredients.length === 0) {
+      return [];
+    }
+
+    // Lấy danh sách tên nguyên liệu
+    const ingredientNames = dishIngredients.map(di => di.ingredient_name);
+
+    // Tìm các nguyên liệu thực tế trong bảng ingredients
+    const ingredients = await this.ingredientRepository.find({
+      where: { name: In(ingredientNames) },
+      relations: ['category', 'place'],
+    });
+
+    // Map lại để kết hợp với quantity
+    const result = dishIngredients.map(dishIngredient => {
+      const matchedIngredient = ingredients.find(
+        ing => ing.name === dishIngredient.ingredient_name
+      );
+
+      // Chỉ trả về ingredient nếu tìm thấy
+      const resultItem: any = {
+        id: dishIngredient.id,
+        dish_id: dishIngredient.dish_id,
+        ingredient_name: dishIngredient.ingredient_name,
+        quantity: dishIngredient.quantity,
+      };
+
+      if (matchedIngredient) {
+        resultItem.ingredient = matchedIngredient;
+      }
+
+      return resultItem;
+    });
+
+    return result;
   }
 }
