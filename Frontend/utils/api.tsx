@@ -7,7 +7,7 @@ declare module 'axios' {
   }
 }
 
-const API_DOMAIN = process.env.API || 'http://localhost:8090/api/';
+const API_DOMAIN = process.env.API || 'http://10.0.2.2:8090/api/';
 
 const apiClient = axios.create({
   baseURL: API_DOMAIN,
