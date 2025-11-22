@@ -124,6 +124,12 @@ export const foodStyles = StyleSheet.create({
   cardImageContainer: {
     marginRight: 12,
   },
+  cardImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#FCE4EC',
+  },
   cardImagePlaceholder: {
     width: 80,
     height: 80,
@@ -142,10 +148,6 @@ export const foodStyles = StyleSheet.create({
     color: COLORS.darkGrey,
     marginBottom: 4,
   },
-  cardRating: {
-    fontSize: 14,
-    color: '#757575', // Lighter grey
-  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -155,6 +157,41 @@ export const foodStyles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     color: COLORS.grey,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loaderText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: COLORS.darkGrey,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.purple,
+    marginLeft: 8,
+  },
+  loadMoreButton: {
+    marginTop: 24,
+    alignSelf: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: COLORS.purple,
+  },
+  loadMoreButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

@@ -9,6 +9,7 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IngredientService } from './ingredient.service';
 import { 
   PaginationDto, 
@@ -20,6 +21,7 @@ import {
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+@ApiTags('Ingredients')
 @Controller('api/ingredients')
 export class IngredientController {
   constructor(private readonly ingredientService: IngredientService) {}
@@ -30,6 +32,7 @@ export class IngredientController {
    * Cần authentication
    */
   @Post()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async create(@Body(ValidationPipe) createIngredientDto: CreateIngredientDto) {
     const ingredient = await this.ingredientService.create(createIngredientDto);
@@ -45,6 +48,7 @@ export class IngredientController {
    * GET /api/ingredients
    */
   @Get()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findAll() {
     const ingredients = await this.ingredientService.findAll();
@@ -60,6 +64,7 @@ export class IngredientController {
    * GET /api/ingredients/paginated?page=1&limit=10
    */
   @Get('paginated')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findAllWithPagination(@Query() paginationDto: PaginationDto) {
     const result = await this.ingredientService.findAllWithPagination(paginationDto);
@@ -84,6 +89,7 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('by-ids')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findByIds(@Query('ids') ids: string) {
     const idArray = ids.split(',').map(id => parseInt(id.trim()));
@@ -101,6 +107,7 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('search/name')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async searchByName(@Query() searchDto: SearchByNameDto) {
     const result = await this.ingredientService.searchByName(searchDto);
@@ -131,6 +138,7 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('search/place')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async searchByPlace(@Query() searchDto: SearchByPlaceDto) {
     const result = await this.ingredientService.searchByPlace(searchDto);
@@ -161,6 +169,7 @@ export class IngredientController {
    * Cần authentication
    */
   @Get('search/category')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async searchByCategory(@Query() searchDto: SearchByCategoryDto) {
     const result = await this.ingredientService.searchByCategory(searchDto);
@@ -190,6 +199,7 @@ export class IngredientController {
    * GET /api/ingredients/search?name=thịt&place_id=1&category_id=2&page=1&limit=10
    */
   @Get('search')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async searchWithFilters(@Query() searchDto: SearchIngredientDto) {
     const result = await this.ingredientService.searchWithFilters(searchDto);
@@ -223,10 +233,29 @@ export class IngredientController {
   }
 
   /**
+   * Lấy danh sách nguyên liệu theo dish_id
+   * GET /api/ingredients/by-dish/:dishId
+   * Cần authentication
+   */
+  @Get('by-dish/:dishId')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async findByDishId(@Param('dishId', ParseIntPipe) dishId: number) {
+    const ingredients = await this.ingredientService.findIngredientsWithDetailsByDishId(dishId);
+    return {
+      success: true,
+      message: `Lấy danh sách nguyên liệu của món ăn ID ${dishId} thành công`,
+      data: ingredients,
+      total: ingredients.length,
+    };
+  }
+
+  /**
    * Lấy nguyên liệu theo ID (phải đặt cuối cùng để tránh conflict với các route khác)
    * GET /api/ingredients/:id
    */
   @Get(':id')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const ingredient = await this.ingredientService.findOne(id);

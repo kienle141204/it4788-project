@@ -11,18 +11,21 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RecipeService } from './recipe.service';
 import { GetRecipesDto } from './dto/get-recipes.dto';
 import { CreateRecipeDto, UpdateRecipeDto } from './dto/create-recipe.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../../entities/user.entity';
 
+@ApiTags('Recipes')
 @Controller('api/recipes')
 export class RecipeController {
   constructor(private readonly recipeService: RecipeService) {}
 
 
   @Get()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findAll(@Query() getRecipesDto: GetRecipesDto, @Request() req) {
     const user: User = req.user;
@@ -56,6 +59,7 @@ export class RecipeController {
    * GET /recipes/:id
    */
   @Get(':id')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
     const user: User = req.user;
@@ -72,6 +76,7 @@ export class RecipeController {
    * GET /recipes/by-dish/:dishId
    */
   @Get('by-dish/:dishId')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async findByDishId(@Param('dishId', ParseIntPipe) dishId: number, @Request() req) {
     const user: User = req.user;
@@ -88,6 +93,8 @@ export class RecipeController {
    * GET /recipes/by-owner/:ownerId
    */
   @Get('by-owner/:ownerId')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async findByOwnerId(@Param('ownerId', ParseIntPipe) ownerId: number) {
     const recipes = await this.recipeService.findByOwnerId(ownerId);
     return {
@@ -102,6 +109,7 @@ export class RecipeController {
    * GET /recipes/popular?limit=10
    */
   @Get('popular')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async getPopularRecipes(@Query('limit') limit?: number, @Request() req?: any) {
     const user: User = req.user;
@@ -118,6 +126,7 @@ export class RecipeController {
    * POST /recipes
    */
   @Post()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async createRecipe(
     @Body() createRecipeDto: CreateRecipeDto,
@@ -138,6 +147,7 @@ export class RecipeController {
    * PUT /recipes/:id
    */
   @Put(':id')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async updateRecipe(
     @Param('id', ParseIntPipe) id: number,
@@ -159,6 +169,7 @@ export class RecipeController {
    * DELETE /recipes/:id
    */
   @Delete(':id')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async deleteRecipe(
     @Param('id', ParseIntPipe) id: number,

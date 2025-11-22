@@ -11,10 +11,12 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DishReviewService } from './dish-review.service';
 import { CreateDishReviewDto, UpdateDishReviewDto } from './dto/dish-review.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+@ApiTags('Dish Reviews')
 @Controller('api/dishes')
 export class DishReviewController {
   constructor(private readonly dishReviewService: DishReviewService) {}
@@ -24,6 +26,8 @@ export class DishReviewController {
    * GET /dishes/:dishId/reviews
    */
   @Get(':dishId/reviews')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async getReviewsByDishId(@Param('dishId', ParseIntPipe) dishId: number) {
     const reviews = await this.dishReviewService.getReviewsByDishId(dishId);
     return {
@@ -38,6 +42,8 @@ export class DishReviewController {
    * GET /dishes/:dishId/reviews/stats
    */
   @Get(':dishId/reviews/stats')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async getDishRatingStats(@Param('dishId', ParseIntPipe) dishId: number) {
     const stats = await this.dishReviewService.getDishRatingStats(dishId);
     return {
@@ -52,6 +58,7 @@ export class DishReviewController {
    * GET /dishes/:dishId/reviews/my-review
    */
   @Get(':dishId/reviews/my-review')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async getMyReviewForDish(
     @Param('dishId', ParseIntPipe) dishId: number,
@@ -72,6 +79,7 @@ export class DishReviewController {
    * POST /dishes/:dishId/reviews
    */
   @Post(':dishId/reviews')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async createReview(
     @Param('dishId', ParseIntPipe) dishId: number,
@@ -97,6 +105,7 @@ export class DishReviewController {
    * PUT /dishes/reviews/:reviewId
    */
   @Put('reviews/:reviewId')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async updateReview(
     @Param('reviewId', ParseIntPipe) reviewId: number,
@@ -122,6 +131,7 @@ export class DishReviewController {
    * DELETE /dishes/reviews/:reviewId
    */
   @Delete('reviews/:reviewId')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async deleteReview(
     @Param('reviewId', ParseIntPipe) reviewId: number,

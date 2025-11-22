@@ -1,16 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { foodStyles } from '../../styles/food.styles';
 import FoodCard from '../../components/FoodCard';
+import { get } from '../../utils/api';
+
+interface Dish {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string | null;
+  created_at: string;
+}
+
+const PAGE_LIMIT = 10;
 
 export default function FoodPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'explore' | 'mine'>('explore');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleBack = () => {
     router.back();
@@ -21,36 +39,69 @@ export default function FoodPage() {
     console.log('Notification pressed');
   };
 
-  // Sample food data - sẽ được thay thế bằng API call
-  const foodItems = [
-    {
-      id: '2357',
-      name: 'Cháo thịt gà 🍗 rau cải 🥬',
-      rating: '',
-      image_url: null
-    },
-    {
-      id: '2356',
-      name: 'Cá ót nấu rau cần',
-      rating: '',
-      image_url: 'https://img-global.cpcdn.com/steps/aa574445fc94586c/160x128cq80/ca-ot-n%E1%BA%A5u-rau-c%E1%BA%A7n-recipe-step-5-photo.jpg'
-    },
-    {
-      id: '2355',
-      name: 'Canh rau ngót Nhật thịt bằm',
-      rating: '',
-      image_url: 'https://img-global.cpcdn.com/steps/c7c75a39423f8395/160x128cq80/canh-rau-ngot-nh%E1%BA%ADt-th%E1%BB%8Bt-b%E1%BA%B1m-recipe-step-3-photo.jpg'
-    },
-    {
-      id: '2354',
-      name: 'Gà nướng táo và rau củ',
-      rating: '',
-      image_url: 'https://img-global.cpcdn.com/steps/833cefe783df5d1f/160x128cq80/ga-n%C6%B0%E1%BB%9Bng-tao-va-rau-c%E1%BB%A7-recipe-step-4-photo.jpg'
-    },
-  ];
+  const fetchDishes = useCallback(async (pageNumber = 1, reset = false) => {
+    const query = searchQuery.trim();
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const endpoint = query
+        ? `dishes/search-paginated?name=${encodeURIComponent(query)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
+        : `dishes/get-paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
+
+      const response = await get(endpoint);
+      const payload = response?.data;
+
+      if (!payload?.success) {
+        throw new Error(payload?.message || 'Không thể tải danh sách món ăn');
+      }
+
+      const newItems: Dish[] = payload.data || [];
+      const pagination = payload.pagination || {};
+
+      setDishes(prev => (reset ? newItems : [...prev, ...newItems]));
+      setHasNextPage(Boolean(pagination.hasNextPage));
+      setPage(pagination.currentPage || pageNumber);
+      setError(null);
+    } catch (err) {
+      console.log(err);
+      setError('Không thể tải danh sách món ăn. Vui lòng thử lại.');
+      if (reset) {
+        setDishes([]);
+      }
+    } finally {
+      if (reset) {
+        setLoading(false);
+        setRefreshing(false);
+      } else {
+        setLoadingMore(false);
+      }
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchDishes(1, true);
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [fetchDishes]);
 
   const handleFoodPress = (id: string) => {
     router.push(`/(food)/${id}` as any);
+  };
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasNextPage) return;
+    fetchDishes(page + 1, false);
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchDishes(1, true);
   };
 
   return (
@@ -124,34 +175,72 @@ export default function FoodPage() {
       </View>
 
       {/* Content */}
-      <ScrollView 
-        style={foodStyles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={foodStyles.scrollContent}
-      >
-        {activeTab === 'explore' && (
-          <>         
-            <View style={foodStyles.foodList}>
-              {foodItems.map((item) => (
-                <FoodCard 
-                  key={item.id} 
-                  id={item.id}
-                  name={item.name} 
-                  rating={item.rating}
-                  image_url={item.image_url}
-                  onPress={handleFoodPress}
-                />
-              ))}
-            </View>
-          </>
-        )}
+      {loading && dishes.length === 0 ? (
+        <View style={foodStyles.loaderContainer}>
+          <ActivityIndicator size="large" color={COLORS.purple} />
+          <Text style={foodStyles.loaderText}>Đang tải món ăn...</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          style={foodStyles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={foodStyles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.purple} />
+          }
+        >
+          {activeTab === 'explore' && (
+            <>      
+              {error && (
+                <View style={foodStyles.errorContainer}>
+                  <Ionicons name="alert-circle-outline" size={20} color={COLORS.purple} />
+                  <Text style={foodStyles.errorText}>{error}</Text>
+                </View>
+              )}
 
-        {activeTab === 'mine' && (
-          <View style={foodStyles.emptyState}>
-            <Text style={foodStyles.emptyStateText}>Chưa có món ăn nào</Text>
-          </View>
-        )}
-      </ScrollView>
+              {!error && dishes.length === 0 && (
+                <View style={foodStyles.emptyState}>
+                  <Text style={foodStyles.emptyStateText}>
+                    Không tìm thấy món ăn nào
+                  </Text>
+                </View>
+              )}
+
+              <View style={foodStyles.foodList}>
+                {dishes.map((item) => (
+                  <FoodCard 
+                    key={item.id} 
+                    id={String(item.id)}
+                    name={item.name} 
+                    image_url={item.image_url}
+                    onPress={handleFoodPress}
+                  />
+                ))}
+              </View>
+
+              {hasNextPage && (
+                <TouchableOpacity 
+                  style={foodStyles.loadMoreButton}
+                  onPress={handleLoadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={foodStyles.loadMoreButtonText}>Tải thêm</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+
+          {activeTab === 'mine' && (
+            <View style={foodStyles.emptyState}>
+              <Text style={foodStyles.emptyStateText}>Chưa có món ăn nào</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

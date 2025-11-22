@@ -21,7 +21,7 @@ import { EmailService } from './email.service';
 
 @Injectable()
 export class AuthService {
-  
+
   /**
    * Chuyển đổi thời gian hiện tại thành Vietnam timezone
    */
@@ -38,7 +38,7 @@ export class AuthService {
     private tempUserRepository: Repository<TempUser>,
     private jwtService: JwtService,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Đăng ký tạm thời và gửi OTP
@@ -73,7 +73,7 @@ export class AuthService {
     });
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
-    
+
     console.log('OTP Created:', {
       email: savedTempUser.email,
       otpCode: savedTempUser.otp_code,
@@ -97,8 +97,8 @@ export class AuthService {
     const { email, otp_code } = verifyOtpDto;
 
     // Tìm temp_user
-    const tempUser = await this.tempUserRepository.findOne({ 
-      where: { email, status: 'PENDING' } 
+    const tempUser = await this.tempUserRepository.findOne({
+      where: { email, status: 'PENDING' }
     });
 
     if (!tempUser) {
@@ -114,7 +114,7 @@ export class AuthService {
     const currentTime = new Date(); // Sử dụng thời gian hiện tại
     const otpSentTime = new Date(tempUser.otp_sent_at);
     const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000);
-    
+
     console.log('OTP Debug Info:', {
       currentTime: currentTime.toISOString(),
       currentTimeLocal: currentTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
@@ -125,7 +125,7 @@ export class AuthService {
       timeDiff: (currentTime.getTime() - otpSentTime.getTime()) / 1000 / 60, // phút
       isExpired: currentTime > otpExpiryTime
     });
-    
+
     if (currentTime > otpExpiryTime) {
       // Đánh dấu OTP hết hạn
       await this.tempUserRepository.update(tempUser.temp_user_id, { status: 'EXPIRED' });
@@ -174,8 +174,8 @@ export class AuthService {
     const { email } = resendOtpDto;
 
     // Tìm temp_user
-    const tempUser = await this.tempUserRepository.findOne({ 
-      where: { email, status: 'PENDING' } 
+    const tempUser = await this.tempUserRepository.findOne({
+      where: { email, status: 'PENDING' }
     });
 
     if (!tempUser) {
@@ -212,15 +212,15 @@ export class AuthService {
   /**
    * Đăng ký thêm thông tin người dùng
    */
-  async registerUserInfo(registerUserInfoDto: RegisterUserInfoDto, userId: number): Promise<{ 
-    message: string; 
-    user: Partial<User> 
+  async registerUserInfo(registerUserInfoDto: RegisterUserInfoDto, userId: number): Promise<{
+    message: string;
+    user: Partial<User>
   }> {
     const { fullname, avatar_url, address } = registerUserInfoDto;
 
     // Tìm user hiện tại
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    
+
     if (!user) {
       throw new NotFoundException('Không tìm thấy người dùng');
     }
@@ -248,10 +248,10 @@ export class AuthService {
   /**
    * Đăng nhập người dùng
    */
-  async login(loginDto: LoginDto): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
-    user: Partial<User> 
+  async login(loginDto: LoginDto): Promise<{
+    access_token: string;
+    refresh_token: string;
+    user: Partial<User>
   }> {
     const { email, password } = loginDto;
 
@@ -292,7 +292,6 @@ export class AuthService {
       user: userWithoutPassword,
     };
   }
-
   /**
    * Lấy thông tin người dùng từ JWT
    */
@@ -312,16 +311,16 @@ export class AuthService {
   /**
    * Làm mới access token
    */
-  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
+  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{
+    access_token: string;
+    refresh_token: string;
   }> {
     const { refresh_token } = refreshTokenDto;
 
     try {
       // Xác minh refresh token
       const payload = this.jwtService.verify(refresh_token);
-      
+
       if (payload.type !== 'refresh') {
         throw new UnauthorizedException('Token không hợp lệ');
       }

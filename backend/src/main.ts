@@ -13,14 +13,29 @@ async function bootstrap() {
     transform: true,
   }));
 
-  // Bật CORS
-  app.enableCors();
+  // Bật CORS với cấu hình chi tiết để hỗ trợ Bearer token
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
+  
   const config = new DocumentBuilder()
-
     .setTitle('E-Learning api')
     .setDescription('API Documentation for E-learning simple version')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth', // Tên này sẽ được sử dụng trong decorator @ApiBearerAuth('JWT-auth')
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -30,3 +45,5 @@ async function bootstrap() {
   
 }
 bootstrap();
+
+  

@@ -11,11 +11,13 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { MenuService } from './menu.service';
-import { CreateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto } from './dto/menu.dto';
+import { CreateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('menus')
+@ApiTags('Menus')
+@Controller('api/menus')
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
 
@@ -24,6 +26,8 @@ export class MenuController {
    * GET /menus?page=1&limit=10&familyId=1
    */
   @Get()
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async findAll(@Query() getMenusDto: GetMenusDto) {
     const result = await this.menuService.findAllWithPagination(getMenusDto);
     
@@ -48,10 +52,51 @@ export class MenuController {
   }
 
   /**
+   * Lấy danh sách menu dishes theo ngày
+   * GET /menus/dishes/by-date?date=2024-01-20
+   */
+  @Get('dishes/by-date')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async getMenuDishesByDate(@Query() getMenuDishesByDateDto: GetMenuDishesByDateDto) {
+    const dishes = await this.menuService.getMenuDishesByDate(getMenuDishesByDateDto);
+    
+    let message = 'Lấy danh sách món ăn trong menu thành công';
+    if (getMenuDishesByDateDto.date) {
+      message += ` cho ngày ${getMenuDishesByDateDto.date}`;
+    }
+
+    return {
+      success: true,
+      message,
+      data: dishes,
+      total: dishes.length,
+    };
+  }
+
+  /**
+   * Tính tổng tiền bữa ăn
+   * GET /menus/:menuId/total
+   */
+  @Get(':menuId/total')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async calculateMenuTotal(@Param('menuId', ParseIntPipe) menuId: number) {
+    const result = await this.menuService.calculateMenuTotal(menuId);
+    return {
+      success: true,
+      message: `Tính tổng tiền menu ID ${menuId} thành công`,
+      data: result,
+    };
+  }
+
+  /**
    * Lấy menu theo ID
    * GET /menus/:id
    */
   @Get(':id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const menu = await this.menuService.findOne(id);
     return {
@@ -66,6 +111,7 @@ export class MenuController {
    * POST /menus?familyId=1
    */
   @Post()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async createMenu(
     @Query('familyId', ParseIntPipe) familyId: number,
@@ -87,6 +133,7 @@ export class MenuController {
    * POST /menus/:menuId/dishes
    */
   @Post(':menuId/dishes')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async addDishToMenu(
     @Param('menuId', ParseIntPipe) menuId: number,
@@ -108,6 +155,7 @@ export class MenuController {
    * PUT /menus/dishes/:menuDishId
    */
   @Put('dishes/:menuDishId')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async updateMenuDish(
     @Param('menuDishId', ParseIntPipe) menuDishId: number,
@@ -129,6 +177,7 @@ export class MenuController {
    * DELETE /menus/dishes/:menuDishId
    */
   @Delete('dishes/:menuDishId')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async removeDishFromMenu(
     @Param('menuDishId', ParseIntPipe) menuDishId: number,
@@ -148,6 +197,7 @@ export class MenuController {
    * DELETE /menus/:id
    */
   @Delete(':id')
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   async deleteMenu(
     @Param('id', ParseIntPipe) id: number,
