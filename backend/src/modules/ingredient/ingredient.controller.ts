@@ -1,4 +1,4 @@
-import {
+  import {
   Controller,
   Get,
   Post,
@@ -56,6 +56,23 @@ export class IngredientController {
       success: true,
       message: 'Lấy danh sách nguyên liệu thành công',
       data: ingredients,
+    };
+  }
+
+  /**
+   * Lấy danh sách địa điểm (places)
+   * GET /api/ingredients/places
+   */
+  @Get('places')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async findAllPlaces() {
+    const places = await this.ingredientService.findAllPlaces();
+    return {
+      success: true,
+      message: 'Lấy danh sách địa điểm thành công',
+      data: places,
+      total: places.length,
     };
   }
 
