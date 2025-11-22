@@ -12,6 +12,7 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
   return (
     <View style={{
       marginHorizontal: 20,
+      marginTop: 10,
       marginBottom: 20,
       backgroundColor: COLORS.purple,
       borderRadius: 16,
@@ -21,7 +22,20 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
       justifyContent: 'space-between',
       position: 'relative'
     }}>
-      {/* Left content */}
+ 
+      <TouchableOpacity
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          zIndex: 1,
+          // marginBottom: 30,
+        }}
+      >
+        <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.white} />
+      </TouchableOpacity>
+
+
       <View style={{ flex: 1, marginRight: 20 }}>
         <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: '600', marginBottom: 10 }}>
           Tổng số nhiệm vụ hôm nay
@@ -40,8 +54,8 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
         </TouchableOpacity>
       </View>
 
-      {/* Progress circle */}
-      <View style={{ alignItems: 'center' }}>
+    
+      <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
         <View style={{
           width: 60,
           height: 60,
@@ -50,7 +64,6 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
           borderColor: COLORS.white,
           justifyContent: 'center',
           alignItems: 'center',
-          position: 'relative'
         }}>
           <Text style={{ color: COLORS.white, fontSize: 18, fontWeight: 'bold' }}>{totalTasks}</Text>
         </View>

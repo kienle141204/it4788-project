@@ -6,9 +6,10 @@ import { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { COLORS } from '@/constants/themes'
 import { registerUser } from '@/service/auth'
+import { Ionicons } from '@expo/vector-icons'
 
 export default function register() {
-  const [isFocused, setIsFocused] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('');
@@ -48,65 +49,70 @@ export default function register() {
         </View>
                 
         <View style={styles.label}>
-            <Text style={styles.labelText}> Email của bạn</Text>
+            <Text style={styles.labelText}>Email của bạn</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'email' && styles.inputFocused]}>
+            <Ionicons name="mail-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-              style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập email của bạn' 
-            selectionColor={COLORS.primary}
-            value={email}
-            keyboardType='email-address'
-            onChangeText={setEmail}
-            placeholderTextColor={COLORS.primary} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('email')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập email của bạn' 
+                placeholderTextColor={COLORS.grey}
+                selectionColor={COLORS.primary}
+                value={email}
+                keyboardType='email-address'
+                autoCapitalize='none'
+                onChangeText={setEmail} />
         </View>
         <View style={styles.label}>
-            <Text style={styles.labelText}> Số điện thoại</Text>
+            <Text style={styles.labelText}>Số điện thoại</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'phone' && styles.inputFocused]}>
+            <Ionicons name="call-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-            style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập số điện thoại của bạn' 
-            selectionColor={COLORS.primary}
-            placeholderTextColor={COLORS.primary}
-            value={phone}
-            keyboardType='decimal-pad'
-            onChangeText={setPhone} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('phone')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập số điện thoại của bạn' 
+                placeholderTextColor={COLORS.grey}
+                selectionColor={COLORS.primary}
+                value={phone}
+                keyboardType='phone-pad'
+                onChangeText={setPhone} />
         </View>
         
         <View style={styles.label}>
-            <Text style={styles.labelText}> Mật khẩu</Text>
+            <Text style={styles.labelText}>Mật khẩu</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'password' && styles.inputFocused]}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-            style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập mật khẩu của bạn' 
-            secureTextEntry
-            selectionColor={COLORS.primary}
-            placeholderTextColor={COLORS.primary}
-            value={password}
-            onChangeText={setPassword} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('password')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập mật khẩu của bạn' 
+                placeholderTextColor={COLORS.grey}
+                secureTextEntry
+                selectionColor={COLORS.primary}
+                value={password}
+                onChangeText={setPassword} />
         </View>
-                <View style={styles.label}>
-            <Text style={styles.labelText}> Nhập lại mật khẩu</Text>
+        <View style={styles.label}>
+            <Text style={styles.labelText}>Nhập lại mật khẩu</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'repassword' && styles.inputFocused]}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-            style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập lại mật khẩu của bạn' 
-            secureTextEntry
-            selectionColor={COLORS.primary}
-            placeholderTextColor={COLORS.primary}
-            value={repassword}
-            onChangeText={setRePassword} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('repassword')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập lại mật khẩu của bạn' 
+                placeholderTextColor={COLORS.grey}
+                secureTextEntry
+                selectionColor={COLORS.primary}
+                value={repassword}
+                onChangeText={setRePassword} />
         </View>
         <View style={styles.loginButton}>
           <TouchableOpacity
@@ -115,7 +121,7 @@ export default function register() {
             disabled={loading} // disable khi đang loading
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={COLORS.white} />
             ) : (
               <Text style={styles.loginButtonText}>Đăng ký</Text>
             )}

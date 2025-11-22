@@ -1,11 +1,12 @@
 import React from 'react';
 
-const Input = ({ 
-  label, 
-  type = 'text', 
-  value, 
-  onChange, 
-  placeholder, 
+const Input = ({
+  label,
+  type = 'text',
+  value,
+  onChange,
+  name,
+  placeholder,
   required = false,
   disabled = false,
   className = ''
@@ -21,6 +22,7 @@ const Input = ({
         type={type}
         value={value}
         onChange={onChange}
+        name={name}
         placeholder={placeholder}
         required={required}
         disabled={disabled}

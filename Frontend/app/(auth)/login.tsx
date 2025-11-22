@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkAsyncStorage } from '@/utils/checkAsyncStorage'
 
 export default function login() {
-  const [isFocused, setIsFocused] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const route = useRouter()
@@ -64,47 +64,51 @@ export default function login() {
         </View>
         
         <View style={styles.label}>
-            <Text style={styles.labelText}> Email của bạn</Text>
+            <Text style={styles.labelText}>Email của bạn</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'email' && styles.inputFocused]}>
+            <Ionicons name="mail-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-             style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập email của bạn' 
-            selectionColor={COLORS.primary}
-            value={email}
-            onChangeText={setEmail}
-            placeholderTextColor={COLORS.primary} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('email')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập email của bạn' 
+                placeholderTextColor={COLORS.grey}
+                selectionColor={COLORS.primary}
+                value={email}
+                keyboardType='email-address'
+                autoCapitalize='none'
+                onChangeText={setEmail} />
         </View>
         
         <View style={styles.label}>
-            <Text style={styles.labelText}> Mật khẩu</Text>
+            <Text style={styles.labelText}>Mật khẩu</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'password' && styles.inputFocused]}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-            style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập mật khẩu của bạn' 
-            secureTextEntry
-            selectionColor={COLORS.primary}
-            placeholderTextColor={COLORS.primary}
-            value={password}
-            onChangeText={setPassword} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('password')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập mật khẩu của bạn' 
+                placeholderTextColor={COLORS.grey}
+                secureTextEntry
+                selectionColor={COLORS.primary}
+                value={password}
+                onChangeText={setPassword} />
         </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '80%', marginTop: 15 }}>
-            <Link href="/forgotPassword" style={{ color: COLORS.primary }}>
+        <View style={styles.linkContainer}>
+            <Link href="/forgotPassword" style={styles.linkText}>
                 Quên mật khẩu?
             </Link>
-            <Link href="/register" style={{ color: COLORS.primary }}>
+            <Link href="/register" style={styles.linkText}>
                 Bạn chưa có tài khoản?
             </Link>
         </View >
         <View style={styles.loginButton}>
             <TouchableOpacity  style={styles.touchAble} onPress={handleLogin}>
               {loading ? (
-                            <ActivityIndicator size="small" color="#fff" />
+                            <ActivityIndicator size="small" color={COLORS.white} />
                           ) : 
                           (<Text style={styles.loginButtonText}>Đăng nhập</Text>)
               }

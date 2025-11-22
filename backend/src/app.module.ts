@@ -13,6 +13,7 @@ import { DishModule } from './modules/dish/dish.module';
 import { RecipeModule } from './modules/recipe/recipe.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
+import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
 
 @Module({
   imports: [
@@ -55,7 +56,7 @@ import { IngredientModule } from './modules/ingredient/ingredient.module';
         return dbConfig;
       },
     }),
-
+    
     UserModule,
     AuthModule,
     FamilyModule,
@@ -66,6 +67,7 @@ import { IngredientModule } from './modules/ingredient/ingredient.module';
     RecipeModule,
     MenuModule,
     IngredientModule,
+    RefrigeratorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
