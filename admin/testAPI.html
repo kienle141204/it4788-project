@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Suite</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .failure { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>API Test Suite for Admin Panel</h1>
+    <p>This page tests all the API endpoints to ensure they work with the backend.</p>
+    
+    <div id="auth-section">
+        <h3>Authentication</h3>
+        <label>Access Token: </label>
+        <input type="text" id="access-token" placeholder="Enter your access token" style="width: 400px;">
+        <button onclick="setToken()">Set Token</button>
+        <div id="token-status" style="margin-top: 10px;"></div>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="runBasicTests()">Run Basic Connectivity Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        // Import API functions by creating a simple script that makes the test calls
+        let accessToken = localStorage.getItem('access_token') || '';
+        
+        // Initialize token field
+        document.getElementById('access-token').value = accessToken;
+        
+        function setToken() {
+            accessToken = document.getElementById('access-token').value;
+            localStorage.setItem('access_token', accessToken);
+            
+            const statusDiv = document.getElementById('token-status');
+            if (accessToken) {
+                statusDiv.innerHTML = '<div class="test-result success">Token set successfully!</div>';
+            } else {
+                statusDiv.innerHTML = '<div class="test-result failure">Token cleared!</div>';
+            }
+        }
+        
+        function addResult(className, message) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${className}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Headers for API requests
+        function getHeaders() {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            return headers;
+        }
+        
+        // Test function for API endpoints
+        async function testEndpoint(name, url, options = {}) {
+            try {
+                const response = await fetch(`http://localhost:8090/api${url}`, {
+                    ...options,
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    data: data,
+                    name: name
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    error: error.message,
+                    name: name
+                };
+            }
+        }
+        
+        async function runBasicTests() {
+            clearResults();
+            addResult('info', '<strong>Running Basic Connectivity Tests...</strong>');
+            
+            // Test basic endpoints
+            const tests = [
+                { name: 'Fetch Dishes (paginated)', endpoint: '/dishes/get-paginated?page=1&limit=3', method: 'GET' },
+                { name: 'Fetch Ingredients (paginated)', endpoint: '/ingredients/paginated?page=1&limit=3', method: 'GET' },
+                { name: 'Fetch Recipes', endpoint: '/recipes?page=1&limit=3', method: 'GET' },
+                { name: 'Fetch Menus', endpoint: '/menus?page=1&limit=3', method: 'GET' },
+                { name: 'Fetch Families', endpoint: '/families?page=1&limit=3', method: 'GET' }
+            ];
+            
+            for (const test of tests) {
+                const result = await testEndpoint(test.name, test.endpoint, { method: test.method });
+                
+                if (result.success) {
+                    addResult('success', `<strong>${result.name}</strong>: Success - Status ${result.status}, ${result.data.data?.length || 0} items returned`);
+                } else {
+                    addResult('failure', `<strong>${result.name}</strong>: Failed - ${result.error || `Status ${result.status}`}`);
+                }
+            }
+            
+            addResult('info', '<strong>Basic tests completed!</strong>');
+        }
+        
+        async function runAllTests() {
+            clearResults();
+            addResult('info', '<strong>Running All API Tests...</strong>');
+            
+            // All API endpoints to test
+            const allTests = [
+                // Dish APIs
+                { name: 'Fetch Dishes', endpoint: '/dishes/get-paginated?page=1&limit=2', method: 'GET' },
+                { name: 'Fetch All Dishes', endpoint: '/dishes/get-all-info-dish', method: 'GET' },
+                { name: 'Search Dishes', endpoint: '/dishes/search-paginated?name=test&page=1', method: 'GET' },
+                
+                // Ingredient APIs
+                { name: 'Fetch Ingredients', endpoint: '/ingredients/paginated?page=1&limit=2', method: 'GET' },
+                { name: 'Search Ingredients by Name', endpoint: '/ingredients/search/name?name=meat', method: 'GET' },
+                { name: 'Search Ingredients by Place', endpoint: '/ingredients/search/place?place_id=1', method: 'GET' },
+                { name: 'Search Ingredients by Category', endpoint: '/ingredients/search/category?category_id=1', method: 'GET' },
+                { name: 'Advanced Search Ingredients', endpoint: '/ingredients/search?name=meat&category_id=1', method: 'GET' },
+                { name: 'Get Ingredients by Dish ID', endpoint: '/ingredients/by-dish/1', method: 'GET' },
+                
+                // Recipe APIs
+                { name: 'Fetch Recipes', endpoint: '/recipes?page=1&limit=2', method: 'GET' },
+                
+                // Menu APIs
+                { name: 'Fetch Menus', endpoint: '/menus?page=1&limit=2', method: 'GET' },
+                
+                // Family APIs
+                { name: 'Fetch Families', endpoint: '/families?page=1&limit=2', method: 'GET' },
+                
+                // Dish Review APIs
+                { name: 'Fetch Dish Reviews', endpoint: '/dishes/1/reviews', method: 'GET' },
+                { name: 'Fetch Dish Review Stats', endpoint: '/dishes/1/reviews/stats', method: 'GET' },
+                
+                // User APIs
+                { name: 'Fetch Users', endpoint: '/users?page=1&limit=2', method: 'GET' }
+            ];
+            
+            let successCount = 0;
+            
+            for (const test of allTests) {
+                const result = await testEndpoint(test.name, test.endpoint, { method: test.method });
+                
+                if (result.success) {
+                    successCount++;
+                    addResult('success', `<strong>${result.name}</strong>: Success - Status ${result.status}, ${result.data.data?.length || (result.data && typeof result.data === 'object' ? Object.keys(result.data).length : 0)} items returned`);
+                } else {
+                    addResult('failure', `<strong>${result.name}</strong>: Failed - ${result.error || `Status ${result.status}`}`);
+                }
+            }
+            
+            addResult('info', `<strong>Tests completed! ${successCount}/${allTests.length} passed.</strong>`);
+        }
+        
+        // Also run a basic connectivity check on page load
+        window.onload = function() {
+            addResult('info', 'API Test Suite Loaded. Please ensure the backend server is running on http://localhost:8090');
+        };
+    </script>
+</body>
+</html>
