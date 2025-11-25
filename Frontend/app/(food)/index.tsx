@@ -1,0 +1,263 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { COLORS } from '../../constants/themes';
+import { foodStyles } from '../../styles/food.styles';
+import FoodCard from '../../components/FoodCard';
+import { getAccess } from '../../utils/api';
+
+interface Dish {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string | null;
+  created_at: string;
+}
+
+const PAGE_LIMIT = 10;
+
+export default function FoodPage() {
+  const router = useRouter();
+  const sessionExpiredRef = useRef(false);
+  const [activeTab, setActiveTab] = useState<'explore' | 'mine'>('explore');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleBack = () => {
+    router.back();
+  };
+
+  const handleNotificationPress = () => {
+    // Handle notification press
+    console.log('Notification pressed');
+  };
+
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiredRef.current) {
+      return;
+    }
+    sessionExpiredRef.current = true;
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại.', [
+      {
+        text: 'OK',
+        onPress: () => router.replace('/(auth)' as any),
+      },
+    ]);
+  }, [router]);
+
+  const fetchDishes = useCallback(async (pageNumber = 1, reset = false) => {
+    const query = searchQuery.trim();
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const endpoint = query
+        ? `dishes/search-paginated?name=${encodeURIComponent(query)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
+        : `dishes/get-paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
+
+      const payload = await getAccess(endpoint);
+
+      if (!payload?.success) {
+        throw new Error(payload?.message || 'Không thể tải danh sách món ăn');
+      }
+
+      const newItems: Dish[] = payload.data || [];
+      const pagination = payload.pagination || {};
+
+      setDishes(prev => (reset ? newItems : [...prev, ...newItems]));
+      setHasNextPage(Boolean(pagination.hasNextPage));
+      setPage(pagination.currentPage || pageNumber);
+      setError(null);
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.log(err);
+      setError('Không thể tải danh sách món ăn. Vui lòng thử lại.');
+      if (reset) {
+        setDishes([]);
+      }
+    } finally {
+      if (reset) {
+        setLoading(false);
+        setRefreshing(false);
+      } else {
+        setLoadingMore(false);
+      }
+    }
+  }, [searchQuery, handleSessionExpired]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchDishes(1, true);
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [fetchDishes]);
+
+  const handleFoodPress = (id: string) => {
+    router.push(`/(food)/${id}` as any);
+  };
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasNextPage) return;
+    fetchDishes(page + 1, false);
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchDishes(1, true);
+  };
+
+  return (
+    <View style={foodStyles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      
+      {/* Header */}
+      <View style={foodStyles.header}>
+        <TouchableOpacity onPress={handleBack} style={foodStyles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
+        </TouchableOpacity>
+        
+        <Text style={foodStyles.headerTitle}>Món ăn</Text>
+        
+        <TouchableOpacity 
+          onPress={handleNotificationPress} 
+          style={foodStyles.notificationButton}
+        >
+          <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
+          <View style={foodStyles.notificationDot} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={foodStyles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            foodStyles.tab,
+            activeTab === 'explore' ? foodStyles.tabActive : foodStyles.tabInactive
+          ]}
+          onPress={() => setActiveTab('explore')}
+        >
+          <Text
+            style={[
+              activeTab === 'explore' ? foodStyles.tabTextActive : foodStyles.tabTextInactive
+            ]}
+          >
+            Khám phá
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            foodStyles.tab,
+            activeTab === 'mine' ? foodStyles.tabActive : foodStyles.tabInactive
+          ]}
+          onPress={() => setActiveTab('mine')}
+        >
+          <Text
+            style={[
+              activeTab === 'mine' ? foodStyles.tabTextActive : foodStyles.tabTextInactive
+            ]}
+          >
+            Của tôi
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Search Bar */}
+      <View style={foodStyles.searchContainer}>
+        <View style={foodStyles.searchBar}>
+          <Ionicons name="search" size={20} color={COLORS.darkGrey} style={foodStyles.searchIcon} />
+          <TextInput
+            style={foodStyles.searchInput}
+            placeholder="Search Anything"
+            placeholderTextColor={COLORS.darkGrey}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+      </View>
+
+      {/* Content */}
+      {loading && dishes.length === 0 ? (
+        <View style={foodStyles.loaderContainer}>
+          <ActivityIndicator size="large" color={COLORS.purple} />
+          <Text style={foodStyles.loaderText}>Đang tải món ăn...</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          style={foodStyles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={foodStyles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.purple} />
+          }
+        >
+          {activeTab === 'explore' && (
+            <>      
+              {error && (
+                <View style={foodStyles.errorContainer}>
+                  <Ionicons name="alert-circle-outline" size={20} color={COLORS.purple} />
+                  <Text style={foodStyles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              {!error && dishes.length === 0 && (
+                <View style={foodStyles.emptyState}>
+                  <Text style={foodStyles.emptyStateText}>
+                    Không tìm thấy món ăn nào
+                  </Text>
+                </View>
+              )}
+
+              <View style={foodStyles.foodList}>
+                {dishes.map((item) => (
+                  <FoodCard 
+                    key={item.id} 
+                    id={String(item.id)}
+                    name={item.name} 
+                    image_url={item.image_url}
+                    onPress={handleFoodPress}
+                  />
+                ))}
+              </View>
+
+              {hasNextPage && (
+                <TouchableOpacity 
+                  style={foodStyles.loadMoreButton}
+                  onPress={handleLoadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={foodStyles.loadMoreButtonText}>Tải thêm</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+
+          {activeTab === 'mine' && (
+            <View style={foodStyles.emptyState}>
+              <Text style={foodStyles.emptyStateText}>Chưa có món ăn nào</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+

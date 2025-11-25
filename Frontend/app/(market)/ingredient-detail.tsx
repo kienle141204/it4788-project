@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,11 @@ export default function IngredientDetailScreen() {
   const [ingredient, setIngredient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleSessionExpired = () => {
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
+    router.replace('/(auth)/login');
+  };
 
   useEffect(() => {
     const fetchIngredient = async () => {
@@ -41,6 +47,10 @@ export default function IngredientDetailScreen() {
         }
       } catch (e: any) {
         console.error("Error fetching ingredient:", e);
+        if (e?.message === 'SESSION_EXPIRED' || e?.response?.status === 401) {
+          handleSessionExpired();
+          return;
+        }
         setError(e.message || "Có lỗi xảy ra khi tải thông tin nguyên liệu");
       } finally {
         setLoading(false);

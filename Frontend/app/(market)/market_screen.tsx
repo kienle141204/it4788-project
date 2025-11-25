@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   BackHandler,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -43,6 +44,11 @@ export default function MarketScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  const handleSessionExpired = () => {
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
+    router.replace('/(auth)/login');
+  };
 
   // Xử lý nút back trên điện thoại - quay về home
   useEffect(() => {
@@ -103,8 +109,11 @@ export default function MarketScreen() {
           setPrev(res.pagination?.hasPrevPage || false);
           setNext(res.pagination?.hasNextPage || false);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Error fetching data:", e);
+        if (e?.message === 'SESSION_EXPIRED' || e?.response?.status === 401) {
+          handleSessionExpired();
+        }
       } finally {
         setLoading(false);
       }
@@ -144,8 +153,11 @@ export default function MarketScreen() {
         setPrev(res.pagination?.hasPrevPage || false);
         setNext(res.pagination?.hasNextPage || false);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      if (e?.message === 'SESSION_EXPIRED' || e?.response?.status === 401) {
+        handleSessionExpired();
+      }
     } finally {
       setRefreshing(false);
     }
@@ -164,7 +176,6 @@ export default function MarketScreen() {
               <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
             </TouchableOpacity>
             <View style={marketStyles.headerContent}>
-              <Text style={marketStyles.greeting}>Xin chào! 👋</Text>
               <Text style={marketStyles.title}>Chợ của người Việt</Text>
             </View>
             <View style={marketStyles.iconGroup}>

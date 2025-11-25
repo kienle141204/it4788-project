@@ -7,7 +7,7 @@ import Modal from '../components/common/Modal';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
 import Pagination from '../components/common/Pagination';
-import { fetchIngredients, createIngredient, updateIngredient, deleteIngredient, searchIngredients } from '../api/foodAPI';
+import { fetchIngredients, createIngredient, updateIngredient, deleteIngredient, searchIngredients } from '../api/ingredientAPI';
 
 const FoodsPage = () => {
   const [foods, setFoods] = useState([]);
@@ -15,6 +15,8 @@ const FoodsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10); // Maximum 10 records per page
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFood, setEditingFood] = useState(null);
   const [formData, setFormData] = useState({
@@ -28,7 +30,7 @@ const FoodsPage = () => {
   // Load ingredients on component mount
   useEffect(() => {
     loadIngredients();
-  }, []);
+  }, [currentPage]); // Add currentPage to dependency array for pagination
 
   // Load ingredients from API
   const loadIngredients = async () => {
@@ -39,14 +41,34 @@ const FoodsPage = () => {
         page: currentPage,
         limit: itemsPerPage
       });
-      let ingredientsData = response.data || response; // Handle both paginated and non-paginated responses
+
+      // Handle paginated response - API returns {data: [...], pagination: {...}}
+      let ingredientsData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
+        ingredientsData = response;
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        ingredientsData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || ingredientsData.length;
+      }
 
       // Sort ingredients by ID from smallest to largest
-      ingredientsData = Array.isArray(ingredientsData)
-        ? [...ingredientsData].sort((a, b) => a.id - b.id)
-        : ingredientsData;
+      ingredientsData = [...ingredientsData].sort((a, b) => {
+        const aId = parseInt(a.id) || 0;
+        const bId = parseInt(b.id) || 0;
+        return aId - bId;
+      });
 
       setFoods(ingredientsData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
     } catch (error) {
       console.error('Error loading ingredients:', error);
     } finally {
@@ -178,14 +200,34 @@ const FoodsPage = () => {
 
     try {
       setLoading(true);
-      const response = await searchIngredients(searchValue);
-      setFoods(response.data || response);
+      const response = await searchIngredients(searchValue, 1, itemsPerPage);
+
+      let ingredientsData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
+        ingredientsData = response;
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        ingredientsData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || ingredientsData.length;
+      }
+
+      setFoods(ingredientsData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
+      setCurrentPage(1); // Reset to first page after search
     } catch (error) {
       console.error('Error searching ingredients:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = foods.filter(f =>
         f.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-        f.category.toLowerCase().includes(searchValue.toLowerCase())
+        f.category?.toLowerCase().includes(searchValue.toLowerCase())
       );
       setFoods(filtered);
     } finally {
@@ -209,17 +251,8 @@ const FoodsPage = () => {
     setCurrentPage(page);
   };
 
-  // Update to use API response for pagination
-  const filteredFoods = foods; // Now filtered by API
-
-  // Calculate pagination for display (only if not using API pagination)
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentFoods = filteredFoods.slice(indexOfFirstItem, indexOfLastItem);
-
-  // In a real implementation with API pagination, you might get this from the API response
-  // For now, we'll use the length of the array
-  const totalPages = Math.ceil(filteredFoods.length / itemsPerPage);
+  // Use foods directly as they come from the API response with proper pagination
+  const currentFoods = foods;
 
   // Show loading indicator while data is being fetched
   if (loading && foods.length === 0) {
