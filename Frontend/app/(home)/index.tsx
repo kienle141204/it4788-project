@@ -40,9 +40,9 @@ export default function HomePage() {
   }, []);
 
   const features = [
-    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: COLORS.purple, onPress: () => Alert.alert('Nhóm', 'Chức năng nhóm') },
+    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: COLORS.purple, onPress: () => router.push('/(group)') },
     { id: 'shopping', name: 'Chợ', icon: 'document-text' as const, color: COLORS.purple, onPress: () => router.push('/(market)/market_screen') },
-    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: COLORS.purple, onPress: () => Alert.alert('Bữa ăn', 'Chức năng bữa ăn') },
+    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: COLORS.purple, onPress: () => router.push('/(meal)') },
     { id: 'nutrition', name: 'Dinh dưỡng', icon: 'book' as const, color: COLORS.orange, onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
     { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: COLORS.purple, onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
     { id: 'food', name: 'Món ăn', icon: 'book' as const, color: COLORS.orange, onPress: () => router.push('/(food)' as any) }

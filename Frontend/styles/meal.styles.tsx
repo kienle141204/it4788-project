@@ -117,7 +117,7 @@ export const mealStyles = StyleSheet.create({
   },
   dishCard: {
     flexDirection: 'row',
-    backgroundColor: '#F8F9FB',
+    backgroundColor: '#F4FBF6',
     borderRadius: 16,
     padding: 10,
     gap: 12,
@@ -127,7 +127,7 @@ export const mealStyles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 12,
-    backgroundColor: '#E8EAF6',
+    backgroundColor: '#D1FAE5',
   },
   dishContent: {
     flex: 1,
@@ -272,7 +272,7 @@ export const mealStyles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 8,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: '#F4FBF6',
     gap: 12,
   },
   quickDateOptionText: {
@@ -340,7 +340,7 @@ export const mealStyles = StyleSheet.create({
     borderRadius: 20,
   },
   calendarDayToday: {
-    backgroundColor: '#A78BFA66',
+    backgroundColor: '#4ADE8066',
     borderRadius: 20,
   },
   calendarDayText: {
