@@ -199,7 +199,7 @@ const ensureTokenValid = async (): Promise<boolean> => {
   return true;
 };
 
-export const getAccess = async (path: string, params: object = {}, retryCount = 0) => {
+export const getAccess = async (path: string, params: object = {}, retryCount = 0) : Promise<any> =>  {
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -235,7 +235,7 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
 };
 
 
-export const postAccess = async (path: string, data: object, retryCount = 0) => {
+export const postAccess = async (path: string, data: object, retryCount = 0) : Promise<any> => {
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -266,7 +266,7 @@ export const postAccess = async (path: string, data: object, retryCount = 0) => 
   }
 };
 
-export const patchAccess = async (path: string, data: object, retryCount = 0) => {
+export const patchAccess = async (path: string, data: object, retryCount = 0) : Promise<any> => {
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -297,7 +297,7 @@ export const patchAccess = async (path: string, data: object, retryCount = 0) =>
   }
 };
 
-export const deleteAccess = async (path: string, retryCount = 0) => {
+export const deleteAccess = async (path: string, retryCount = 0) : Promise<any> => {
   let tokenHeader = {};
   try {
     await ensureTokenValid();
