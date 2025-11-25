@@ -21,4 +21,7 @@ export class CreateShoppingListDto {
     @IsOptional()
     @IsBoolean()
     is_shared?: boolean;
+
+    @ApiProperty({ description: 'Ngày mua sắm', example: '2024-06-15' })
+    shopping_date: Date;
 }

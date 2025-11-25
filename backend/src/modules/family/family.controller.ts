@@ -27,7 +27,7 @@ export class FamilyController {
   ) { }
   /** Create family */
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Tạo gia đình mới',
     description: 'API này cho phép người dùng tạo một gia đình mới. Admin có thể tạo gia đình cho người khác bằng cách chỉ định owner_id.'
   })
@@ -49,8 +49,8 @@ export class FamilyController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Tạo gia đình thành công',
     example: {
       id: 1,
@@ -66,7 +66,7 @@ export class FamilyController {
   }
 
   @Post('add-member')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Thêm thành viên vào gia đình',
     description: 'API này cho phép owner hoặc admin thêm thành viên mới vào gia đình với vai trò cụ thể (owner, member).'
   })
@@ -91,8 +91,8 @@ export class FamilyController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Thêm thành viên thành công',
     example: {
       id: 1,
@@ -120,12 +120,12 @@ export class FamilyController {
 
   /** Get all families */
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy ra toàn bộ gia đình',
     description: 'API này trả về danh sách tất cả các gia đình trong hệ thống. Yêu cầu quyền admin.'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách gia đình thành công',
     example: [
       {
@@ -144,13 +144,13 @@ export class FamilyController {
 
   /** Get family by ID */
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy gia đình theo id',
     description: 'API này trả về thông tin chi tiết của một gia đình theo ID, bao gồm danh sách thành viên.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy thông tin gia đình thành công',
     example: {
       id: 1,
@@ -172,12 +172,12 @@ export class FamilyController {
   }
 
   @Get('my-family')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy ra các nhóm gia đình có người dùng là thành viên',
     description: 'API này trả về danh sách tất cả các gia đình mà người dùng hiện tại là thành viên (owner hoặc member).'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách gia đình thành công',
     example: [
       {
@@ -195,7 +195,7 @@ export class FamilyController {
 
   /** Update family */
   @Put(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Cập nhật gia đình',
     description: 'API này cho phép owner hoặc admin cập nhật thông tin gia đình như tên hoặc chuyển quyền owner cho người khác.'
   })
@@ -217,8 +217,8 @@ export class FamilyController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật gia đình thành công',
     example: {
       id: 1,
@@ -238,14 +238,14 @@ export class FamilyController {
   }
 
   /** Delete family */
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Xóa gia đình',
     description: 'API này cho phép owner hoặc admin xóa gia đình. Lưu ý: Hành động này không thể hoàn tác.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
   @Delete(':id')
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Xóa gia đình thành công',
     example: {
       message: 'Family 1 deleted successfully'
