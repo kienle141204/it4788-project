@@ -8,32 +8,31 @@ interface FilterTabsProps {
 }
 
 const FilterTabs: React.FC<FilterTabsProps> = ({ activeTab, onSelectTab }) => {
-  const tabs = ['All', 'MyTask', 'GroupTask', 'Completed'];
+  const tabs = [
+    { id: 'shopping', label: 'Danh sách mua sắm' },
+    { id: 'members', label: 'Thành viên nhóm' }
+  ];
 
   return (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={taskStyles.tabContainer}
-    >
-      {tabs.map((tab, index) => (
+    <View style={taskStyles.tabContainer}>
+      {tabs.map((tab) => (
         <TouchableOpacity
-          key={index}
+          key={tab.id}
           style={[
             taskStyles.tab,
-            activeTab === tab && taskStyles.tabActive
+            activeTab === tab.id && taskStyles.tabActive
           ]}
-          onPress={() => onSelectTab(tab)}
+          onPress={() => onSelectTab(tab.id)}
         >
           <Text style={[
             taskStyles.tabText,
-            activeTab === tab && taskStyles.tabTextActive
+            activeTab === tab.id && taskStyles.tabTextActive
           ]}>
-            {tab}
+            {tab.label}
           </Text>
         </TouchableOpacity>
       ))}
-    </ScrollView>
+    </View>
   );
 };
 

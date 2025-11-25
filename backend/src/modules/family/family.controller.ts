@@ -15,7 +15,7 @@ import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
-// import { FirebaseService } from '../../firebase/firebase.service';
+import { FirebaseService } from '../../firebase/firebase.service';
 
 @ApiTags('Families')
 @Controller('api/families')
@@ -23,7 +23,7 @@ import type { JwtUser } from '../../common/types/user.type';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FamilyController {
   constructor(private readonly familyService: FamilyService,
-    // private readonly firebaseService: FirebaseService,
+    private readonly firebaseService: FirebaseService,
   ) { }
   /** Create family */
   @Post()
@@ -108,15 +108,15 @@ export class FamilyController {
     const member = this.familyService.addMember(req.family_id, req.member_id, req.role, user)
     return member
   }
-  // @Post('test-push')
-  // @ApiOperation({ summary: 'Thử gửi thông báo đến thiết bị có body.token' })
-  // async sendTestPush(@Body() body: { token: string }) {
-  //   return this.firebaseService.sendNotification(
-  //     body.token,
-  //     'Test Notification',
-  //     'Hello from NestJS Firebase!'
-  //   );
-  // }
+  @Post('test-push')
+  @ApiOperation({ summary: 'Thử gửi thông báo đến thiết bị có body.token' })
+  async sendTestPush(@Body() body: { token: string }) {
+    return this.firebaseService.sendNotification(
+      body.token,
+      'Test Notification',
+      'Hello from NestJS Firebase!'
+    );
+  }
 
   /** Get all families */
   @Get()

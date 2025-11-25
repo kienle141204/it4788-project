@@ -50,3 +50,13 @@ export const resendEmail =async (data: object) : Promise<ResenResponse> => {
   const res = await post('auth/resend-otp', data)
   return res
 }
+
+export interface RefreshTokenResponse {
+  access_token: string;
+  refresh_token: string;
+}
+
+export const refreshToken = async (refresh_token: string): Promise<RefreshTokenResponse> => {
+  const res = await post('auth/refresh-token', { refresh_token });
+  return res;
+}
