@@ -15,6 +15,7 @@ import { CreateShoppingListDto } from './dto/create-shopping-list.dto';
 import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from 'src/common/types/user.type';
+import { Public } from 'src/common/decorators/public.decorator';
 
 @ApiTags('Shopping Lists')
 @ApiBearerAuth('JWT-auth')
