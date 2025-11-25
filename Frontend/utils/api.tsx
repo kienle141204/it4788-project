@@ -49,6 +49,7 @@ export const patch = async (path: String, data: object) => {
     }
 }
 
+const API_DOMAIN = process.env.API || 'http://localhost:8090/api/';
 export const deleteData = async (path: String) => {
     try{
         const res = await axios.delete(API_DOMAIN + path)

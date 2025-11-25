@@ -267,7 +267,7 @@ export const foodDetailStyles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: COLORS.darkGrey,
-    lineHeight: 24,
+    lineHeight: 20,
   },
   recipeContainer: {
     marginTop: 24,
@@ -308,7 +308,7 @@ export const foodDetailStyles = StyleSheet.create({
   stepDescription: {
     fontSize: 15,
     color: COLORS.darkGrey,
-    lineHeight: 22,
+    lineHeight: 18,
   },
   loadingContainer: {
     flex: 1,
@@ -497,7 +497,7 @@ export const foodDetailStyles = StyleSheet.create({
   reviewComment: {
     fontSize: 15,
     color: COLORS.darkGrey,
-    lineHeight: 22,
+    lineHeight: 18,
   },
   emptyReviewsText: {
     marginTop: 12,
