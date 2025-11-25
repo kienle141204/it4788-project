@@ -13,8 +13,8 @@ export default function Index() {
     
     const checkLogin = async () => {
       try {
-        await AsyncStorage.removeItem('access_token')
-        await AsyncStorage.removeItem('refresh_token')
+        // await AsyncStorage.removeItem('access_token')
+        // await AsyncStorage.removeItem('refresh_token')
         const key = await AsyncStorage.getItem('access_token')
         console.log(key)
         const token = await checkAsyncStorage();
