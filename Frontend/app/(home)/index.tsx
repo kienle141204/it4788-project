@@ -45,7 +45,7 @@ export default function HomePage() {
     { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: COLORS.purple, onPress: () => Alert.alert('Bữa ăn', 'Chức năng bữa ăn') },
     { id: 'nutrition', name: 'Dinh dưỡng', icon: 'book' as const, color: COLORS.orange, onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
     { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: COLORS.purple, onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
-    { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: COLORS.orange, onPress: () => Alert.alert('Công thức', 'Chức năng công thức') }
+    { id: 'food', name: 'Món ăn', icon: 'book' as const, color: COLORS.orange, onPress: () => router.push('/(food)' as any) }
   ];
 
   const handleGoToMarket = () => {
