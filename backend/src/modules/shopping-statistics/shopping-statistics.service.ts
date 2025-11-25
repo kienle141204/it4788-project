@@ -22,12 +22,12 @@ export class ShoppingStatisticsService {
   async totalCostByMonth(year: number, userId: number) {
     return await this.shoppingListRepo
       .createQueryBuilder('list')
-      .select("DATE_TRUNC('month', list.created_at)", 'month')
+      .select("DATE_TRUNC('month', list.shopping_date)", 'month')
       .addSelect('SUM(list.cost)', 'total_cost')
       .where('list.owner_id = :userId', { userId })
-      .andWhere('EXTRACT(YEAR FROM list.created_at) = :year', { year })
-      .groupBy("DATE_TRUNC('month', list.created_at)")
-      .orderBy("DATE_TRUNC('month', list.created_at)", 'ASC')
+      .andWhere('EXTRACT(YEAR FROM list.shopping_date) = :year', { year })
+      .groupBy("DATE_TRUNC('month', list.shopping_date)")
+      .orderBy("DATE_TRUNC('month', list.shopping_date)", 'ASC')
       .getRawMany();
   }
 
