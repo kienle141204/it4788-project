@@ -1,8 +1,8 @@
 export const COLORS = {
-  primary: "#8B5CF6", // Màu tím như home
-  secondary: "#A78BFA", // Light purple
+  primary: "#15803D", // Chủ đạo xanh lá
+  secondary: "#4ADE80", // Xanh lá nhạt hơn
   background: "#fff",
-  backgroundLight: "#eee9ff",
+  backgroundLight: "#E8F5E9",
   surface: "#1A1A1A",
   surfaceLight: "#2A2A2A",
   white: "#F5F5F5",
@@ -10,8 +10,8 @@ export const COLORS = {
   blue: '#1c67c9ff',
   orange: '#c9792eff',
   // New colors for home page
-  purple: '#8B5CF6',
-  lightPurple: '#A78BFA',
+  purple: '#16A34A', // Dùng làm accent xanh
+  lightPurple: '#86EFAC',
   lightBlue: '#E0F2FE',
   darkGrey: '#374151',
   lightGrey: '#F3F4F6',

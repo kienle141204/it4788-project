@@ -176,7 +176,6 @@ export default function MarketScreen() {
               <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
             </TouchableOpacity>
             <View style={marketStyles.headerContent}>
-              <Text style={marketStyles.greeting}>Xin chào! 👋</Text>
               <Text style={marketStyles.title}>Chợ của người Việt</Text>
             </View>
             <View style={marketStyles.iconGroup}>

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
@@ -47,7 +46,7 @@ export default function GroupPage() {
   };
 
   return (
-    <SafeAreaView style={groupStyles.container} edges={['top']}>
+    <View style={groupStyles.container}>
       <StatusBar barStyle='dark-content' backgroundColor='#FFFFFF' />
 
       {/* Header */}
@@ -111,7 +110,7 @@ export default function GroupPage() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
