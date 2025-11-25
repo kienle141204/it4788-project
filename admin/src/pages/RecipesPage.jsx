@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2 } from 'lucide-react';
 import Button from '../components/common/Button';
+import Input from '../components/common/Input';
+import TextArea from '../components/common/TextArea';
 import Modal from '../components/common/Modal';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
 import Pagination from '../components/common/Pagination';
-import { fetchRecipes, getRecipeById } from '../api/recipeAPI';
+import { fetchRecipes, createRecipe, updateRecipe, deleteRecipe, getRecipeById } from '../api/recipeAPI';
 
 const RecipesPage = () => {
   const [recipes, setRecipes] = useState([]);
@@ -14,7 +16,14 @@ const RecipesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10); // Maximum 10 records per page
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [editingRecipe, setEditingRecipe] = useState(null);
+  const [formData, setFormData] = useState({
+    dish_id: '',
+    status: '',
+    steps: []
+  });
   const [detailLoading, setDetailLoading] = useState(false);
 
   // Load recipes on component mount
@@ -22,36 +31,46 @@ const RecipesPage = () => {
     loadRecipes();
   }, [currentPage]); // Add currentPage to dependency array for pagination
 
+  // State for pagination
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Load recipes from API
   const loadRecipes = async () => {
     try {
       setLoading(true);
-      const response = await fetchRecipes({ 
-        page: currentPage, 
-        limit: itemsPerPage 
+      const response = await fetchRecipes({
+        page: currentPage,
+        limit: itemsPerPage
       });
-      
+
       // Handle paginated response - API returns {data: [...], pagination: {...}}
       let recipesData = [];
-      if (response && response.data) {
-        if (Array.isArray(response.data)) {
-          recipesData = response.data;
-        } else {
-          recipesData = [];
-        }
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && response.data && response.pagination) {
+        // Response is properly paginated
+        recipesData = response.data;
+        responseTotalPages = response.pagination.totalPages;
+        responseTotalItems = response.pagination.totalItems;
       } else if (Array.isArray(response)) {
         // Fallback if response is directly an array
         recipesData = response;
+        responseTotalPages = 1; // Or calculate based on itemsPerPage
+        responseTotalItems = response.length;
       }
-      
-      // Sort recipes by ID from smallest to largest  
+
+      // Sort recipes by ID from smallest to largest
       recipesData = [...recipesData].sort((a, b) => {
         const aId = parseInt(a.id) || 0;
         const bId = parseInt(b.id) || 0;
         return aId - bId;
       });
-        
+
       setRecipes(recipesData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
     } catch (error) {
       console.error('Error loading recipes:', error);
       setRecipes([]);
@@ -62,8 +81,8 @@ const RecipesPage = () => {
 
   const columns = [
     { header: 'ID', key: 'id' },
-    { 
-      header: 'Hình ảnh', 
+    {
+      header: 'Hình ảnh',
       key: 'dish.image_url',
       render: (value, row) => row.dish?.image_url ? (
         <img src={row.dish.image_url} alt="Recipe" className="w-12 h-12 object-cover rounded" />
@@ -71,13 +90,13 @@ const RecipesPage = () => {
         <span className="text-gray-400">Không có</span>
       )
     },
-    { 
-      header: 'Tên công thức', 
+    {
+      header: 'Tên công thức',
       key: 'dish.name',
       render: (value, row) => row.dish?.name || 'N/A'
     },
-    { 
-      header: 'Người sở hữu', 
+    {
+      header: 'Người sở hữu',
       key: 'owner.full_name',
       render: (value, row) => row.owner?.full_name || row.owner?.email || 'N/A'
     },
@@ -85,17 +104,58 @@ const RecipesPage = () => {
       header: 'Hành động',
       key: 'actions',
       render: (value, row) => (
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          onClick={() => viewRecipeDetails(row.id)}
-          icon={Eye}
-        >
-          Xem chi tiết
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => viewRecipeDetails(row.id)}
+            icon={Eye}
+          >
+            Xem
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => handleEdit(row)}
+            icon={Edit}
+          >
+            Sửa
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => handleDelete(row)}
+            icon={Trash2}
+          >
+            Xóa
+          </Button>
+        </div>
       )
     },
   ];
+
+  const handleEdit = (recipe) => {
+    setEditingRecipe(recipe);
+    // Map the recipe data to match form field names
+    setFormData({
+      dish_id: recipe.dish_id || recipe.dish?.id || '',
+      status: recipe.status || '',
+      steps: recipe.steps || []
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = async (recipe) => {
+    if (window.confirm(`Bạn có chắc muốn xóa công thức "${recipe.dish?.name || 'N/A'}"?`)) {
+      try {
+        await deleteRecipe(recipe.id);
+        // Remove recipe from local state after successful deletion
+        setRecipes(recipes.filter(r => r.id !== recipe.id));
+      } catch (error) {
+        console.error('Error deleting recipe:', error);
+      }
+    }
+  };
 
   // View recipe details
   const viewRecipeDetails = async (recipeId) => {
@@ -117,6 +177,43 @@ const RecipesPage = () => {
     setSelectedRecipe(null);
   };
 
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingRecipe(null);
+    setFormData({
+      dish_id: '',
+      status: '',
+      steps: []
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // Prepare data with correct field names
+      const recipeData = {
+        dish_id: parseInt(formData.dish_id),
+        status: formData.status,
+        steps: formData.steps
+      };
+
+      if (editingRecipe) {
+        // Update existing recipe
+        const updatedRecipe = await updateRecipe(editingRecipe.id, recipeData);
+        // Update recipe in local state
+        setRecipes(recipes.map(r => r.id === editingRecipe.id ? updatedRecipe : r));
+      } else {
+        // Create new recipe
+        const newRecipe = await createRecipe(recipeData);
+        // Add new recipe to local state
+        setRecipes([...recipes, newRecipe]);
+      }
+      closeEditModal();
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+    }
+  };
+
   // Instead of client-side filtering, we'll implement server-side search
   const performSearch = async (searchValue) => {
     if (searchValue.trim() === '') {
@@ -134,24 +231,32 @@ const RecipesPage = () => {
         q: searchValue
       });
       
-      let recipesData;
-      if (response.data && Array.isArray(response.data)) {
-        // If response has data array, use it
-        recipesData = response.data;
-      } else if (Array.isArray(response)) {
-        // If response is directly an array, use it
+      let recipesData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
         recipesData = response;
-      } else {
-        // Fallback
-        recipesData = [];
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        recipesData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || recipesData.length;
       }
-      
+
       // Sort recipes by ID from smallest to largest
-      recipesData = Array.isArray(recipesData) 
-        ? [...recipesData].sort((a, b) => parseInt(a.id) - parseInt(b.id))
-        : recipesData;
-        
+      recipesData = [...recipesData].sort((a, b) => {
+        const aId = parseInt(a.id) || 0;
+        const bId = parseInt(b.id) || 0;
+        return aId - bId;
+      });
+
       setRecipes(recipesData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
       setCurrentPage(1); // Reset to first page after search
     } catch (error) {
       console.error('Error searching recipes:', error);
@@ -183,12 +288,8 @@ const RecipesPage = () => {
     setCurrentPage(page);
   };
 
-  // Use recipes directly since they come paginated from API
-  const currentRecipes = recipes;
-  // Placeholder for total pages - would need to get this from API response if available
-  // For now, we'll use a simple calculation based on total items if available in API response
-  // If the API response includes pagination info, we should use it
-  const totalPages = 10; // This should ideally come from the API response
+  // Use recipes directly as they come from the API response with proper pagination
+  const currentRecipes = Array.isArray(recipes) ? recipes : [];
 
   // Show loading indicator while data is being fetched
   if (loading && recipes.length === 0) {
@@ -203,7 +304,6 @@ const RecipesPage = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Quản lý Công thức nấu ăn</h1>
-        {/* Remove the "Add Recipe" button for now since we're focusing on viewing */}
       </div>
 
       <div className="mb-4">
@@ -212,6 +312,16 @@ const RecipesPage = () => {
           onChange={handleSearchChange}
           placeholder="Tìm kiếm công thức..."
         />
+      </div>
+
+      <div className="mb-6">
+        <Button icon={Plus} onClick={() => {
+          setEditingRecipe(null);
+          setFormData({ dish_id: '', status: '', steps: [] });
+          setIsEditModalOpen(true);
+        }}>
+          Thêm công thức
+        </Button>
       </div>
 
       <Table
@@ -226,6 +336,49 @@ const RecipesPage = () => {
           onPageChange={handlePageChange}
         />
       )}
+
+      {/* Edit Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={closeEditModal}
+        title={editingRecipe ? 'Sửa công thức' : 'Thêm công thức mới'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit}>
+          <Input
+            label="ID Món ăn"
+            type="number"
+            value={formData.dish_id}
+            onChange={(e) => setFormData({...formData, dish_id: e.target.value})}
+            required
+          />
+          <Input
+            label="Trạng thái"
+            value={formData.status}
+            onChange={(e) => setFormData({...formData, status: e.target.value})}
+            placeholder="public, private, etc."
+          />
+          <TextArea
+            label="Các bước thực hiện (JSON)"
+            value={JSON.stringify(formData.steps, null, 2)}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                setFormData({...formData, steps: Array.isArray(parsed) ? parsed : []});
+              } catch (error) {
+                // If JSON is invalid, keep the current steps
+                console.error('Invalid JSON:', error);
+              }
+            }}
+            placeholder=' [{"step_number": 1, "description": "Chuẩn bị nguyên liệu"}]'
+            rows={6}
+          />
+          <div className="flex gap-2 justify-end mt-6">
+            <Button variant="secondary" onClick={closeEditModal}>Hủy</Button>
+            <Button type="submit">Lưu</Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Detail Modal */}
       <Modal
@@ -244,7 +397,7 @@ const RecipesPage = () => {
               <h3 className="font-semibold text-lg">Món ăn:</h3>
               <p>{selectedRecipe.dish?.name || 'N/A'}</p>
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-lg">Mô tả:</h3>
               <p>{selectedRecipe.dish?.description || 'Không có mô tả'}</p>
@@ -265,18 +418,23 @@ const RecipesPage = () => {
               <p>{selectedRecipe.created_at ? new Date(selectedRecipe.created_at).toLocaleString('vi-VN') : 'N/A'}</p>
             </div>
 
-            {selectedRecipe && (
+            {selectedRecipe.steps && selectedRecipe.steps.length > 0 && (
               <div>
                 <h3 className="font-semibold text-lg">Các bước thực hiện:</h3>
-                <p>Chi tiết các bước sẽ được hiển thị ở đây khi xem công thức chi tiết.</p>
-                {/* Steps would be available in detailed view from the API */}
+                <ul className="list-decimal list-inside space-y-2">
+                  {selectedRecipe.steps.map((step, index) => (
+                    <li key={index}>
+                      <span className="font-medium">Bước {step.step_number || index + 1}:</span> {step.description}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
         ) : (
           <p>Không có thông tin công thức</p>
         )}
-        
+
         <div className="flex justify-end mt-6">
           <Button variant="secondary" onClick={closeDetailModal}>Đóng</Button>
         </div>

@@ -5,10 +5,12 @@ import { get, post, put, del } from './authFetch';
 // Get users with optional pagination and filtering
 export const fetchUsers = async (params = {}) => {
   console.log('API call: fetchUsers', params);
-  
+
   try {
     // Real API call:
-    return await get(`/users`, params);
+    const response = await get(`/users`, params);
+    // Return the response as is to handle both paginated and non-paginated responses
+    return response;
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
@@ -55,12 +57,18 @@ export const deleteUser = async (id) => {
 };
 
 // Search users
-export const searchUsers = async (searchTerm) => {
+export const searchUsers = async (searchTerm, page = 1, limit = 10) => {
   console.log('API call: searchUsers', searchTerm);
-  
+
   try {
     // Real API call:
-    return await get(`/users/search`, { q: searchTerm });
+    const response = await get(`/users/search`, {
+      q: searchTerm,
+      page: page,
+      limit: limit
+    });
+    // Return the response as is to handle both paginated and non-paginated responses
+    return response;
   } catch (error) {
     console.error('Error searching users:', error);
     throw error;
@@ -70,10 +78,12 @@ export const searchUsers = async (searchTerm) => {
 // Get a single user by ID
 export const getUserById = async (id) => {
   console.log('API call: getUserById', id);
-  
+
   try {
     // Real API call:
-    return await get(`/users/${id}`);
+    const response = await get(`/users/${id}`);
+    // Return the user data from the response
+    return response.data || response;
   } catch (error) {
     console.error('Error getting user by ID:', error);
     throw error;
