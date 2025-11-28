@@ -14,7 +14,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     console.log('JWT Strategy initialized with secret:', secret ? `${secret.substring(0, 10)}...` : 'undefined');
     
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        // Ưu tiên lấy từ Authorization: Bearer <token> (chuẩn)
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        // Hỗ trợ lấy từ header access_token hoặc access-token
+        // Lưu ý: Express/NestJS normalize headers thành lowercase và chuyển dấu gạch ngang thành dấu gạch dưới
+        (request: any) => {
+          if (!request || !request.headers) return null;
+          // Thử các cách khác nhau: access_token, access-token, x-access-token
+          const token = 
+            request.headers.access_token || 
+            request.headers['access-token'] || 
+            request.headers['x-access-token'] ||
+            request.headers['x_access_token'];
+          return token ? (typeof token === 'string' ? token : token[0]) : null;
+        },
+      ]),
       ignoreExpiration: false,
       secretOrKey: secret,
     });

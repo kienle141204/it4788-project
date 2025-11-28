@@ -1,12 +1,13 @@
 // styles/task.styles.tsx
 import { StyleSheet } from 'react-native';
+import { COLORS } from '../constants/themes';
 import { Colors } from '../constants/colors';
 
 export const taskStyles = StyleSheet.create({
   // Container Styles
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: COLORS.background,
   },
   
   content: {
@@ -20,9 +21,7 @@ export const taskStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: COLORS.background,
   },
   
   backButton: {
@@ -34,9 +33,17 @@ export const taskStyles = StyleSheet.create({
   },
   
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: Colors.black,
+    color: COLORS.darkGrey,
+  },
+  
+  menuButton: {
+    padding: 8,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
   notificationButton: {
@@ -55,88 +62,250 @@ export const taskStyles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.secondary,
+    backgroundColor: COLORS.secondary,
   },
   
   // Date Selector Styles
   dateContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: Colors.white,
-    gap: 12,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 16,
+    backgroundColor: COLORS.background,
+    gap: 8,
+  },
+  
+  dateNavButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  dateScrollContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
   },
   
   dateItem: {
-    flex: 1,
+    minWidth: 70,
     alignItems: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    backgroundColor: Colors.backgroundLight,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: COLORS.backgroundLight,
   },
   
   dateItemSelected: {
-    backgroundColor: Colors.primary,
-  },
-  
-  dateMonth: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 4,
+    backgroundColor: COLORS.purple,
   },
   
   dateDay: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '700',
-    color: Colors.black,
-    marginBottom: 4,
+    color: COLORS.darkGrey,
+    marginTop: 4,
   },
   
   dateDaySelected: {
-    color: Colors.white,
+    color: COLORS.white,
   },
   
   dateWeekday: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: COLORS.darkGrey,
+    opacity: 0.7,
   },
   
   dateTextSelected: {
-    color: Colors.white,
+    color: COLORS.white,
+    opacity: 1,
   },
   
   // Filter Tabs Styles
   tabContainer: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: Colors.white,
+    paddingVertical: 12,
+    backgroundColor: COLORS.background,
     gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGrey,
   },
   
   tab: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: Colors.backgroundLight,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   
   tabActive: {
-    backgroundColor: Colors.primary,
+    borderBottomColor: COLORS.purple,
   },
   
   tabText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
-    color: Colors.textSecondary,
+    color: COLORS.darkGrey,
+    opacity: 0.6,
   },
   
   tabTextActive: {
-    color: Colors.white,
+    color: COLORS.purple,
+    opacity: 1,
+    fontWeight: '600',
   },
   
   // Task List Styles
   taskList: {
     padding: 20,
+    backgroundColor: COLORS.background,
+  },
+  
+  // Shopping List Item Styles
+  shoppingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    gap: 12,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  
+  checkboxContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.grey,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  checkboxChecked: {
+    backgroundColor: COLORS.purple,
+    borderColor: COLORS.purple,
+  },
+  
+  itemContent: {
+    flex: 1,
+    gap: 6,
+  },
+  
+  itemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.darkGrey,
+  },
+  
+  itemNameCompleted: {
+    textDecorationLine: 'line-through',
+    opacity: 0.5,
+    color: COLORS.grey,
+  },
+  
+  itemQuantity: {
+    fontSize: 13,
+    color: COLORS.darkGrey,
+    opacity: 0.7,
+  },
+  
+  assignedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  
+  avatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.purple,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  assignedText: {
+    fontSize: 13,
+    color: COLORS.darkGrey,
+    opacity: 0.9,
+  },
+  
+  assignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: COLORS.purple,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  
+  assignButtonText: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  
+  quantityButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  quantityButtonText: {
+    fontSize: 18,
+    color: COLORS.purple,
+    fontWeight: '600',
+  },
+  
+  quantityValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.darkGrey,
+    minWidth: 20,
+    textAlign: 'center',
+  },
+  
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  
+  emptyStateText: {
+    fontSize: 14,
+    color: COLORS.darkGrey,
+    opacity: 0.6,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   
   // Task Card Styles

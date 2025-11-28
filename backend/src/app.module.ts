@@ -57,7 +57,7 @@ import { NutrientModule } from './modules/nutrient/nutrient.module';
         return dbConfig;
       },
     }),
-    
+
     UserModule,
     AuthModule,
     FamilyModule,

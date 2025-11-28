@@ -16,6 +16,8 @@ const DishesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10); // Maximum 10 records per page
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDish, setEditingDish] = useState(null);
   const [formData, setFormData] = useState({
@@ -27,21 +29,44 @@ const DishesPage = () => {
   // Load dishes on component mount
   useEffect(() => {
     loadDishes();
-  }, []);
+  }, [currentPage]); // Add currentPage to dependency array for pagination
 
   // Load dishes from API
   const loadDishes = async () => {
     try {
       setLoading(true);
-      const response = await fetchDishes();
-      let dishesData = response.data || response; // Handle both paginated and non-paginated responses
-      
+      const response = await fetchDishes({
+        page: currentPage,
+        limit: itemsPerPage
+      });
+
+      // Handle paginated response - API returns {data: [...], pagination: {...}}
+      let dishesData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
+        dishesData = response;
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        dishesData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || dishesData.length;
+      }
+
       // Sort dishes by ID from smallest to largest
-      dishesData = Array.isArray(dishesData) 
-        ? [...dishesData].sort((a, b) => a.id - b.id)
-        : dishesData;
-        
+      dishesData = [...dishesData].sort((a, b) => {
+        const aId = parseInt(a.id) || 0;
+        const bId = parseInt(b.id) || 0;
+        return aId - bId;
+      });
+
       setDishes(dishesData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
     } catch (error) {
       console.error('Error loading dishes:', error);
     } finally {
@@ -149,14 +174,34 @@ const DishesPage = () => {
 
     try {
       setLoading(true);
-      const response = await searchDishes(searchValue);
-      setDishes(response.data || response);
+      const response = await searchDishes(searchValue, 1, itemsPerPage);
+
+      let dishesData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
+        dishesData = response;
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        dishesData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || dishesData.length;
+      }
+
+      setDishes(dishesData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
+      setCurrentPage(1); // Reset to first page after search
     } catch (error) {
       console.error('Error searching dishes:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = dishes.filter(d =>
         d.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-        d.category.toLowerCase().includes(searchValue.toLowerCase())
+        d.category?.toLowerCase().includes(searchValue.toLowerCase())
       );
       setDishes(filtered);
     } finally {
@@ -175,13 +220,8 @@ const DishesPage = () => {
     }, 300);
   };
 
-  const filteredDishes = dishes; // Now filtered by API
-
-  // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentDishes = filteredDishes.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredDishes.length / itemsPerPage);
+  // Use dishes directly as they come from the API response with proper pagination
+  const currentDishes = dishes;
 
   // Show loading indicator while data is being fetched
   if (loading && dishes.length === 0) {

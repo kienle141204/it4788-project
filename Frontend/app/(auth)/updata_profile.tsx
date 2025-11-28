@@ -10,12 +10,13 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/themes";
 import { styles } from "@/styles/auth.styles";
 
 export default function ProfileScreen() {
   const [image, setImage] = useState<string | null>(null);
-  const [isFocused, setIsFocused] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
     const [phone, setPhone] = useState('');
@@ -122,7 +123,7 @@ export default function ProfileScreen() {
           style={styles.cameraButton}
           onPress={() => setModalVisible(true)}
         >
-          <MaterialIcons name="photo-camera" size={40} color="#fff" />
+          <MaterialIcons name="photo-camera" size={40} color={COLORS.white} />
         </TouchableOpacity>
       </View>
 
@@ -130,31 +131,33 @@ export default function ProfileScreen() {
               <Text style={styles.labelText}>Số điện thoại</Text>
       </View>
 
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputWrapper, focusedInput === 'phone' && styles.inputFocused]}>
+        <Ionicons name="call-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
         <TextInput        
-          style={[styles.input, isFocused && styles.inputFocused]}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)} 
+          style={styles.inputInner}
+          onFocus={() => setFocusedInput('phone')}
+          onBlur={() => setFocusedInput(null)} 
           placeholder='Nhập số điện thoại của bạn' 
+          placeholderTextColor={COLORS.grey}
           selectionColor={COLORS.primary}
           value={phone}
-          keyboardType='decimal-pad'
-          onChangeText={setPhone}
-          placeholderTextColor={COLORS.primary} />
-        </View>
+          keyboardType='phone-pad'
+          onChangeText={setPhone} />
+      </View>
         <View style={styles.label}>
-            <Text style={styles.labelText}> Địa chỉ</Text>
+            <Text style={styles.labelText}>Địa chỉ</Text>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputWrapper, focusedInput === 'address' && styles.inputFocused]}>
+            <Ionicons name="location-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
             <TextInput        
-            style={[styles.input, isFocused && styles.inputFocused]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)} 
-            placeholder='Nhập địa chỉ của bạn' 
-            selectionColor={COLORS.primary}
-            placeholderTextColor={COLORS.primary}
-            value={address}
-            onChangeText={setAddress} />
+                style={styles.inputInner}
+                onFocus={() => setFocusedInput('address')}
+                onBlur={() => setFocusedInput(null)} 
+                placeholder='Nhập địa chỉ của bạn' 
+                placeholderTextColor={COLORS.grey}
+                selectionColor={COLORS.primary}
+                value={address}
+                onChangeText={setAddress} />
       </View>
 
         <View style={styles.otpViewTouch}>
@@ -184,17 +187,17 @@ export default function ProfileScreen() {
 
             <View style={styles.modalOptions}>
               <TouchableOpacity style={styles.option} onPress={openCamera}>
-                <MaterialIcons name="photo-camera" size={28} color="#d19a00" />
+                <MaterialIcons name="photo-camera" size={28} color={COLORS.orange} />
                 <Text style={styles.optionText}>Camera</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.option} onPress={openGallery}>
-                <MaterialIcons name="photo-library" size={28} color="#d19a00" />
+                <MaterialIcons name="photo-library" size={28} color={COLORS.orange} />
                 <Text style={styles.optionText}>Gallery</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.option} onPress={removePhoto}>
-                <MaterialIcons name="delete" size={28} color="#d19a00" />
+                <MaterialIcons name="delete" size={28} color={COLORS.orange} />
                 <Text style={styles.optionText}>Remove</Text>
               </TouchableOpacity>
             </View>

@@ -13,10 +13,6 @@ export default function Index() {
     
     const checkLogin = async () => {
       try {
-        // await AsyncStorage.removeItem('access_token')
-        // await AsyncStorage.removeItem('refresh_token')
-        const key = await AsyncStorage.getItem('access_token')
-        console.log(key)
         const token = await checkAsyncStorage();
         setIsLoggedIn(token);
       } catch (e) {
@@ -28,15 +24,14 @@ export default function Index() {
     checkLogin();
   }, []);
 
-  // if (!isReady) {
-  //   return (
-  //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-  //       <ActivityIndicator size="large" />
-  //     </View>
-  //   );
-  // }
+  // Đợi kiểm tra token xong mới redirect
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
-    
-  // return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
-  return <Redirect  href={'/(task)'} />;
+  return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
 }

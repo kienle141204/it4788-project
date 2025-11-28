@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/themes';
 import { homeStyles } from '../styles/home.styles';
@@ -17,10 +17,9 @@ export default function Header({ userName, onNotificationPress, onMenuPress }: H
       <View style={homeStyles.topBar}>
         {/* User profile section */}
         <View style={homeStyles.userProfile}>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face' }}
-            style={homeStyles.profileImage}
-          />
+          <View style={homeStyles.profileImageContainer}>
+            <Ionicons name="person" size={24} color={COLORS.white} />
+          </View>
           <View style={homeStyles.userInfo}>
             <Text style={homeStyles.greeting}>Hello!</Text>
             <Text style={homeStyles.userName}>{userName}</Text>
