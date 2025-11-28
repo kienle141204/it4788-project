@@ -30,6 +30,9 @@ export class ShoppingList {
   @Column({ name: 'is_shared', type: 'boolean', default: false })
   is_shared: boolean;
 
+  @Column({ name: 'shopping_date' })
+  shopping_date: Date;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'owner_id' })
   owner: User;

@@ -28,8 +28,8 @@ export class DishReviewController {
   @Get(':dishId/reviews')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  async getReviewsByDishId(@Param('dishId', ParseIntPipe) dishId: number) {
-    const reviews = await this.dishReviewService.getReviewsByDishId(dishId);
+  async getReviewsByDishId(@Param('dishId', ParseIntPipe) dishId: number, @Query('page') page: number, @Query('limit') limit: number) {
+    const reviews = await this.dishReviewService.getReviewsByDishId(dishId, page, limit);
     return {
       success: true,
       message: `Lấy danh sách đánh giá món ăn thành công`,

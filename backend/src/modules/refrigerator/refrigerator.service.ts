@@ -1,17 +1,29 @@
 import { Injectable, NotFoundException, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Refrigerator } from '../../entities/refrigerator.entity';
 import { CreateRefrigeratorDto } from './dto/create-refrigerator.dto';
 import { UpdateRefrigeratorDto } from './dto/update-refrigerator.dto';
 import type { JwtUser } from '../../common/types/user.type';
 import { FamilyService } from '../family/family.service';
+import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
+import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
+import { Dish } from '../../entities/dish.entity';
 
 @Injectable()
 export class RefrigeratorService {
   constructor(
     @InjectRepository(Refrigerator)
     private readonly refrigeratorRepo: Repository<Refrigerator>,
+
+    @InjectRepository(FridgeIngredient)
+    private readonly fridgeIngredientRepo: Repository<FridgeIngredient>,
+
+    @InjectRepository(DishesIngredients)
+    private readonly dishesIngredientsRepo: Repository<DishesIngredients>,
+
+    @InjectRepository(Dish)
+    private readonly dishRepo: Repository<Dish>,
 
     private readonly familyService: FamilyService,
   ) { }
@@ -143,4 +155,87 @@ export class RefrigeratorService {
     await this.refrigeratorRepo.remove(fridge);
   }
 
+  /**
+   * Gợi ý các món ăn dựa trên nguyên liệu hiện có trong tủ lạnh
+   */
+  async suggestDishes(refrigerator_id: number, user: JwtUser) {
+    // đảm bảo người dùng có quyền truy cập tủ lạnh
+    await this.findOne(refrigerator_id, user);
+
+    const fridgeIngredients = await this.fridgeIngredientRepo.find({
+      where: { refrigerator_id },
+      relations: ['ingredient'],
+    });
+
+    if (!fridgeIngredients.length) {
+      return [];
+    }
+
+    const fridgeIngredientNames = Array.from(
+      new Set(
+        fridgeIngredients
+          .map((item) => item.ingredient?.name?.trim().toLowerCase())
+          .filter((name): name is string => Boolean(name)),
+      ),
+    );
+
+    if (!fridgeIngredientNames.length) {
+      return [];
+    }
+
+    const matchingDishIngredients = await this.dishesIngredientsRepo
+      .createQueryBuilder('di')
+      .leftJoinAndSelect('di.dish', 'dish')
+      .where('LOWER(di.ingredient_name) IN (:...names)', { names: fridgeIngredientNames })
+      .getMany();
+
+    if (!matchingDishIngredients.length) {
+      return [];
+    }
+
+    const dishIds = Array.from(new Set(matchingDishIngredients.map((item) => item.dish_id)));
+
+    const [allDishIngredients, dishes] = await Promise.all([
+      this.dishesIngredientsRepo.find({ where: { dish_id: In(dishIds) } }),
+      this.dishRepo.find({ where: { id: In(dishIds) } }),
+    ]);
+
+    const dishMap = new Map(dishes.map((dish) => [dish.id, dish]));
+
+    const suggestions = dishIds
+      .map((dishId) => {
+        const dish = dishMap.get(dishId);
+        if (!dish) return null;
+
+        const dishIngredients = allDishIngredients.filter((item) => item.dish_id === dishId);
+        const matchedIngredients = matchingDishIngredients.filter((item) => item.dish_id === dishId);
+
+        const matchedNames = Array.from(new Set(matchedIngredients.map((item) => item.ingredient_name)));
+        const allNames = Array.from(new Set(dishIngredients.map((item) => item.ingredient_name)));
+
+        const missingNames = allNames.filter((name) => !matchedNames.includes(name));
+        const totalIngredients = allNames.length;
+        const matchCount = matchedNames.length;
+        const matchPercentage = totalIngredients ? Number((matchCount / totalIngredients).toFixed(2)) : 0;
+
+        return {
+          dishId: dish.id,
+          dishName: dish.name,
+          matchCount,
+          totalIngredients,
+          matchPercentage,
+          matchedIngredients: matchedNames,
+          missingIngredients: missingNames,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .sort((a, b) => {
+        if (b.matchPercentage !== a.matchPercentage) {
+          return b.matchPercentage - a.matchPercentage;
+        }
+        return b.matchCount - a.matchCount;
+      });
+
+    return suggestions;
+  }
 }

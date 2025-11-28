@@ -52,6 +52,31 @@ export class MemberService {
     return this.memberRepository.save(member);
   }
 
+  /**
+   * Thêm member bằng mã mời (không cần permission check)
+   */
+  async addMemberByInvitation(dto: AddMemberDto): Promise<FamilyMember> {
+    const { family_id, user_id, role } = dto;
+
+    const family = await this.familyRepository.findOne({
+      where: { id: family_id },
+    });
+    if (!family) throw new NotFoundException(`Không tìm thấy family ${family_id}`);
+
+    const exists = await this.memberRepository.findOne({
+      where: { family_id, user_id },
+    });
+    if (exists) throw new BadRequestException('Người này đã có trong gia đình');
+
+    const member = this.memberRepository.create({
+      family_id,
+      user_id,
+      role,
+    });
+
+    return this.memberRepository.save(member);
+  }
+
   /** Get all members in a family */
   async getMembersByFamily(family_id: number) {
     return this.memberRepository.find({ where: { family_id } });
@@ -110,5 +135,23 @@ export class MemberService {
     }
 
     await this.memberRepository.delete(id);
+  }
+
+  /**
+   * Xóa member bằng ID (dùng cho tự rời nhóm, không cần permission check)
+   */
+  async removeMemberById(id: number) {
+    const member = await this.memberRepository.findOne({ where: { id } });
+    if (!member) {
+      throw new NotFoundException('Không tìm thấy thành viên này');
+    }
+    await this.memberRepository.delete(id);
+  }
+
+  /**
+   * Xóa tất cả members của một family (dùng khi xóa family)
+   */
+  async deleteAllMembersByFamily(family_id: number) {
+    await this.memberRepository.delete({ family_id });
   }
 }

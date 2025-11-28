@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } 
 import { FamilyService } from './family.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
+import { JoinByCodeDto } from './dto/join-by-code.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
 import { FirebaseService } from '../../firebase/firebase.service';
@@ -27,7 +28,7 @@ export class FamilyController {
   ) { }
   /** Create family */
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Tạo gia đình mới',
     description: 'API này cho phép người dùng tạo một gia đình mới. Admin có thể tạo gia đình cho người khác bằng cách chỉ định owner_id.'
   })
@@ -49,8 +50,8 @@ export class FamilyController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Tạo gia đình thành công',
     example: {
       id: 1,
@@ -66,7 +67,7 @@ export class FamilyController {
   }
 
   @Post('add-member')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Thêm thành viên vào gia đình',
     description: 'API này cho phép owner hoặc admin thêm thành viên mới vào gia đình với vai trò cụ thể (owner, member).'
   })
@@ -91,8 +92,8 @@ export class FamilyController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Thêm thành viên thành công',
     example: {
       id: 1,
@@ -108,6 +109,27 @@ export class FamilyController {
     const member = this.familyService.addMember(req.family_id, req.member_id, req.role, user)
     return member
   }
+
+  /** Join family by invitation code */
+  @Post('join-by-code')
+  @ApiOperation({ summary: 'Tham gia gia đình bằng mã mời' })
+  async joinByCode(
+    @Body() dto: JoinByCodeDto,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.joinFamilyByCode(dto.invitation_code, user);
+  }
+
+  /** Leave family */
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Rời khỏi gia đình' })
+  async leaveFamily(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.leaveFamily(id, user.id);
+  }
+
   @Post('test-push')
   @ApiOperation({ summary: 'Thử gửi thông báo đến thiết bị có body.token' })
   async sendTestPush(@Body() body: { token: string }) {
@@ -120,12 +142,12 @@ export class FamilyController {
 
   /** Get all families */
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy ra toàn bộ gia đình',
     description: 'API này trả về danh sách tất cả các gia đình trong hệ thống. Yêu cầu quyền admin.'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách gia đình thành công',
     example: [
       {
@@ -142,15 +164,31 @@ export class FamilyController {
     return this.familyService.getAllFamilies();
   }
 
+  @Get('my-family')
+  @ApiOperation({ summary: 'Lấy ra các nhóm gia đình có người dùng là thành viên' })
+  async getMyFamily(@User() user: JwtUser) {
+    return this.familyService.getMyFamily(user.id)
+  }
+
+  /** Get invitation code and QR code */
+  @Get(':id/invitation')
+  @ApiOperation({ summary: 'Lấy mã mời và QR code của gia đình' })
+  async getInvitationCode(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.getInvitationCode(id, user.id, user.role);
+  }
+
   /** Get family by ID */
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy gia đình theo id',
     description: 'API này trả về thông tin chi tiết của một gia đình theo ID, bao gồm danh sách thành viên.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy thông tin gia đình thành công',
     example: {
       id: 1,
@@ -171,31 +209,9 @@ export class FamilyController {
     return this.familyService.getFamilyById(id);
   }
 
-  @Get('my-family')
-  @ApiOperation({ 
-    summary: 'Lấy ra các nhóm gia đình có người dùng là thành viên',
-    description: 'API này trả về danh sách tất cả các gia đình mà người dùng hiện tại là thành viên (owner hoặc member).'
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lấy danh sách gia đình thành công',
-    example: [
-      {
-        id: 1,
-        name: 'Gia đình Nguyễn Văn A',
-        owner_id: 1,
-        role: 'owner',
-        created_at: '2024-01-01T00:00:00.000Z'
-      }
-    ]
-  })
-  async getMyFamily(@User() user: JwtUser) {
-    return this.familyService.getMyFamily(user.id)
-  }
-
   /** Update family */
   @Put(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Cập nhật gia đình',
     description: 'API này cho phép owner hoặc admin cập nhật thông tin gia đình như tên hoặc chuyển quyền owner cho người khác.'
   })
@@ -217,8 +233,8 @@ export class FamilyController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật gia đình thành công',
     example: {
       id: 1,
@@ -238,14 +254,14 @@ export class FamilyController {
   }
 
   /** Delete family */
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Xóa gia đình',
     description: 'API này cho phép owner hoặc admin xóa gia đình. Lưu ý: Hành động này không thể hoàn tác.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
   @Delete(':id')
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Xóa gia đình thành công',
     example: {
       message: 'Family 1 deleted successfully'

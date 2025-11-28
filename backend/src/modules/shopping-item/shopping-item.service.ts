@@ -121,6 +121,17 @@ export class ShoppingItemService {
     // Đảo ngược trạng thái is_checked
     item.is_checked = !item.is_checked;
 
+    // Cập nhật cost trong shopping list nếu có ingredient và giá
+    if (item.ingredient && item.ingredient.price != null) {
+      const shoppingList = await this.shoppingListRepo.findOne({ where: { id: item.list_id } });
+      if (shoppingList) {
+        shoppingList.cost += item.is_checked ? Number(item.ingredient.price) : -Number(item.ingredient.price);
+        // Cập nhật shopping list
+        await this.shoppingListRepo.save(shoppingList);
+      }
+    }
+
+    // Cập nhật item
     return await this.shoppingItemRepo.save(item);
   }
 
