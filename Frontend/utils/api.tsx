@@ -1,8 +1,24 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
+const getApiDomain = () => {
+  if (process.env.API) {
+    return process.env.API;
+  }
+  
 
-// const API_DOMAIN = process.env.API || 'http://10.0.2.2:8090/api/'
+  if (Platform.OS === 'web') {
+    return 'http://localhost:8090/api/';
+  } else if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8090/api/';
+  } else {
+    // iOS and other platforms use localhost
+    return 'http://localhost:8090/api/';
+  }
+};
+
+const API_DOMAIN = getApiDomain();
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
     headers: {
@@ -14,12 +30,19 @@ export const get = async (path: String) => {
     try {
         const result = await axios.get(API_DOMAIN + path, { withCredentials: true });
         return result;
-    } catch (e){
-        if(e) {
-            console.log(e)
-        }
-        else {
-            console.log("Network connect failed")
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Network connect failed'
+            };
         }
     }
 }
@@ -31,10 +54,18 @@ export const post = async (path: string, data: object) => {
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
       console.log('API Error:', error.response?.data || error.message);
-      return error.response?.data; 
+      // Return error response data or structured error object
+      return error.response?.data || { 
+        statusCode: error.response?.status || 500, 
+        message: error.message || 'Network Error' 
+      }; 
     } else {
       console.error('Unknown error:', error);
-      throw error;
+      // Return structured error instead of throwing
+      return {
+        statusCode: 500,
+        message: error?.message || 'Unknown error occurred'
+      };
     }
   }
 };
@@ -44,18 +75,41 @@ export const patch = async (path: String, data: object) => {
     try{
         const res = await axios.patch(API_DOMAIN +path, data, config)
         return res
-    } catch (e) {
-        return e; 
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Unknown error occurred'
+            };
+        }
     }
 }
 
-const API_DOMAIN = process.env.API || 'http://localhost:8090/api/';
 export const deleteData = async (path: String) => {
     try{
         const res = await axios.delete(API_DOMAIN + path)
         return res
-    } catch (e) {
-        console.log(e)
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Unknown error occurred'
+            };
+        }
     }
 }
 
@@ -66,8 +120,20 @@ export const upImage = async (path: String, data: object) => {
     try{
         const response = await axios.post(API_DOMAIN + path, data, { headers: { 'Content-Type': 'multipart/form-data' } })
         return response
-    } catch(e) {
-        console.log(e)
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Unknown error occurred'
+            };
+        }
     }
 }
 
@@ -204,6 +270,7 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
   try {
     await ensureTokenValid();
     tokenHeader = await getTokenHeader();
+    console.log('API_DOMAIN + path', API_DOMAIN + path);
     const result = await axios.get(API_DOMAIN + path, {
       ...config,
       headers: { ...config.headers, ...tokenHeader },

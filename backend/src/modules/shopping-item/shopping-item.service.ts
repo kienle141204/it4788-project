@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ShoppingItem } from '../../entities/shopping-item.entity';
@@ -8,6 +8,7 @@ import { ShoppingList } from '../../entities/shopping-list.entity';
 import { Ingredient } from '../../entities/ingredient.entity';
 import type { JwtUser } from 'src/common/types/user.type';
 import { FamilyService } from '../family/family.service';
+import { ShoppingListService } from '../shopping-list/shopping-list.service';
 
 @Injectable()
 export class ShoppingItemService {
@@ -22,6 +23,9 @@ export class ShoppingItemService {
     private readonly ingredientRepo: Repository<Ingredient>,
 
     private readonly familyService: FamilyService,
+    
+    @Inject(forwardRef(() => ShoppingListService))
+    private readonly shoppingListService: ShoppingListService,
   ) { }
 
   /** Tạo item mới */
@@ -44,9 +48,18 @@ export class ShoppingItemService {
     const ingredient = await this.ingredientRepo.findOne({ where: { id: ingredient_id } });
     if (!ingredient) throw new NotFoundException(`Không tìm thấy nguyên liệu ${ingredient_id}`);
 
+    // Auto-populate price from ingredient if not provided
+    const itemData = { ...dto };
+    if (itemData.price === null || itemData.price === undefined) {
+      itemData.price = ingredient.price || 0;
+    }
+
     // Tạo entity và lưu vào DB
-    const item = this.shoppingItemRepo.create(dto); // tạo entity trong memory
+    const item = this.shoppingItemRepo.create(itemData);
     const savedItem = await this.shoppingItemRepo.save(item);
+
+    // Recalculate shopping list cost
+    await this.shoppingListService.recalculateShoppingListCost(list_id);
 
     // Load relation
     const result = await this.shoppingItemRepo.findOne({
@@ -96,6 +109,7 @@ export class ShoppingItemService {
   /** Cập nhật item */
   async update(id: number, dto: UpdateShoppingItemDto, user: JwtUser): Promise<ShoppingItem> {
     const item = await this.findOne(id, user);
+    const oldListId = item.list_id;
 
     // Nếu có truyền lại list_id hay ingredient_id thì cập nhật đúng quan hệ
     if (dto.list_id) {
@@ -111,49 +125,40 @@ export class ShoppingItemService {
     }
 
     Object.assign(item, dto);
-    return await this.shoppingItemRepo.save(item);
+    const updatedItem = await this.shoppingItemRepo.save(item);
+
+    // Recalculate cost for both old and new list (if list changed)
+    await this.shoppingListService.recalculateShoppingListCost(updatedItem.list_id);
+    if (dto.list_id && dto.list_id !== oldListId) {
+      await this.shoppingListService.recalculateShoppingListCost(oldListId);
+    }
+
+    return updatedItem;
   }
 
-  // Check item
+  // Check/uncheck item (toggle)
   async check(id: number, user: JwtUser): Promise<ShoppingItem> {
     const item = await this.findOne(id, user);
 
     // Đảo ngược trạng thái is_checked
     item.is_checked = !item.is_checked;
 
-    // Cập nhật cost trong shopping list nếu có ingredient và giá
-    // Nếu item có ingredient và giá hợp lệ
-    const price = Number(item.price);
-
-    // Nếu giá không phải số -> bỏ qua
-    if (!isNaN(price)) {
-      const shoppingList = await this.shoppingListRepo.findOne({
-        where: { id: item.list_id },
-      });
-
-      if (shoppingList) {
-        // Ensure shoppingList.cost là số
-        const currentCost = Number(shoppingList.cost) || 0;
-
-        // Cộng hoặc trừ
-        shoppingList.cost = item.is_checked
-          ? currentCost + price
-          : currentCost - price;
-
-        // Làm tròn 2 số sau dấu phẩy để tránh lỗi Decimal
-        shoppingList.cost = Number(shoppingList.cost.toFixed(2));
-
-        await this.shoppingListRepo.save(shoppingList);
-      }
-    }
-
     // Cập nhật item
-    return await this.shoppingItemRepo.save(item);
+    const updatedItem = await this.shoppingItemRepo.save(item);
+
+    // Note: Cost is always calculated from all items regardless of checked status
+    // If you want to only count checked items, modify recalculateShoppingListCost method
+
+    return updatedItem;
   }
 
   /** Xóa item */
   async remove(id: number, user: JwtUser): Promise<void> {
     const item = await this.findOne(id, user);
+    const listId = item.list_id;
     await this.shoppingItemRepo.remove(item);
+    
+    // Recalculate shopping list cost after removal
+    await this.shoppingListService.recalculateShoppingListCost(listId);
   }
 }

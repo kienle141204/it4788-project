@@ -29,13 +29,20 @@ export default function login() {
       const data = { email, password };
 
       const res = await loginUSer(data);
+      
+      // Check if response exists and has error
+      if (!res) {
+        Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+        return;
+      }
+      
       let message = res?.message;
       if (res.statusCode) {
         if (Array.isArray(message)) {
           message = message.join('\n'); // Ghép mảng lại thành 1 chuỗi
         }
 
-        Alert.alert('Lỗi', message);
+        Alert.alert('Lỗi', message || 'Đăng nhập thất bại');
         return;
       }
 

@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Family } from '../../entities/family.entity';
+import { FamilyMember } from '../../entities/family-member.entity';
 import { MemberService } from '../member/member.service';
 import { AddMemberDto } from '../member/dto/add-member.dto';
 import type { JwtUser } from 'src/common/types/user.type';
@@ -17,6 +18,9 @@ export class FamilyService {
   constructor(
     @InjectRepository(Family)
     private readonly familyRepository: Repository<Family>,
+
+    @InjectRepository(FamilyMember)
+    private readonly familyMemberRepository: Repository<FamilyMember>,
 
     private readonly memberService: MemberService,
   ) { }
@@ -101,6 +105,42 @@ export class FamilyService {
     return this.findFamilyOrFail(id);
   }
 
+  /**
+   * Lấy danh sách thành viên của family kèm thông tin user chi tiết
+   */
+  async getFamilyMembersWithDetails(familyId: number, userId: number) {
+    // Kiểm tra family có tồn tại không
+    const family = await this.findFamilyOrFail(familyId);
+
+    // Kiểm tra user có phải là thành viên của family không
+    const members = await this.memberService.getMembersByFamily(familyId);
+    const isMember = members.some(m => m.user_id === userId);
+
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của gia đình này');
+    }
+
+    // Lấy danh sách members với thông tin user
+    const membersWithDetails = await this.familyMemberRepository.find({
+      where: { family_id: familyId },
+      relations: ['user'],
+    });
+
+    // Format response
+    return membersWithDetails.map(member => ({
+      id: member.id,
+      user_id: member.user_id,
+      role: member.role,
+      joined_at: member.joined_at,
+      user: {
+        id: member.user.id,
+        full_name: member.user.full_name,
+        email: member.user.email,
+        avatar_url: member.user.avatar_url,
+      },
+    }));
+  }
+
   async getMyFamily(userId: number) {
     // Lấy các record Member của user
     const members = await this.memberService.getMyFamily(userId);
@@ -116,7 +156,11 @@ export class FamilyService {
       relations: ['members'],
     });
 
-    return families;
+    // Add memberCount to each family
+    return families.map(family => ({
+      ...family,
+      memberCount: family.members?.length || 0,
+    }));
   }
 
   async updateFamily(
