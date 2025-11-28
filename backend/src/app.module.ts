@@ -14,8 +14,7 @@ import { RecipeModule } from './modules/recipe/recipe.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
 import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
-import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
-import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
+import { NutrientModule } from './modules/nutrient/nutrient.module';
 
 @Module({
   imports: [
@@ -70,8 +69,7 @@ import { ConsumptionHistoryModule } from './modules/consumption-history/consumpt
     MenuModule,
     IngredientModule,
     RefrigeratorModule,
-    ShoppingStatisticsModule,
-    ConsumptionHistoryModule,
+    NutrientModule,
   ],
   controllers: [AppController],
   providers: [AppService],

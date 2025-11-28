@@ -17,19 +17,23 @@ export class DishReviewService {
   /**
    * Lấy tất cả đánh giá của một món ăn
    */
-  async getReviewsByDishId(dishId: number): Promise<DishReview[]> {
-    // Kiểm tra món ăn có tồn tại không
+  async getReviewsByDishId(dishId: number, page: number, limit: number): Promise<DishReview[]> {
     const dish = await this.dishRepository.findOne({ where: { id: dishId } });
     if (!dish) {
       throw new NotFoundException('Không tìm thấy món ăn');
     }
 
-    return await this.dishReviewRepository.find({
+    const skip = (page - 1) * limit;
+    const [reviews, total] = await this.dishReviewRepository.findAndCount({
       where: { dish_id: dishId },
       relations: ['user'],
       order: { created_at: 'DESC' },
+      skip,
+      take: limit,
     });
-  }
+    
+    return reviews; 
+}
 
   /**
    * Lấy đánh giá của user cho một món ăn

@@ -8,6 +8,8 @@ import {
   Body,
   ParseIntPipe,
   UseGuards,
+  ValidationPipe,
+  Patch,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -119,51 +121,19 @@ export class UserController {
   /** Update user */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
-  @Put(':id')
-  @ApiOperation({ 
-    summary: 'Cập nhật thông tin người dùng',
-    description: 'API này cho phép người dùng cập nhật thông tin của chính mình hoặc admin có thể cập nhật thông tin của bất kỳ người dùng nào.'
-  })
-  @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của người dùng' })
-  @ApiBody({
-    type: UpdateUserDto,
-    examples: {
-      example1: {
-        summary: 'Cập nhật thông tin đầy đủ',
-        value: {
-          fullname: 'Nguyễn Văn B',
-          avatar_url: 'https://example.com/new-avatar.jpg',
-          address: '456 Đường XYZ, Quận 2, TP.HCM'
-        }
-      },
-      example2: {
-        summary: 'Chỉ cập nhật tên',
-        value: {
-          fullname: 'Nguyễn Văn B'
-        }
-      }
-    }
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Cập nhật thông tin thành công',
-    example: {
-      id: 1,
-      email: 'user@example.com',
-      fullname: 'Nguyễn Văn B',
-      avatar_url: 'https://example.com/new-avatar.jpg',
-      address: '456 Đường XYZ, Quận 2, TP.HCM',
-      updated_at: '2024-01-01T00:00:00.000Z'
-    }
-  })
-  @ApiResponse({ status: 403, description: 'Không có quyền cập nhật người dùng này' })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy người dùng' })
+  @Patch(':id')
+  @ApiOperation({ summary: 'Cập nhật thông tin người dùng' })
   async updateUser(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateUserDto,
+    @Body(ValidationPipe) dto: UpdateUserDto,
     @User() user: JwtUser,
   ) {
-    return await this.userService.updateUser(id, dto);
+    const updatedUser = await this.userService.updateUser(id, dto);
+    return {
+      success: true,
+      message: 'Cập nhật thông tin người dùng thành công',
+      data: updatedUser,
+    };
   }
 
   /** Delete user */

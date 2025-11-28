@@ -38,6 +38,15 @@ export class IngredientService {
   }
 
   /**
+   * Lấy tất cả địa điểm (places)
+   */
+  async findAllPlaces(): Promise<Place[]> {
+    return await this.placeRepository.find({
+      order: { name_place: 'ASC' },
+    });
+  }
+
+  /**
    * Lấy nguyên liệu theo ID
    */
   async findOne(id: number): Promise<Ingredient> {
