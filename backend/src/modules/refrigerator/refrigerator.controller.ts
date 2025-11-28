@@ -26,6 +26,7 @@ import type { JwtUser } from '../../common/types/user.type';
 @Controller('api/fridge')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 export class RefrigeratorController {
   constructor(
     private readonly refrigeratorService: RefrigeratorService,
@@ -423,6 +424,12 @@ export class RefrigeratorController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy tủ lạnh' })
   async getIngredients(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
     return await this.fridgeIngredientService.findByRefrigerator(refrigerator_id, user);
+  }
+
+  @Get(':id/suggestions')
+  @ApiOperation({ summary: 'Gợi ý món ăn phù hợp với nguyên liệu trong tủ lạnh' })
+  async suggestDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
+    return await this.refrigeratorService.suggestDishes(refrigerator_id, user);
   }
 
   @Patch('ingredients/:ingredientId')

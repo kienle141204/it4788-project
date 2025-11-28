@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } 
 import { FamilyService } from './family.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
+import { JoinByCodeDto } from './dto/join-by-code.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
 import { FirebaseService } from '../../firebase/firebase.service';
@@ -108,6 +109,27 @@ export class FamilyController {
     const member = this.familyService.addMember(req.family_id, req.member_id, req.role, user)
     return member
   }
+
+  /** Join family by invitation code */
+  @Post('join-by-code')
+  @ApiOperation({ summary: 'Tham gia gia đình bằng mã mời' })
+  async joinByCode(
+    @Body() dto: JoinByCodeDto,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.joinFamilyByCode(dto.invitation_code, user);
+  }
+
+  /** Leave family */
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Rời khỏi gia đình' })
+  async leaveFamily(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.leaveFamily(id, user.id);
+  }
+
   @Post('test-push')
   @ApiOperation({ summary: 'Thử gửi thông báo đến thiết bị có body.token' })
   async sendTestPush(@Body() body: { token: string }) {
@@ -142,6 +164,22 @@ export class FamilyController {
     return this.familyService.getAllFamilies();
   }
 
+  @Get('my-family')
+  @ApiOperation({ summary: 'Lấy ra các nhóm gia đình có người dùng là thành viên' })
+  async getMyFamily(@User() user: JwtUser) {
+    return this.familyService.getMyFamily(user.id)
+  }
+
+  /** Get invitation code and QR code */
+  @Get(':id/invitation')
+  @ApiOperation({ summary: 'Lấy mã mời và QR code của gia đình' })
+  async getInvitationCode(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.getInvitationCode(id, user.id, user.role);
+  }
+
   /** Get family by ID */
   @Get(':id')
   @ApiOperation({
@@ -169,28 +207,6 @@ export class FamilyController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình' })
   async getFamilyById(@Param('id', ParseIntPipe) id: number) {
     return this.familyService.getFamilyById(id);
-  }
-
-  @Get('my-family')
-  @ApiOperation({
-    summary: 'Lấy ra các nhóm gia đình có người dùng là thành viên',
-    description: 'API này trả về danh sách tất cả các gia đình mà người dùng hiện tại là thành viên (owner hoặc member).'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lấy danh sách gia đình thành công',
-    example: [
-      {
-        id: 1,
-        name: 'Gia đình Nguyễn Văn A',
-        owner_id: 1,
-        role: 'owner',
-        created_at: '2024-01-01T00:00:00.000Z'
-      }
-    ]
-  })
-  async getMyFamily(@User() user: JwtUser) {
-    return this.familyService.getMyFamily(user.id)
   }
 
   /** Update family */

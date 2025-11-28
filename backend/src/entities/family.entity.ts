@@ -24,6 +24,9 @@ export class Family {
   @Column({ name: 'owner_id', type: 'bigint' })
   owner_id: number;
 
+  @Column({ name: 'invitation_code', unique: true, length: 50, nullable: true })
+  invitation_code: string;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 

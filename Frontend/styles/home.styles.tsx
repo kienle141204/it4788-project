@@ -24,7 +24,7 @@ export const homeStyles = StyleSheet.create({
   },
   homeTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: COLORS.darkGrey,
   },
   headerActions: {
@@ -75,6 +75,7 @@ export const homeStyles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.darkGrey,
     marginBottom: 2,
+    fontWeight: 'bold',
   },
   userName: {
     fontSize: 20,
@@ -104,7 +105,7 @@ export const homeStyles = StyleSheet.create({
   taskCardTitle: {
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 10,
   },
   viewTaskButton: {
@@ -117,7 +118,7 @@ export const homeStyles = StyleSheet.create({
   viewTaskButtonText: {
     color: COLORS.purple,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   progressCircle: {
     width: 60,
@@ -145,14 +146,14 @@ export const homeStyles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: COLORS.darkGrey,
     marginRight: 8,
   },
   sectionCount: {
     fontSize: 14,
     color: COLORS.purple,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   notificationCard: {
     backgroundColor: COLORS.lightBlue,
@@ -164,6 +165,7 @@ export const homeStyles = StyleSheet.create({
     color: COLORS.darkGrey,
     fontSize: 14,
     marginBottom: 8,
+    fontWeight: 'bold',
   },
   progressBar: {
     height: 4,
@@ -201,7 +203,7 @@ export const homeStyles = StyleSheet.create({
     color: COLORS.darkGrey,
     marginTop: 8,
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: 'bold',
   },
   bottomNavigation: {
     backgroundColor: COLORS.backgroundLight,

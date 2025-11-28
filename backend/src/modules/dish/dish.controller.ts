@@ -9,17 +9,29 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
 import { DishService } from './dish.service';
 import { CreateDishDto } from './dto/create-dish.dto';
 import { PaginationDto, SearchDishDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../../entities/user.entity';
+import { NutrientService } from '../nutrient/nutrient.service';
 
 @ApiTags('Dishes')
 @Controller('api/dishes')
 export class DishController {
-  constructor(private readonly dishService: DishService) {}
+  constructor(
+    private readonly dishService: DishService,
+    private readonly nutrientService: NutrientService,
+  ) {}
 
   @Get('get-all-info-dish')
   @ApiBearerAuth('JWT-auth')
@@ -245,6 +257,31 @@ export class DishController {
       success: true,
       message: 'Tạo món ăn thành công',
       data: dish,
+    };
+  }
+
+  /**
+   * Lấy dinh dưỡng của một món ăn
+   * GET /api/dishes/:id/nutrients
+   */
+  @Get(':id/nutrients')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy dinh dưỡng của một món ăn theo ID' })
+  async getDishNutrients(@Param('id', ParseIntPipe) id: number) {
+    const dish = await this.dishService.findOne(id);
+    const nutrients = await this.nutrientService.findByDishId(id);
+    return {
+      success: true,
+      message: 'Lấy dinh dưỡng của món ăn thành công',
+      data: {
+        dish: {
+          id: dish.id,
+          name: dish.name,
+        },
+        nutrients: nutrients,
+      },
+      total: nutrients.length,
     };
   }
 }
