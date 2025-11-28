@@ -8,6 +8,7 @@ import type { JwtUser } from '../../common/types/user.type';
 import { FamilyService } from '../family/family.service';
 import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
 import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
+import { Ingredient } from '../../entities/ingredient.entity';
 import { Dish } from '../../entities/dish.entity';
 
 @Injectable()
@@ -21,6 +22,9 @@ export class RefrigeratorService {
 
     @InjectRepository(DishesIngredients)
     private readonly dishesIngredientsRepo: Repository<DishesIngredients>,
+
+    @InjectRepository(Ingredient)
+    private readonly ingredientRepo: Repository<Ingredient>,
 
     @InjectRepository(Dish)
     private readonly dishRepo: Repository<Dish>,
@@ -78,7 +82,7 @@ export class RefrigeratorService {
   async findOne(id: number, user: JwtUser): Promise<Refrigerator> {
     const fridge = await this.refrigeratorRepo.findOne({
       where: { id },
-      relations: ['owner', 'family', 'family.members'], // đảm bảo members được load
+      relations: ['owner', 'family', 'family.members', "fridgeIngredients", "fridgeIngredients.ingredient", "fridgeIngredients.dishIngredient", "fridgeDishes", "fridgeDishes.dish"], // đảm bảo members được load
     });
 
     if (!fridge) throw new NotFoundException(`Không tìm thấy tủ lạnh`);
@@ -99,7 +103,7 @@ export class RefrigeratorService {
   async myFridge(user: JwtUser): Promise<Refrigerator> {
     const fridge = await this.refrigeratorRepo.findOne({
       where: { owner_id: user.id },
-      relations: ['owner', 'family', 'family.members'],
+      relations: ['owner', 'family', 'family.members', "fridgeIngredients", "fridgeIngredients.ingredient", "fridgeIngredients.dishIngredient", "fridgeDishes", "fridgeDishes.dish"],
     });
 
     if (!fridge) throw new NotFoundException(`Bạn chưa có tủ lạnh`);
@@ -110,7 +114,7 @@ export class RefrigeratorService {
   async myFamilyFridge(family_id: number, user: JwtUser): Promise<Refrigerator> {
     const fridge = await this.refrigeratorRepo.findOne({
       where: { family_id },
-      relations: ['owner', 'family', 'family.members'],
+      relations: ['owner', 'family', 'family.members', "fridgeIngredients", "fridgeIngredients.ingredient", "fridgeIngredients.dishIngredient", "fridgeDishes", "fridgeDishes.dish"],
     });
 
     if (!fridge) throw new NotFoundException(`Không tìm thấy tủ lạnh`);
