@@ -1,13 +1,25 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsPositive } from 'class-validator';
+import {
+    IsNotEmpty,
+    IsNumber,
+    IsOptional,
+    IsPositive,
+    IsInt,
+    Min,
+} from 'class-validator';
 
 export class CreateFridgeIngredientDto {
-    @IsNotEmpty()
-    @IsNumber()
-    ingredient_id: number;
-
     @IsOptional()
     @IsNumber()
-    @IsPositive()
+    ingredient_id?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    dish_ingredient_id?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
     stock?: number;
 
     @IsOptional()
