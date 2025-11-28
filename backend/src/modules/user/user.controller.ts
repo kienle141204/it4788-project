@@ -8,8 +8,10 @@ import {
   Body,
   ParseIntPipe,
   UseGuards,
+  ValidationPipe,
+  Patch,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { SelfOrAdminGuard } from '../auth/guards/self-or-admin.guard';
@@ -51,13 +53,19 @@ export class UserController {
   /** Update user */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
-  @Put(':id')
+  @Patch(':id')
+  @ApiOperation({ summary: 'Cập nhật thông tin người dùng' })
   async updateUser(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateUserDto,
+    @Body(ValidationPipe) dto: UpdateUserDto,
     @User() user: JwtUser,
   ) {
-    return await this.userService.updateUser(id, dto);
+    const updatedUser = await this.userService.updateUser(id, dto);
+    return {
+      success: true,
+      message: 'Cập nhật thông tin người dùng thành công',
+      data: updatedUser,
+    };
   }
 
   /** Delete user */
