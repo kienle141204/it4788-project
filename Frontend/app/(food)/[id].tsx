@@ -76,6 +76,8 @@ export default function FoodDetailPage() {
   const [newComment, setNewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [userReview, setUserReview] = useState<Review | null>(null);
+  const [isEditingReview, setIsEditingReview] = useState(false);
 
   const handleSessionExpired = useCallback(() => {
     if (sessionExpiredRef.current) {
@@ -205,11 +207,28 @@ export default function FoodDetailPage() {
       }
     };
 
+    const fetchUserReview = async () => {
+      try {
+        const payload = await getAccess(`dishes/${id}/reviews/my-review`);
+        if (payload?.success && payload.data) {
+          setUserReview(payload.data);
+        }
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        // Không có review của user là trường hợp bình thường, không cần xử lý lỗi
+        console.log('No user review yet');
+      }
+    };
+
     if (id) {
       fetchDish();
       fetchRecipe();
       fetchReviews();
       fetchReviewStats();
+      fetchUserReview();
     }
   }, [id, handleSessionExpired]);
 
@@ -277,6 +296,110 @@ export default function FoodDetailPage() {
     return sections;
   };
 
+  const handleUpdateReview = async () => {
+    if (!userReview || !newComment.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập bình luận');
+      return;
+    }
+
+    if (newRating < 1 || newRating > 5) {
+      Alert.alert('Lỗi', 'Vui lòng chọn điểm đánh giá từ 1 đến 5');
+      return;
+    }
+
+    setSubmittingReview(true);
+
+    try {
+      const response = await postAccess(`dishes/${id}/reviews/${userReview.id}`, {
+        rating: newRating,
+        comment: newComment.trim(),
+      }, 'PUT');
+
+      if (response?.success) {
+        Alert.alert('Thành công', 'Cập nhật đánh giá thành công');
+        setShowReviewForm(false);
+        setIsEditingReview(false);
+        
+        // Refresh user review and all reviews
+        const userReviewPayload = await getAccess(`dishes/${id}/reviews/my-review`);
+        if (userReviewPayload?.success && userReviewPayload.data) {
+          setUserReview(userReviewPayload.data);
+        }
+
+        const reviewsPayload = await getAccess(`dishes/${id}/reviews`);
+        if (reviewsPayload?.success && Array.isArray(reviewsPayload.data)) {
+          setReviews(reviewsPayload.data);
+        }
+
+        const statsPayload = await getAccess(`dishes/${id}/reviews/stats`);
+        if (statsPayload?.success && statsPayload.data) {
+          setReviewStats(statsPayload.data);
+        }
+      } else {
+        Alert.alert('Lỗi', response?.message || 'Không thể cập nhật đánh giá');
+      }
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.log(err);
+      Alert.alert('Lỗi', 'Không thể cập nhật đánh giá. Vui lòng thử lại.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!userReview) return;
+
+    Alert.alert(
+      'Xác nhận xóa',
+      'Bạn có chắc muốn xóa đánh giá này?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await postAccess(`dishes/${id}/reviews/${userReview.id}`, {}, 'DELETE');
+
+              if (response?.success) {
+                Alert.alert('Thành công', 'Đã xóa đánh giá');
+                setUserReview(null);
+                setShowReviewForm(false);
+                setIsEditingReview(false);
+                setNewRating(5);
+                setNewComment('');
+                
+                // Refresh reviews and stats
+                const reviewsPayload = await getAccess(`dishes/${id}/reviews`);
+                if (reviewsPayload?.success && Array.isArray(reviewsPayload.data)) {
+                  setReviews(reviewsPayload.data);
+                }
+
+                const statsPayload = await getAccess(`dishes/${id}/reviews/stats`);
+                if (statsPayload?.success && statsPayload.data) {
+                  setReviewStats(statsPayload.data);
+                }
+              } else {
+                Alert.alert('Lỗi', response?.message || 'Không thể xóa đánh giá');
+              }
+            } catch (err: any) {
+              if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+                handleSessionExpired();
+                return;
+              }
+              console.log(err);
+              Alert.alert('Lỗi', 'Không thể xóa đánh giá. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmitReview = async () => {
     if (!newComment.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập bình luận');
@@ -321,7 +444,36 @@ export default function FoodDetailPage() {
         return;
       }
       console.log(err);
-      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      
+      // Xử lý lỗi 409 - User đã đánh giá rồi
+      const errorMessage = err?.response?.data?.message || err?.message || '';
+      if (err?.response?.status === 409 || errorMessage.includes('đã đánh giá')) {
+        Alert.alert(
+          'Bạn đã đánh giá món ăn này rồi',
+          'Vui lòng chỉnh sửa đánh giá hiện tại thay vì tạo mới.',
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                // Fetch lại user review
+                try {
+                  const payload = await getAccess(`dishes/${id}/reviews/my-review`);
+                  if (payload?.success && payload.data) {
+                    setUserReview(payload.data);
+                    setNewRating(payload.data.rating);
+                    setNewComment(payload.data.comment);
+                    setIsEditingReview(true);
+                  }
+                } catch (e) {
+                  console.log('Error fetching user review', e);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      }
     } finally {
       setSubmittingReview(false);
     }
@@ -646,16 +798,76 @@ export default function FoodDetailPage() {
                     </View>
                   )}
 
-                  <TouchableOpacity
-                    style={foodDetailStyles.addReviewButton}
-                    onPress={() => setShowReviewForm((prev) => !prev)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="add-circle-outline" size={20} color={COLORS.purple} />
-                    <Text style={foodDetailStyles.addReviewButtonText}>
-                      {showReviewForm ? 'Hủy đánh giá' : 'Viết đánh giá'}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Hiển thị review hiện tại của user nếu có */}
+                  {userReview && !showReviewForm && (
+                    <View style={foodDetailStyles.userReviewCard}>
+                      <View style={foodDetailStyles.userReviewHeader}>
+                        <Text style={foodDetailStyles.userReviewTitle}>Đánh giá của bạn</Text>
+                        <View style={foodDetailStyles.userReviewActions}>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setNewRating(userReview.rating);
+                              setNewComment(userReview.comment);
+                              setIsEditingReview(true);
+                              setShowReviewForm(true);
+                            }}
+                            style={foodDetailStyles.iconButton}
+                          >
+                            <Ionicons name="create-outline" size={20} color={COLORS.purple} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <View style={foodDetailStyles.ratingDisplay}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={star <= userReview.rating ? 'star' : 'star-outline'}
+                            size={20}
+                            color={star <= userReview.rating ? '#FFD700' : COLORS.grey}
+                          />
+                        ))}
+                      </View>
+                      <Text style={foodDetailStyles.userReviewComment}>{userReview.comment}</Text>
+                    </View>
+                  )}
+
+                  {/* Nút viết đánh giá - chỉ hiển thị nếu chưa có review */}
+                  {!userReview && !showReviewForm && (
+                    <TouchableOpacity
+                      style={foodDetailStyles.addReviewButton}
+                      onPress={() => {
+                        setShowReviewForm(true);
+                        setIsEditingReview(false);
+                        setNewRating(5);
+                        setNewComment('');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="add-circle-outline" size={20} color={COLORS.purple} />
+                      <Text style={foodDetailStyles.addReviewButtonText}>
+                        Viết đánh giá
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Nút hủy khi đang mở form */}
+                  {showReviewForm && (
+                    <TouchableOpacity
+                      style={[foodDetailStyles.addReviewButton, { backgroundColor: COLORS.lightGrey }]}
+                      onPress={() => {
+                        setShowReviewForm(false);
+                        setIsEditingReview(false);
+                        setNewRating(5);
+                        setNewComment('');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="close-circle-outline" size={20} color={COLORS.darkGrey} />
+                      <Text style={[foodDetailStyles.addReviewButtonText, { color: COLORS.darkGrey }]}>
+                        Hủy
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
                   {showReviewForm && (
                     <View style={foodDetailStyles.reviewForm}>
@@ -685,21 +897,35 @@ export default function FoodDetailPage() {
                         onChangeText={setNewComment}
                         textAlignVertical="top"
                       />
-                      <TouchableOpacity
-                        style={[
-                          foodDetailStyles.submitButton,
-                          submittingReview && foodDetailStyles.submitButtonDisabled,
-                        ]}
-                        onPress={handleSubmitReview}
-                        disabled={submittingReview}
-                        activeOpacity={0.8}
-                      >
-                        {submittingReview ? (
-                          <ActivityIndicator size="small" color={COLORS.white} />
-                        ) : (
-                          <Text style={foodDetailStyles.submitButtonText}>Gửi đánh giá</Text>
+                      <View style={foodDetailStyles.reviewFormActions}>
+                        <TouchableOpacity
+                          style={[
+                            foodDetailStyles.submitButton,
+                            submittingReview && foodDetailStyles.submitButtonDisabled,
+                          ]}
+                          onPress={isEditingReview ? handleUpdateReview : handleSubmitReview}
+                          disabled={submittingReview}
+                          activeOpacity={0.8}
+                        >
+                          {submittingReview ? (
+                            <ActivityIndicator size="small" color={COLORS.white} />
+                          ) : (
+                            <Text style={foodDetailStyles.submitButtonText}>
+                              {isEditingReview ? 'Cập nhật' : 'Gửi đánh giá'}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                        {isEditingReview && (
+                          <TouchableOpacity
+                            style={foodDetailStyles.deleteButton}
+                            onPress={handleDeleteReview}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                            <Text style={foodDetailStyles.deleteButtonText}>Xóa</Text>
+                          </TouchableOpacity>
                         )}
-                      </TouchableOpacity>
+                      </View>
                     </View>
                   )}
 

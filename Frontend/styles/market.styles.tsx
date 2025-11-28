@@ -13,64 +13,20 @@ export const marketStyles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 16,
-    backgroundColor: COLORS.background,
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.shadow || "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  headerTop: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: COLORS.white,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  greeting: {
-    fontSize: 14,
-    color: COLORS.grey,
-    marginBottom: 4,
-  },
-  title: { 
-    fontSize: 24, 
-    fontWeight: "700",
-    color: COLORS.secondary,
-  },
-  iconGroup: { 
-    flexDirection: "row", 
-    gap: 12,
-    alignItems: "center",
-  },
-  iconButton: {
-    position: "relative",
     padding: 4,
   },
-  badge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.darkGrey,
   },
   searchContainer: {
     flexDirection: "row",
@@ -279,6 +235,17 @@ export const marketStyles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGrey,
+  },
+  centerLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    zIndex: 10,
   },
   pageButton: {
     minWidth: 36,

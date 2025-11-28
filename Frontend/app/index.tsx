@@ -24,7 +24,6 @@ export default function Index() {
     checkLogin();
   }, []);
 
-  // Đợi kiểm tra token xong mới redirect
   if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -33,5 +32,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect  href={isLoggedIn ? '/(home)' : '/(auth)'} />;
+  return <Redirect  href={isLoggedIn ? '/(tabs)/home' : '/(auth)'} />;
 }

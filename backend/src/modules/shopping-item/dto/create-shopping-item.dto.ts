@@ -4,10 +4,12 @@ import { IsNumber, IsOptional, IsBoolean } from 'class-validator';
 export class CreateShoppingItemDto {
     @ApiProperty()
     @IsNumber()
+    @IsOptional()
     list_id: number;
 
     @ApiProperty()
     @IsNumber()
+    @IsOptional()
     ingredient_id: number;
 
     @ApiProperty({ default: 0 })

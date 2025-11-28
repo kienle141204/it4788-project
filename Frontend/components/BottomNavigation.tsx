@@ -14,7 +14,7 @@ export default function BottomNavigation({ activeTab, onTabPress }: BottomNaviga
     { id: 'calendar', icon: 'calendar-outline', activeIcon: 'calendar' },
     { id: 'add', icon: 'add', activeIcon: 'add' }, 
     { id: 'document', icon: 'document-text-outline', activeIcon: 'document-text' },
-    { id: 'people', icon: 'people-outline', activeIcon: 'people' }
+    { id: 'profile', icon: 'person-outline', activeIcon: 'person' }
   ];
 
   return (

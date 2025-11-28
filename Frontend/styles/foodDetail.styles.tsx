@@ -9,9 +9,10 @@ export const foodDetailStyles = StyleSheet.create({
   headerWrapper: {
     backgroundColor: COLORS.white,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 12,
     borderBottomWidth: 0,
+    marginTop: -20,
   },
   header: {
     flexDirection: 'row',
@@ -430,6 +431,7 @@ export const foodDetailStyles = StyleSheet.create({
     marginBottom: 12,
   },
   submitButton: {
+    flex: 1,
     backgroundColor: COLORS.purple,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -505,6 +507,69 @@ export const foodDetailStyles = StyleSheet.create({
     color: COLORS.grey,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  userReviewCard: {
+    backgroundColor: '#F0E6FF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: COLORS.purple,
+  },
+  userReviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  userReviewTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  userReviewActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ratingDisplay: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 12,
+  },
+  userReviewComment: {
+    fontSize: 15,
+    color: COLORS.darkGrey,
+    lineHeight: 22,
+  },
+  reviewFormActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteButton: {
+    flex: 1,
+    backgroundColor: '#FFE5E5',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  deleteButtonText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

@@ -17,7 +17,7 @@ export class DishReviewService {
   /**
    * Lấy tất cả đánh giá của một món ăn
    */
-  async getReviewsByDishId(dishId: number, page: number, limit: number): Promise<DishReview[]> {
+  async getReviewsByDishId(dishId: number, page: number = 1, limit: number = 10): Promise<DishReview[]> {
     const dish = await this.dishRepository.findOne({ where: { id: dishId } });
     if (!dish) {
       throw new NotFoundException('Không tìm thấy món ăn');

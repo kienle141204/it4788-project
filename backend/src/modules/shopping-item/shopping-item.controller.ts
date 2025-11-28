@@ -32,23 +32,30 @@ export class ShoppingItemController {
     type: CreateShoppingItemDto,
     examples: {
       example1: {
-        summary: 'Thêm item mới',
+        summary: 'Thêm item mới với đầy đủ thông tin',
         value: {
-          shopping_list_id: 1,
-          name: 'Thịt bò',
-          quantity: 500,
-          unit: 'g',
+          list_id: 1,
+          ingredient_id: 5,
+          stock: 500,
+          price: 150000,
           is_checked: false
         }
       },
       example2: {
         summary: 'Thêm item đã mua',
         value: {
-          shopping_list_id: 1,
-          name: 'Rau cải',
-          quantity: 1,
-          unit: 'bó',
+          list_id: 1,
+          ingredient_id: 8,
+          stock: 2,
+          price: 50000,
           is_checked: true
+        }
+      },
+      example3: {
+        summary: 'Thêm item tối thiểu (chỉ list_id và ingredient_id)',
+        value: {
+          list_id: 1,
+          ingredient_id: 10
         }
       }
     }
@@ -59,10 +66,10 @@ export class ShoppingItemController {
     type: ShoppingItem,
     example: {
       id: 1,
-      shopping_list_id: 1,
-      name: 'Thịt bò',
-      quantity: 500,
-      unit: 'g',
+      list_id: 1,
+      ingredient_id: 5,
+      stock: 500,
+      price: 150000,
       is_checked: false,
       created_at: '2024-01-01T00:00:00.000Z'
     }
@@ -87,10 +94,10 @@ export class ShoppingItemController {
     example: [
       {
         id: 1,
-        shopping_list_id: 1,
-        name: 'Thịt bò',
-        quantity: 500,
-        unit: 'g',
+        list_id: 1,
+        ingredient_id: 5,
+        stock: 500,
+        price: 150000,
         is_checked: false
       }
     ]
@@ -111,10 +118,10 @@ export class ShoppingItemController {
     description: 'Lấy thông tin item thành công',
     example: {
       id: 1,
-      shopping_list_id: 1,
-      name: 'Thịt bò',
-      quantity: 500,
-      unit: 'g',
+      list_id: 1,
+      ingredient_id: 5,
+      stock: 500,
+      price: 150000,
       is_checked: false,
       created_at: '2024-01-01T00:00:00.000Z'
     }
@@ -136,7 +143,8 @@ export class ShoppingItemController {
     description: 'Cập nhật trạng thái thành công',
     example: {
       id: 1,
-      name: 'Thịt bò',
+      list_id: 1,
+      ingredient_id: 5,
       is_checked: true,
       message: 'Item đã được đánh dấu là đã mua'
     }
@@ -144,6 +152,32 @@ export class ShoppingItemController {
   @ApiResponse({ status: 403, description: 'Không có quyền cập nhật item này' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy item' })
   async check(@Param('id') id: string, @User() user: JwtUser) {
+    return await this.shoppingItemService.check(+id, user);
+  }
+
+  @Patch(':id/toggle')
+  @ApiOperation({ 
+    summary: 'Toggle trạng thái checked của item',
+    description: 'API này cho phép chuyển đổi trạng thái checked/unchecked của một shopping item.'
+  })
+  @ApiParam({ name: 'id', type: 'string', example: '1', description: 'ID của shopping item' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Toggle trạng thái thành công',
+    type: ShoppingItem,
+    example: {
+      id: 1,
+      list_id: 1,
+      ingredient_id: 5,
+      stock: 500,
+      price: 150000,
+      is_checked: true,
+      created_at: '2024-01-01T00:00:00.000Z'
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền cập nhật item này' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy item' })
+  async toggle(@Param('id') id: string, @User() user: JwtUser) {
     return await this.shoppingItemService.check(+id, user);
   }
 
@@ -157,16 +191,16 @@ export class ShoppingItemController {
     type: UpdateShoppingItemDto,
     examples: {
       example1: {
-        summary: 'Cập nhật số lượng',
+        summary: 'Cập nhật số lượng và giá',
         value: {
-          quantity: 1000,
-          unit: 'g'
+          stock: 1000,
+          price: 200000
         }
       },
       example2: {
-        summary: 'Cập nhật tên',
+        summary: 'Cập nhật trạng thái',
         value: {
-          name: 'Thịt bò tươi'
+          is_checked: true
         }
       }
     }
@@ -176,10 +210,10 @@ export class ShoppingItemController {
     description: 'Cập nhật item thành công',
     example: {
       id: 1,
-      shopping_list_id: 1,
-      name: 'Thịt bò tươi',
-      quantity: 1000,
-      unit: 'g',
+      list_id: 1,
+      ingredient_id: 5,
+      stock: 1000,
+      price: 200000,
       is_checked: false,
       updated_at: '2024-01-01T00:00:00.000Z'
     }

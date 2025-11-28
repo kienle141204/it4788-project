@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional, ValidateNested } from 'class-validator';
+import { IsBoolean, IsDateString, IsNumber, IsOptional, ValidateNested } from 'class-validator';
 
 export class CreateShoppingListDto {
     @ApiProperty()
@@ -17,11 +17,13 @@ export class CreateShoppingListDto {
     @IsNumber()
     cost?: number;
 
-    @ApiProperty({ default: false })
+    @ApiProperty({ default: true })
     @IsOptional()
     @IsBoolean()
     is_shared?: boolean;
 
     @ApiProperty({ description: 'Ngày mua sắm', example: '2024-06-15' })
+    @IsOptional()
+    @IsDateString()
     shopping_date: Date;
 }

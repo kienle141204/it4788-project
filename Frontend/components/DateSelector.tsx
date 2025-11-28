@@ -13,7 +13,7 @@ interface DateItem {
 
 interface DateSelectorProps {
   selectedDate: number;
-  onSelectDate: (day: number) => void;
+  onSelectDate: (day: number, fullDate?: Date) => void;
 }
 
 const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate }) => {
@@ -58,7 +58,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
   };
 
   const handleDatePress = (date: DateItem) => {
-    onSelectDate(date.date.getDate());
+    onSelectDate(date.date.getDate(), date.date);
   };
 
   return (

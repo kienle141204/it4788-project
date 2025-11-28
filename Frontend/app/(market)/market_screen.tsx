@@ -38,6 +38,7 @@ export default function MarketScreen() {
   const [data, setData] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [prev, setPrev] = useState(false);
   const [next, setNext] = useState(true);
@@ -69,6 +70,7 @@ export default function MarketScreen() {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
       setCurrentPage(1);
+      setInitialLoad(true);
     }, 500); 
 
     return () => clearTimeout(timer);
@@ -76,6 +78,7 @@ export default function MarketScreen() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setInitialLoad(true);
   }, [selectedCategory]);
 
   useEffect(() => {
@@ -116,6 +119,7 @@ export default function MarketScreen() {
         }
       } finally {
         setLoading(false);
+        setInitialLoad(false);
       }
     };
 
@@ -167,27 +171,16 @@ export default function MarketScreen() {
     <View style={marketStyles.safeArea}>
       <View style={marketStyles.container}>
     
+        {/* Header */}
         <View style={marketStyles.header}>
-          <View style={marketStyles.headerTop}>
-            <TouchableOpacity 
-              style={marketStyles.backButton}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
-            </TouchableOpacity>
-            <View style={marketStyles.headerContent}>
-              <Text style={marketStyles.title}>Chợ của người Việt</Text>
-            </View>
-            <View style={marketStyles.iconGroup}>
-              <TouchableOpacity style={marketStyles.iconButton}>
-                <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
-                <View style={marketStyles.badge} />
-              </TouchableOpacity>
-              <TouchableOpacity style={marketStyles.iconButton}>
-                <Ionicons name="person-circle-outline" size={28} color={COLORS.darkGrey} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity 
+            style={marketStyles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
+          </TouchableOpacity>
+          <Text style={marketStyles.headerTitle}>Chợ của người Việt</Text>
+          <View style={{ width: 32 }} />
         </View>
 
    
@@ -246,18 +239,18 @@ export default function MarketScreen() {
         </View>
 
   
-        {loading && !refreshing ? (
+        {initialLoad && loading && data.length === 0 ? (
           <View style={marketStyles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text style={marketStyles.loadingText}>Đang tải sản phẩm...</Text>
           </View>
-        ) : data.length === 0 ? (
-          <View style={marketStyles.emptyContainer}>
-            <Ionicons name="basket-outline" size={64} color={COLORS.grey} />
-            <Text style={marketStyles.emptyText}>Không có sản phẩm nào</Text>
-          </View>
         ) : (
           <View style={{ flex: 1 }}>
+            {loading && !refreshing && (
+              <View style={marketStyles.centerLoadingOverlay}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              </View>
+            )}
             <FlatList
               data={data}
               numColumns={2}
@@ -301,6 +294,14 @@ export default function MarketScreen() {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
               }
               showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                !loading ? (
+                  <View style={marketStyles.emptyContainer}>
+                    <Ionicons name="basket-outline" size={64} color={COLORS.grey} />
+                    <Text style={marketStyles.emptyText}>Không có sản phẩm nào</Text>
+                  </View>
+                ) : null
+              }
             />
             
 
@@ -308,17 +309,17 @@ export default function MarketScreen() {
               <View style={marketStyles.paginationContainerFixed}>
                 <TouchableOpacity
                   onPress={() => setCurrentPage(currentPage - 1)}
-                  disabled={!prev}
+                  disabled={!prev || loading}
                   style={[
                     marketStyles.pageButton,
                     marketStyles.pageButtonNav,
-                    !prev && marketStyles.pageButtonDisabled,
+                    (!prev || loading) && marketStyles.pageButtonDisabled,
                   ]}
                 >
                   <Ionicons 
                     name="chevron-back" 
                     size={18} 
-                    color={prev ? COLORS.darkGrey : COLORS.grey} 
+                    color={prev && !loading ? COLORS.darkGrey : COLORS.grey} 
                   />
                 </TouchableOpacity>
 
@@ -351,9 +352,11 @@ export default function MarketScreen() {
                       <TouchableOpacity
                         key={page}
                         onPress={() => setCurrentPage(page as number)}
+                        disabled={loading}
                         style={[
                           marketStyles.pageButton,
                           currentPage === page && marketStyles.activePage,
+                          loading && marketStyles.pageButtonDisabled,
                         ]}
                       >
                         <Text style={[
@@ -369,17 +372,17 @@ export default function MarketScreen() {
 
                 <TouchableOpacity
                   onPress={() => setCurrentPage(currentPage + 1)}
-                  disabled={!next}
+                  disabled={!next || loading}
                   style={[
                     marketStyles.pageButton,
                     marketStyles.pageButtonNav,
-                    !next && marketStyles.pageButtonDisabled,
+                    (!next || loading) && marketStyles.pageButtonDisabled,
                   ]}
                 >
                   <Ionicons 
                     name="chevron-forward" 
                     size={18} 
-                    color={next ? COLORS.darkGrey : COLORS.grey} 
+                    color={next && !loading ? COLORS.darkGrey : COLORS.grey} 
                   />
                 </TouchableOpacity>
               </View>
