@@ -26,9 +26,10 @@ export class ShoppingStatisticsController {
   @ApiResponse({ status: 200, description: 'Total cost retrieved successfully.' })
   async getTotalCostByMonth(
     @Query('year', ParseIntPipe) year: number,
-    @Query('userId', ParseIntPipe) userId: number
+    @Query('familyId', ParseIntPipe) familyId: number,
+    @User() user: JwtUser,
   ) {
-    return this.statisticsService.totalCostByMonth(year, userId);
+    return this.statisticsService.totalCostByMonth(year, familyId, user);
   }
 
   /** Số lượng item đã check */
@@ -38,9 +39,10 @@ export class ShoppingStatisticsController {
   @ApiOperation({ summary: 'Lấy ra số lượng item đã được check' })
   @ApiResponse({ status: 200, description: 'Checked items count retrieved successfully.' })
   async getCheckedItems(
-    @Query('userId', ParseIntPipe) userId: number
+    @Query('familyId', ParseIntPipe) familyId: number,
+    @User() user: JwtUser,
   ) {
-    return this.statisticsService.countCheckedItems(userId);
+    return this.statisticsService.countCheckedItems(familyId, user);
   }
 
   /** Top nguyên liệu theo số lượng */
@@ -50,10 +52,11 @@ export class ShoppingStatisticsController {
   @ApiOperation({ summary: 'Lấy ra top nguyên liệu được mua theo số lượng' })
   @ApiResponse({ status: 200, description: 'Top ingredients retrieved successfully.' })
   async getTopIngredients(
-    @Query('userId', ParseIntPipe) userId: number,
-    @Query('limit') limit: number = 5
+    @Query('familyId', ParseIntPipe) familyId: number,
+    @Query('limit') limit: number = 5,
+    @User() user: JwtUser,
   ) {
-    return this.statisticsService.topIngredients(limit, userId);
+    return this.statisticsService.topIngredients(limit, familyId, user);
   }
 
   /** Top nguyên liệu theo tổng tiền */
@@ -63,10 +66,11 @@ export class ShoppingStatisticsController {
   @ApiOperation({ summary: 'Lấy ra top nguyên liệu được mua theo tổng tiền' })
   @ApiResponse({ status: 200, description: 'Top ingredients by cost retrieved successfully.' })
   async getTopIngredientsByCost(
-    @Query('userId', ParseIntPipe) userId: number,
+    @Query('familyId', ParseIntPipe) familyId: number,
     @Query('limit') limit: number = 5,
+    @User() user: JwtUser,
   ) {
-    return this.statisticsService.topIngredientsByCost(limit, userId);
+    return this.statisticsService.topIngredientsByCost(limit, familyId, user);
   }
 
   /** Thống kê theo user */
@@ -76,9 +80,10 @@ export class ShoppingStatisticsController {
   @ApiOperation({ summary: 'Lấy ra thống kê mua sắm theo user' })
   @ApiResponse({ status: 200, description: 'User statistics retrieved successfully.' })
   async getUserStatistics(
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
+    @User() user: JwtUser,
   ) {
-    return this.statisticsService.statisticsByUser(userId);
+    return this.statisticsService.statisticsByUser(userId, user);
   }
 
   /** Thống kê theo family */
@@ -88,8 +93,9 @@ export class ShoppingStatisticsController {
   @ApiOperation({ summary: 'Lấy ra thống kê mua sắm theo family' })
   @ApiResponse({ status: 200, description: 'Family statistics retrieved successfully.' })
   async getFamilyStatistics(
-    @Param('familyId', ParseIntPipe) familyId: number
+    @Param('familyId', ParseIntPipe) familyId: number,
+    @User() user: JwtUser,
   ) {
-    return this.statisticsService.statisticsByFamily(familyId);
+    return this.statisticsService.statisticsByFamily(familyId, user);
   }
 }
