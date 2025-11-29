@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { mealStyles } from '../../styles/meal.styles';
-import { get, post, patch, deleteData } from '../../utils/api';
+import { getAccess, postAccess, patchAccess, deleteAccess } from '../../utils/api';
 
 interface Family {
   id: string;
@@ -50,7 +50,8 @@ const PAGE_LIMIT = 20;
 export default function EditMenuPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [menuId, setMenuId] = useState<string | null>(id || null);
+  const sessionExpiredRef = useRef(false);
+  const [menuId] = useState<string | null>(id || null);
   const [family, setFamily] = useState<Family | null>(null);
   const [description, setDescription] = useState('');
   const [selectedDishes, setSelectedDishes] = useState<SelectedDish[]>([]);
@@ -63,18 +64,24 @@ export default function EditMenuPage() {
   const [hasNextDishPage, setHasNextDishPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    if (menuId) {
-      fetchMenu();
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiredRef.current) {
+      return;
     }
-  }, [menuId]);
+    sessionExpiredRef.current = true;
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại.', [
+      {
+        text: 'OK',
+        onPress: () => router.replace('/(auth)' as any),
+      },
+    ]);
+  }, [router]);
 
-  const fetchMenu = async () => {
+  const fetchMenu = useCallback(async () => {
     if (!menuId) return;
     setLoadingMenu(true);
     try {
-      const response = await get(`menus/${menuId}`);
-      const payload = response?.data;
+      const payload = await getAccess(`menus/${menuId}`);
 
       if (!payload?.success) {
         throw new Error(payload?.message || 'Không thể tải thông tin thực đơn');
@@ -95,13 +102,21 @@ export default function EditMenuPage() {
         setSelectedDishes(menuDishes);
       }
     } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
       console.error('fetchMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể tải thông tin thực đơn');
       router.back();
     } finally {
       setLoadingMenu(false);
     }
-  };
+  }, [menuId, handleSessionExpired]);
+
+  useEffect(() => {
+    fetchMenu();
+  }, [fetchMenu]);
 
   const fetchDishes = useCallback(
     async (pageNumber = 1, reset = false) => {
@@ -111,8 +126,7 @@ export default function EditMenuPage() {
           ? `dishes/search-paginated?name=${encodeURIComponent(searchQuery)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
           : `dishes/get-paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
 
-        const response = await get(endpoint);
-        const payload = response?.data;
+        const payload = await getAccess(endpoint);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải danh sách món ăn');
@@ -124,13 +138,17 @@ export default function EditMenuPage() {
         setDishes(prev => (reset ? newDishes : [...prev, ...newDishes]));
         setHasNextDishPage(Boolean(pagination.hasNextPage));
         setDishPage(pagination.currentPage || pageNumber);
-      } catch (err) {
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
         console.error('fetchDishes error', err);
       } finally {
         setLoadingDishes(false);
       }
     },
-    [searchQuery],
+    [searchQuery, handleSessionExpired],
   );
 
   useEffect(() => {
@@ -157,14 +175,17 @@ export default function EditMenuPage() {
     // Nếu có menuDishId, cần xóa từ server
     if (selectedDish.menuDishId) {
       try {
-        const response = await deleteData(`menus/dishes/${selectedDish.menuDishId}`);
-        const payload = response?.data;
+        const payload = await deleteAccess(`menus/dishes/${selectedDish.menuDishId}`);
         if (payload?.success !== false) {
           setSelectedDishes(prev => prev.filter(sd => sd.dish.id !== selectedDish.dish.id));
         } else {
           throw new Error(payload?.message || 'Không thể xóa món ăn');
         }
       } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
         console.error('handleRemoveDish error', err);
         Alert.alert('Lỗi', err?.message || 'Không thể xóa món ăn. Vui lòng thử lại.');
       }
@@ -185,10 +206,14 @@ export default function EditMenuPage() {
     // Nếu có menuDishId, cập nhật trên server
     if (selectedDish.menuDishId) {
       try {
-        await patch(`menus/dishes/${selectedDish.menuDishId}`, {
+        await patchAccess(`menus/dishes/${selectedDish.menuDishId}`, {
           [field]: value,
         });
-      } catch (err) {
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
         console.error('handleUpdateDish error', err);
         // Revert state nếu lỗi
         setSelectedDishes(prev =>
@@ -216,7 +241,6 @@ export default function EditMenuPage() {
     setLoading(true);
     try {
       // Lấy danh sách món ăn hiện có và món ăn mới
-      const existingDishes = selectedDishes.filter(sd => sd.menuDishId);
       const newDishes = selectedDishes.filter(sd => !sd.menuDishId);
 
       // Cập nhật các món ăn đã tồn tại (nếu có thay đổi)
@@ -225,7 +249,7 @@ export default function EditMenuPage() {
       // Thêm các món ăn mới
       if (newDishes.length > 0) {
         const addDishPromises = newDishes.map(selectedDish =>
-          post(`menus/${menuId}/dishes`, {
+          postAccess(`menus/${menuId}/dishes`, {
             dish_id: parseInt(selectedDish.dish.id),
             stock: selectedDish.stock,
             price: selectedDish.price,
@@ -241,6 +265,10 @@ export default function EditMenuPage() {
         },
       ]);
     } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
       console.error('handleSaveMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể cập nhật thực đơn. Vui lòng thử lại.');
     } finally {
@@ -344,7 +372,7 @@ export default function EditMenuPage() {
 
           {selectedDishes.length === 0 ? (
             <Text style={{ color: COLORS.grey, fontStyle: 'italic', marginTop: 8 }}>
-              Chưa có món ăn nào. Nhấn "Thêm món" để thêm.
+              Chưa có món ăn nào. Nhấn &quot;Thêm món&quot; để thêm.
             </Text>
           ) : (
             <View style={{ gap: 12, marginTop: 8 }}>

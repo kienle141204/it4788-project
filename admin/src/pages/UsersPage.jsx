@@ -16,6 +16,8 @@ const UsersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10); // Maximum 10 records per page
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -29,21 +31,44 @@ const UsersPage = () => {
   // Load users on component mount
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [currentPage]); // Add currentPage to dependency array for pagination
 
   // Load users from API
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetchUsers();
-      let usersData = response.data || response; // Handle both paginated and non-paginated responses
-      
+      const response = await fetchUsers({
+        page: currentPage,
+        limit: itemsPerPage
+      });
+
+      // Handle paginated response - API returns {data: [...], pagination: {...}}
+      let usersData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
+        usersData = response;
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        usersData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || usersData.length;
+      }
+
       // Sort users by ID from smallest to largest
-      usersData = Array.isArray(usersData) 
-        ? [...usersData].sort((a, b) => a.id - b.id)
-        : usersData;
-        
+      usersData = [...usersData].sort((a, b) => {
+        const aId = parseInt(a.id) || 0;
+        const bId = parseInt(b.id) || 0;
+        return aId - bId;
+      });
+
       setUsers(usersData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
     } catch (error) {
       console.error('Error loading users:', error);
       // In a real app, you might want to show an error message to the user
@@ -131,8 +156,28 @@ const UsersPage = () => {
 
     try {
       setLoading(true);
-      const response = await searchUsers(searchValue);
-      setUsers(response.data || response);
+      const response = await searchUsers(searchValue, 1, itemsPerPage);
+
+      let usersData = [];
+      let responseTotalPages = 1;
+      let responseTotalItems = 0;
+
+      if (response && Array.isArray(response)) {
+        // Response is directly an array (non-paginated)
+        usersData = response;
+        responseTotalPages = 1;
+        responseTotalItems = response.length;
+      } else if (response && response.data) {
+        // Response is paginated {data: [...], pagination: {...}}
+        usersData = response.data;
+        responseTotalPages = response.pagination?.totalPages || 1;
+        responseTotalItems = response.pagination?.totalItems || usersData.length;
+      }
+
+      setUsers(usersData);
+      setTotalPages(responseTotalPages || 1);
+      setTotalItems(responseTotalItems || 0);
+      setCurrentPage(1); // Reset to first page after search
     } catch (error) {
       console.error('Error searching users:', error);
       // Fallback to client-side filtering if API search fails
@@ -157,11 +202,8 @@ const UsersPage = () => {
     }, 300);
   };
 
-  // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentUsers = users.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(users.length / itemsPerPage);
+  // Use users directly as they come from the API response with proper pagination
+  const currentUsers = users;
 
   // Show loading indicator while data is being fetched
   if (loading && users.length === 0) {

@@ -39,14 +39,14 @@ export default function HomePage() {
     return () => backHandler.remove();
   }, []);
 
-  // Sample data
   const features = [
-    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: COLORS.purple, onPress: () => router.push('/(group)' as any) },
-    { id: 'shopping', name: 'Mua sắm', icon: 'document-text' as const, color: COLORS.purple, onPress: () => router.push('/(market)/market_screen') },
-    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: COLORS.purple, onPress: () => router.push('/(meal)' as any) },
-    { id: 'nutrition', name: 'Dinh dưỡng', icon: 'book' as const, color: COLORS.orange, onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
-    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: COLORS.purple, onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
-    { id: 'food', name: 'Món ăn', icon: 'book' as const, color: COLORS.orange, onPress: () => router.push('/(food)' as any) }
+    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: '#A855F7', bgColor: '#F3E8FF', onPress: () => router.push('/(group)') },
+    { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
+    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
+    { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
+    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
+    { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
+    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) }
   ];
 
   const handleGoToMarket = () => {
@@ -69,12 +69,18 @@ export default function HomePage() {
     setActiveTab(tab);
     if (tab === 'add') {
       Alert.alert('Thêm mới', 'Tạo nội dung mới');
+    } else if (tab === 'calendar') {
+      router.push('/(task)');
     }
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
 
         <Header
           userName="Livia Vaccaro"
@@ -88,13 +94,13 @@ export default function HomePage() {
           onViewTasks={handleViewTasks}
         />
 
-   
+
         <View style={styles.notificationSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Notification</Text>
             <Ionicons name="sparkles" size={20} color={COLORS.purple} />
           </View>
-          
+
           <NotificationCard
             title="Thông báo quan trọng"
             message="Thực phẩm hết hạn hay gì đó (thông báo quan trọng)"
@@ -112,7 +118,7 @@ export default function HomePage() {
         </View>
       </ScrollView>
 
-  
+
       <BottomNavigation
         activeTab={activeTab}
         onTabPress={handleTabPress}
@@ -141,7 +147,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: COLORS.darkGrey,
   },
   featuresSection: {

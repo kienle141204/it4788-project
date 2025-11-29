@@ -45,13 +45,13 @@ export const foodStyles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#E8EAF6', // Light purple for inactive
+    backgroundColor: '#DCFCE7', // Light green for inactive
   },
   tabActive: {
     backgroundColor: COLORS.purple,
   },
   tabInactive: {
-    backgroundColor: '#E8EAF6',
+    backgroundColor: '#DCFCE7',
   },
   tabText: {
     fontSize: 14,
@@ -128,13 +128,13 @@ export const foodStyles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#FCE4EC',
+    backgroundColor: '#BBF7D0',
   },
   cardImagePlaceholder: {
     width: 80,
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#FCE4EC', // Light pink
+    backgroundColor: '#BBF7D0', // Light green
     justifyContent: 'center',
     alignItems: 'center',
   },

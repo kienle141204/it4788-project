@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { foodStyles } from '../../styles/food.styles';
 import FoodCard from '../../components/FoodCard';
-import { get } from '../../utils/api';
+import { getAccess } from '../../utils/api';
 
 interface Dish {
   id: string;
@@ -20,6 +19,7 @@ const PAGE_LIMIT = 10;
 
 export default function FoodPage() {
   const router = useRouter();
+  const sessionExpiredRef = useRef(false);
   const [activeTab, setActiveTab] = useState<'explore' | 'mine'>('explore');
   const [searchQuery, setSearchQuery] = useState('');
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -39,6 +39,19 @@ export default function FoodPage() {
     console.log('Notification pressed');
   };
 
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiredRef.current) {
+      return;
+    }
+    sessionExpiredRef.current = true;
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại.', [
+      {
+        text: 'OK',
+        onPress: () => router.replace('/(auth)' as any),
+      },
+    ]);
+  }, [router]);
+
   const fetchDishes = useCallback(async (pageNumber = 1, reset = false) => {
     const query = searchQuery.trim();
     if (reset) {
@@ -52,8 +65,7 @@ export default function FoodPage() {
         ? `dishes/search-paginated?name=${encodeURIComponent(query)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
         : `dishes/get-paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
 
-      const response = await get(endpoint);
-      const payload = response?.data;
+      const payload = await getAccess(endpoint);
 
       if (!payload?.success) {
         throw new Error(payload?.message || 'Không thể tải danh sách món ăn');
@@ -66,7 +78,11 @@ export default function FoodPage() {
       setHasNextPage(Boolean(pagination.hasNextPage));
       setPage(pagination.currentPage || pageNumber);
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
       console.log(err);
       setError('Không thể tải danh sách món ăn. Vui lòng thử lại.');
       if (reset) {
@@ -80,7 +96,7 @@ export default function FoodPage() {
         setLoadingMore(false);
       }
     }
-  }, [searchQuery]);
+  }, [searchQuery, handleSessionExpired]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -105,7 +121,7 @@ export default function FoodPage() {
   };
 
   return (
-    <SafeAreaView style={foodStyles.container} edges={['top']}>
+    <View style={foodStyles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       {/* Header */}
@@ -241,7 +257,7 @@ export default function FoodPage() {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

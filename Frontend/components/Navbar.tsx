@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { taskStyles } from '../styles/task.styles';
-import { Colors } from '../constants/colors';
+import { COLORS } from '../constants/themes';
 
 interface NavbarProps {
   title: string;
@@ -10,6 +10,8 @@ interface NavbarProps {
   showNotification?: boolean;
   notificationCount?: number;
   onNotificationPress?: () => void;
+  showMenu?: boolean;
+  onMenuPress?: () => void;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -18,6 +20,8 @@ const Navbar: React.FC<NavbarProps> = ({
   showNotification = true,
   notificationCount = 0,
   onNotificationPress,
+  showMenu = false,
+  onMenuPress,
 }) => {
   return (
     <View style={taskStyles.header}>
@@ -27,20 +31,28 @@ const Navbar: React.FC<NavbarProps> = ({
         style={taskStyles.backButton}
         activeOpacity={0.7}
       >
-        <Ionicons name="arrow-back" size={24} color={Colors.black} />
+        <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
       </TouchableOpacity>
 
       {/* Title */}
       <Text style={taskStyles.headerTitle}>{title}</Text>
 
-      {/* Notification Button */}
-      {showNotification ? (
+      {/* Menu or Notification Button */}
+      {showMenu ? (
+        <TouchableOpacity 
+          style={taskStyles.menuButton}
+          onPress={onMenuPress}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color={COLORS.darkGrey} />
+        </TouchableOpacity>
+      ) : showNotification ? (
         <TouchableOpacity 
           style={taskStyles.notificationButton}
           onPress={onNotificationPress}
           activeOpacity={0.7}
         >
-          <Ionicons name="notifications" size={24} color={Colors.primary} />
+          <Ionicons name="notifications" size={24} color={COLORS.primary} />
           {notificationCount > 0 && (
             <View style={taskStyles.notificationBadge} />
           )}

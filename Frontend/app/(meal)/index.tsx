@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -11,12 +11,11 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { mealStyles } from '../../styles/meal.styles';
 import { COLORS } from '../../constants/themes';
-import { get, deleteData } from '../../utils/api';
+import { getAccess, deleteAccess } from '../../utils/api';
 
 interface Family {
   id: string;
@@ -75,6 +74,7 @@ const formatPrice = (value?: string | number) => {
 
 export default function MealPage() {
   const router = useRouter();
+  const sessionExpiredRef = useRef(false);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -89,6 +89,19 @@ export default function MealPage() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
 
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiredRef.current) {
+      return;
+    }
+    sessionExpiredRef.current = true;
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại.', [
+      {
+        text: 'OK',
+        onPress: () => router.replace('/(auth)' as any),
+      },
+    ]);
+  }, [router]);
+
   const fetchMenus = useCallback(
     async (pageNumber = 1, reset = false) => {
       if (reset) {
@@ -98,8 +111,7 @@ export default function MealPage() {
       }
 
       try {
-        const response = await get(`menus?page=${pageNumber}&limit=${PAGE_LIMIT}`);
-        const payload = response?.data;
+        const payload = await getAccess(`menus?page=${pageNumber}&limit=${PAGE_LIMIT}`);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải danh sách thực đơn');
@@ -112,7 +124,11 @@ export default function MealPage() {
         setHasNextPage(Boolean(pagination.hasNextPage));
         setPage(pagination.currentPage || pageNumber);
         setError(null);
-      } catch (err) {
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
         console.error('fetchMenus error', err);
         setError('Không thể tải danh sách thực đơn. Vui lòng thử lại.');
         if (reset) {
@@ -127,7 +143,7 @@ export default function MealPage() {
         }
       }
     },
-    [],
+    [handleSessionExpired],
   );
 
   useEffect(() => {
@@ -201,9 +217,8 @@ export default function MealPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await deleteData(`menus/${selectedMenu.id}`);
-              const payload = response?.data;
-              
+              const payload = await deleteAccess(`menus/${selectedMenu.id}`);
+    
               if (payload?.success !== false) {
                 Alert.alert('Thành công', 'Đã xóa thực đơn thành công');
                 setShowMenuOptionsModal(false);
@@ -214,6 +229,10 @@ export default function MealPage() {
                 throw new Error(payload?.message || 'Không thể xóa thực đơn');
               }
             } catch (err: any) {
+              if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+                handleSessionExpired();
+                return;
+              }
               console.error('handleDeleteMenu error', err);
               Alert.alert('Lỗi', err?.message || 'Không thể xóa thực đơn. Vui lòng thử lại.');
             }
@@ -351,7 +370,7 @@ export default function MealPage() {
   };
 
   return (
-    <SafeAreaView style={mealStyles.container} edges={['top']}>
+    <View style={mealStyles.container}>
       <StatusBar barStyle='dark-content' backgroundColor='#FFFFFF' />
 
       <View style={mealStyles.header}>
@@ -670,7 +689,7 @@ export default function MealPage() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

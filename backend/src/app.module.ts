@@ -14,6 +14,7 @@ import { RecipeModule } from './modules/recipe/recipe.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
 import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
+import { NutrientModule } from './modules/nutrient/nutrient.module';
 
 @Module({
   imports: [
@@ -56,7 +57,7 @@ import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
         return dbConfig;
       },
     }),
-    
+
     UserModule,
     AuthModule,
     FamilyModule,
@@ -68,6 +69,7 @@ import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
     MenuModule,
     IngredientModule,
     RefrigeratorModule,
+    NutrientModule,
   ],
   controllers: [AppController],
   providers: [AppService],

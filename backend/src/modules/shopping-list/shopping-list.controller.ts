@@ -15,6 +15,7 @@ import { CreateShoppingListDto } from './dto/create-shopping-list.dto';
 import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from 'src/common/types/user.type';
+import { Public } from 'src/common/decorators/public.decorator';
 
 @ApiTags('Shopping Lists')
 @ApiBearerAuth('JWT-auth')
@@ -25,9 +26,9 @@ export class ShoppingListController {
 
   /** POST /shopping-lists */
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Tạo danh sách mua sắm',
-    description: 'API này cho phép người dùng tạo một danh sách mua sắm mới. Owner có thể tạo danh sách cho thành viên khác trong gia đình.'
+    description: 'API này cho phép người dùng tạo một danh sách mua sắm mới.'
   })
   @ApiBody({
     type: CreateShoppingListDto,
@@ -35,30 +36,35 @@ export class ShoppingListController {
       example1: {
         summary: 'Tạo danh sách mua sắm cho bản thân',
         value: {
-          name: 'Danh sách mua sắm tuần này',
-          family_id: 1
+          family_id: 1,
+          cost: 0,
+          is_shared: false,
+          shopping_date: '2024-06-15'
         }
       },
       example2: {
-        summary: 'Owner tạo danh sách cho thành viên khác',
+        summary: 'Owner tạo danh sách cho người khác',
         value: {
-          name: 'Danh sách mua sắm cho mẹ',
+          owner_id: 2,
           family_id: 1,
-          owner_id: 2
+          cost: 0,
+          is_shared: false,
+          shopping_date: '2024-06-20'
         }
       }
     }
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Tạo danh sách mua sắm thành công',
     example: {
       id: 1,
-      name: 'Danh sách mua sắm tuần này',
-      family_id: 1,
       owner_id: 1,
+      family_id: 1,
+      cost: 0,
       is_shared: false,
-      created_at: '2024-01-01T00:00:00.000Z'
+      shopping_date: '2024-06-15',
+      created_at: '2024-06-10T00:00:00.000Z'
     }
   })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -69,22 +75,24 @@ export class ShoppingListController {
 
   /** GET /shopping-lists */
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy ra toàn bộ danh sách mua sắm',
     description: 'API này trả về danh sách tất cả các danh sách mua sắm trong hệ thống. Yêu cầu quyền admin.'
   })
   @UseGuards(RolesGuard)
   @Roles('admin')
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách thành công',
     example: [
       {
         id: 1,
-        name: 'Danh sách mua sắm tuần này',
-        family_id: 1,
         owner_id: 1,
-        is_shared: false
+        family_id: 1,
+        cost: 120000,
+        is_shared: false,
+        shopping_date: '2024-06-15',
+        created_at: '2024-06-10T00:00:00.000Z'
       }
     ]
   })
@@ -95,20 +103,21 @@ export class ShoppingListController {
 
   /** GET /shopping-lists/my-list */
   @Get('my-list')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy danh sách mua sắm của tôi',
     description: 'API này trả về danh sách tất cả các danh sách mua sắm mà người dùng hiện tại là chủ sở hữu.'
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lấy danh sách thành công',
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách của tôi',
     example: [
       {
         id: 1,
-        name: 'Danh sách mua sắm tuần này',
-        family_id: 1,
         owner_id: 1,
+        family_id: 1,
+        cost: 50000,
         is_shared: false,
+        shopping_date: '2024-06-15',
         items: []
       }
     ]
@@ -119,13 +128,13 @@ export class ShoppingListController {
 
   /** GET /shopping-lists/:id */
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy danh sách mua sắm theo ID',
     description: 'API này trả về thông tin chi tiết của một danh sách mua sắm theo ID, bao gồm các items trong danh sách.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của danh sách mua sắm' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy thông tin danh sách thành công',
     example: {
       id: 1,
@@ -152,23 +161,31 @@ export class ShoppingListController {
 
   // Lấy ra danh sách các list mua sắm được share trong gia đình
   @Get('my-family-shared/:id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy danh sách mua sắm được share trong gia đình',
     description: 'API này trả về danh sách tất cả các danh sách mua sắm được share trong một gia đình cụ thể.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lấy danh sách thành công',
-    example: [
-      {
-        id: 1,
-        name: 'Danh sách mua sắm tuần này',
-        family_id: 1,
-        owner_id: 1,
-        is_shared: true
-      }
-    ]
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy chi tiết danh sách',
+    example: {
+      id: 1,
+      owner_id: 1,
+      family_id: 1,
+      cost: 120000,
+      is_shared: false,
+      shopping_date: '2024-06-15',
+      items: [
+        {
+          id: 10,
+          name: 'Thịt bò',
+          quantity: 500,
+          unit: 'g',
+          is_checked: false
+        }
+      ]
+    }
   })
   @ApiResponse({ status: 403, description: 'Không phải thành viên của gia đình này' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình' })
@@ -178,17 +195,16 @@ export class ShoppingListController {
 
   /** PATCH /shopping-lists/:id */
   @Patch('share/:id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Share danh sách với gia đình',
     description: 'API này cho phép owner share danh sách mua sắm với tất cả thành viên trong gia đình.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của danh sách mua sắm' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Share danh sách thành công',
     example: {
       id: 1,
-      name: 'Danh sách mua sắm tuần này',
       is_shared: true,
       message: 'Danh sách đã được share với gia đình'
     }
@@ -201,7 +217,7 @@ export class ShoppingListController {
 
   /** PATCH /shopping-lists/:id */
   @Patch(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Cập nhật danh sách mua sắm',
     description: 'API này cho phép owner cập nhật thông tin của danh sách mua sắm như tên.'
   })
@@ -217,15 +233,18 @@ export class ShoppingListController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật danh sách thành công',
     example: {
       id: 1,
-      name: 'Danh sách mua sắm tuần mới',
-      family_id: 1,
       owner_id: 1,
-      updated_at: '2024-01-01T00:00:00.000Z'
+      family_id: 1,
+      name: 'Danh sách mua sắm tuần mới',
+      cost: 150000,
+      is_shared: false,
+      shopping_date: '2024-06-20',
+      updated_at: '2024-06-21T00:00:00.000Z'
     }
   })
   @ApiResponse({ status: 403, description: 'Không có quyền cập nhật danh sách này' })
@@ -236,13 +255,13 @@ export class ShoppingListController {
 
   /** DELETE /shopping-lists/:id */
   @Delete(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Xóa danh sách mua sắm',
     description: 'API này cho phép owner xóa danh sách mua sắm. Lưu ý: Tất cả các items trong danh sách cũng sẽ bị xóa.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của danh sách mua sắm' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Xóa danh sách thành công',
     example: {
       message: 'Danh sách mua sắm đã được xóa thành công'

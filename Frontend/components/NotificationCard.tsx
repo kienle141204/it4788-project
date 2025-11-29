@@ -14,9 +14,9 @@ export default function NotificationCard({ title, message, progress }: Notificat
       backgroundColor: COLORS.lightBlue,
       borderRadius: 12,
       padding: 16,
-      marginTop: 10
+      // marginTop: 10
     }}>
-      <Text style={{ color: COLORS.darkGrey, fontSize: 14, marginBottom: 8 }}>
+      <Text style={{ color: COLORS.darkGrey, fontSize: 14, marginBottom: 8, fontWeight: 'bold' }}>
         {message}
       </Text>
       <View style={{

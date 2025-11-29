@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { User } from '../../entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -41,6 +42,37 @@ export class UserService {
 
   async updateUser(id: number, dto: UpdateUserDto): Promise<User> {
     const user = await this.getUserById(id);
+
+    // Kiểm tra email trùng (nếu có thay đổi email)
+    if (dto.email && dto.email !== user.email) {
+      const existingUser = await this.userRepository.findOne({
+        where: { email: dto.email },
+      });
+      if (existingUser && existingUser.id !== id) {
+        throw new BadRequestException('Email đã được sử dụng bởi người dùng khác');
+      }
+    }
+
+    // Kiểm tra phone trùng (nếu có thay đổi phone)
+    if (dto.phone && dto.phone !== user.phone) {
+      const existingUser = await this.userRepository.findOne({
+        where: { phone: dto.phone },
+      });
+      if (existingUser && existingUser.id !== id) {
+        throw new BadRequestException('Số điện thoại đã được sử dụng bởi người dùng khác');
+      }
+    }
+
+    // Hash password nếu có thay đổi
+    if (dto.password) {
+      const salt = await bcrypt.genSalt(10);
+      dto.password = await bcrypt.hash(dto.password, salt);
+      // Đổi tên field từ password sang password_hash
+      (dto as any).password_hash = dto.password;
+      delete (dto as any).password;
+    }
+
+    // Cập nhật thông tin
     Object.assign(user, dto);
     return await this.userRepository.save(user);
   }

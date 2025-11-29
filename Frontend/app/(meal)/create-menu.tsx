@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { mealStyles } from '../../styles/meal.styles';
-import { get, post } from '../../utils/api';
+import { getAccess, postAccess } from '../../utils/api';
 
 interface Family {
   id: string;
@@ -41,6 +41,7 @@ const PAGE_LIMIT = 20;
 
 export default function CreateMenuPage() {
   const router = useRouter();
+  const sessionExpiredRef = useRef(false);
   const [families, setFamilies] = useState<Family[]>([]);
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -55,24 +56,43 @@ export default function CreateMenuPage() {
   const [hasNextDishPage, setHasNextDishPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchFamilies();
-  }, []);
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiredRef.current) {
+      return;
+    }
+    sessionExpiredRef.current = true;
+    Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại.', [
+      {
+        text: 'OK',
+        onPress: () => router.replace('/(auth)' as any),
+      },
+    ]);
+  }, [router]);
 
-  const fetchFamilies = async () => {
+  const fetchFamilies = useCallback(async () => {
     setLoadingFamilies(true);
     try {
-      const response = await get('families');
-      if (response?.data?.success !== false) {
-        const data = Array.isArray(response?.data) ? response.data : response?.data?.data || [];
+      const payload = await getAccess('families');
+      if (Array.isArray(payload)) {
+        setFamilies(payload as Family[]);
+      } else if (payload?.success !== false) {
+        const data = Array.isArray(payload?.data) ? payload.data : payload?.data?.data || [];
         setFamilies(data);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
       console.error('fetchFamilies error', err);
     } finally {
       setLoadingFamilies(false);
     }
-  };
+  }, [handleSessionExpired]);
+
+  useEffect(() => {
+    fetchFamilies();
+  }, [fetchFamilies]);
 
   const fetchDishes = useCallback(
     async (pageNumber = 1, reset = false) => {
@@ -82,8 +102,7 @@ export default function CreateMenuPage() {
           ? `dishes/search-paginated?name=${encodeURIComponent(searchQuery)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
           : `dishes/get-paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
 
-        const response = await get(endpoint);
-        const payload = response?.data;
+        const payload = await getAccess(endpoint);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải danh sách món ăn');
@@ -95,13 +114,17 @@ export default function CreateMenuPage() {
         setDishes(prev => (reset ? newDishes : [...prev, ...newDishes]));
         setHasNextDishPage(Boolean(pagination.hasNextPage));
         setDishPage(pagination.currentPage || pageNumber);
-      } catch (err) {
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
         console.error('fetchDishes error', err);
       } finally {
         setLoadingDishes(false);
       }
     },
-    [searchQuery],
+    [searchQuery, handleSessionExpired],
   );
 
   useEffect(() => {
@@ -160,7 +183,7 @@ export default function CreateMenuPage() {
     setLoading(true);
     try {
       // Tạo menu
-      const menuResponse = await post(`menus?familyId=${selectedFamilyId}`, {
+      const menuResponse = await postAccess(`menus?familyId=${selectedFamilyId}`, {
         description: description.trim() || undefined,
       });
 
@@ -175,7 +198,7 @@ export default function CreateMenuPage() {
 
       // Thêm các món ăn vào menu
       const addDishPromises = selectedDishes.map(selectedDish =>
-        post(`menus/${menuId}/dishes`, {
+        postAccess(`menus/${menuId}/dishes`, {
           dish_id: parseInt(selectedDish.dish.id),
           stock: selectedDish.stock,
           price: selectedDish.price,
@@ -191,6 +214,10 @@ export default function CreateMenuPage() {
         },
       ]);
     } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
       console.error('handleCreateMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể tạo thực đơn. Vui lòng thử lại.');
     } finally {
@@ -288,7 +315,7 @@ export default function CreateMenuPage() {
 
           {selectedDishes.length === 0 ? (
             <Text style={{ color: COLORS.grey, fontStyle: 'italic', marginTop: 8 }}>
-              Chưa có món ăn nào. Nhấn "Thêm món" để thêm.
+              Chưa có món ăn nào. Nhấn &quot;Thêm món&quot; để thêm.
             </Text>
           ) : (
             <View style={{ gap: 12, marginTop: 8 }}>
