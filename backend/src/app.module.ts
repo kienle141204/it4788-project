@@ -15,6 +15,8 @@ import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
 import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
 import { NutrientModule } from './modules/nutrient/nutrient.module';
+import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
+import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
 
 @Module({
   imports: [
@@ -70,6 +72,8 @@ import { NutrientModule } from './modules/nutrient/nutrient.module';
     IngredientModule,
     RefrigeratorModule,
     NutrientModule,
+    ShoppingStatisticsModule,
+    ConsumptionHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
