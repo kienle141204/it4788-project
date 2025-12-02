@@ -15,6 +15,7 @@ import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
 import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
 import { NutrientModule } from './modules/nutrient/nutrient.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { NutrientModule } from './modules/nutrient/nutrient.module';
     IngredientModule,
     RefrigeratorModule,
     NutrientModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
