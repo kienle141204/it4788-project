@@ -15,14 +15,10 @@ import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
 import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
 import { NutrientModule } from './modules/nutrient/nutrient.module';
-<<<<<<< HEAD
 import { UploadModule } from './modules/upload/upload.module';
-=======
 import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
 import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
 import { MarketModule } from './modules/market/market.module';
->>>>>>> c35368d4c6a9ce5901e1e58ca9591187f64db243
-
 @Module({
   imports: [
     // Cấu hình biến môi trường (toàn cục)
