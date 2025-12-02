@@ -8,6 +8,7 @@ interface Feature {
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
+  bgColor?: string;
   onPress: () => void;
 }
 
@@ -16,30 +17,43 @@ interface FeatureGridProps {
 }
 
 export default function FeatureGrid({ features }: FeatureGridProps) {
-  return (    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
       {features.map((feature, index) => (
         <TouchableOpacity
           key={feature.id}
           onPress={feature.onPress}
           style={{
-            width: '27%',
-            aspectRatio: 1,
+            width: '48%',
             backgroundColor: COLORS.white,
-            borderRadius: 10,
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginBottom: 12,
-            boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-            elevation: 3
+            borderRadius: 20,
+            padding: 16,
+            marginBottom: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+            height: 100,
+            // justifyContent: 'space-between',
+            alignItems: 'flex-start'
           }}
         >
-          <Ionicons name={feature.icon} size={32} color={feature.color} />
+          <View style={{
+            backgroundColor: feature.bgColor || '#F3F4F6',
+            padding: 10,
+            borderRadius: 30,
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <Ionicons name={feature.icon} size={24} color={feature.color} />
+          </View>
+
           <Text style={{
-            fontSize: 11,
-            color: COLORS.darkGrey,
-            marginTop: 6,
-            textAlign: 'center',
-            fontWeight: '500'
+            fontSize: 16,
+            color: '#1F2937',
+            fontWeight: 'bold',
+            marginTop: 8
           }}>
             {feature.name}
           </Text>

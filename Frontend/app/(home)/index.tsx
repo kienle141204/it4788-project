@@ -40,12 +40,14 @@ export default function HomePage() {
   }, []);
 
   const features = [
-    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: COLORS.purple, onPress: () => router.push('/(group)') },
-    { id: 'shopping', name: 'Chợ', icon: 'document-text' as const, color: COLORS.purple, onPress: () => router.push('/(market)/market_screen') },
-    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: COLORS.purple, onPress: () => router.push('/(meal)') },
-    { id: 'nutrition', name: 'Dinh dưỡng', icon: 'book' as const, color: COLORS.orange, onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
-    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: COLORS.purple, onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
-    { id: 'food', name: 'Món ăn', icon: 'book' as const, color: COLORS.orange, onPress: () => router.push('/(food)' as any) }
+    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: '#A855F7', bgColor: '#F3E8FF', onPress: () => router.push('/(group)') },
+    { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
+    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
+    { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
+    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
+    { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
+    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
+    { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
   ];
 
   const handleGoToMarket = () => {
@@ -75,7 +77,11 @@ export default function HomePage() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
 
         <Header
           userName="Livia Vaccaro"
@@ -83,23 +89,21 @@ export default function HomePage() {
           onMenuPress={handleMenuPress}
         />
 
-
         <TaskSummaryCard
           totalTasks={10}
           onViewTasks={handleViewTasks}
         />
 
-   
         <View style={styles.notificationSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Notification</Text>
             <Ionicons name="sparkles" size={20} color={COLORS.purple} />
           </View>
-          
+
           <NotificationCard
-            title="Thông báo quan trọng"
-            message="Thực phẩm hết hạn hay gì đó (thông báo quan trọng)"
-            progress={75}
+            title="Thực phẩm sắp hết hạn"
+            message="Kiểm tra tủ lạnh của bạn ngay!"
+            type="warning"
           />
         </View>
 
@@ -111,9 +115,9 @@ export default function HomePage() {
           </View>
           <FeatureGrid features={features} />
         </View>
+
       </ScrollView>
 
-  
       <BottomNavigation
         activeTab={activeTab}
         onTabPress={handleTabPress}
@@ -142,7 +146,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: COLORS.darkGrey,
   },
   featuresSection: {

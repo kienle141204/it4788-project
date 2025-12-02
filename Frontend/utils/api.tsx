@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
-const API_DOMAIN = process.env.API || 'http://10.0.2.2:8090/api/'
+// const API_DOMAIN = process.env.API || 'http://10.0.2.2:8090/api/'
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
     headers: {

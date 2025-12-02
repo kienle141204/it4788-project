@@ -12,7 +12,7 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
   return (
     <View style={{
       marginHorizontal: 20,
-      marginTop: 10,
+      // marginTop: 10,
       marginBottom: 20,
       backgroundColor: COLORS.purple,
       borderRadius: 16,
@@ -22,7 +22,7 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
       justifyContent: 'space-between',
       position: 'relative'
     }}>
- 
+
       <TouchableOpacity
         style={{
           position: 'absolute',
@@ -37,7 +37,7 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
 
 
       <View style={{ flex: 1, marginRight: 20 }}>
-        <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: '600', marginBottom: 10 }}>
+        <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
           Tổng số nhiệm vụ hôm nay
         </Text>
         <TouchableOpacity
@@ -50,11 +50,11 @@ export default function TaskSummaryCard({ totalTasks, onViewTasks }: TaskSummary
             alignSelf: 'flex-start'
           }}
         >
-          <Text style={{ color: COLORS.purple, fontSize: 14, fontWeight: '600' }}>View Task</Text>
+          <Text style={{ color: COLORS.purple, fontSize: 14, fontWeight: 'bold' }}>View Task</Text>
         </TouchableOpacity>
       </View>
 
-    
+
       <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
         <View style={{
           width: 60,

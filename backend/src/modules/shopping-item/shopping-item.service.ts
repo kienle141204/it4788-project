@@ -122,11 +122,27 @@ export class ShoppingItemService {
     item.is_checked = !item.is_checked;
 
     // Cập nhật cost trong shopping list nếu có ingredient và giá
-    if (item.ingredient && item.ingredient.price != null) {
-      const shoppingList = await this.shoppingListRepo.findOne({ where: { id: item.list_id } });
+    // Nếu item có ingredient và giá hợp lệ
+    const price = Number(item.price);
+
+    // Nếu giá không phải số -> bỏ qua
+    if (!isNaN(price)) {
+      const shoppingList = await this.shoppingListRepo.findOne({
+        where: { id: item.list_id },
+      });
+
       if (shoppingList) {
-        shoppingList.cost += item.is_checked ? Number(item.ingredient.price) : -Number(item.ingredient.price);
-        // Cập nhật shopping list
+        // Ensure shoppingList.cost là số
+        const currentCost = Number(shoppingList.cost) || 0;
+
+        // Cộng hoặc trừ
+        shoppingList.cost = item.is_checked
+          ? currentCost + price
+          : currentCost - price;
+
+        // Làm tròn 2 số sau dấu phẩy để tránh lỗi Decimal
+        shoppingList.cost = Number(shoppingList.cost.toFixed(2));
+
         await this.shoppingListRepo.save(shoppingList);
       }
     }
