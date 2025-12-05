@@ -28,7 +28,7 @@ export class FamilyService {
   private async findFamilyOrFail(id: number) {
     const family = await this.familyRepository.findOne({
       where: { id },
-      relations: ['members'],
+      relations: ['members', 'members.user'],
     });
     if (!family) throw new NotFoundException(`Không tìm thấy gia đình ${id}`);
     return family;
@@ -46,7 +46,7 @@ export class FamilyService {
   private async generateInvitationCode(): Promise<string> {
     let code: string = '';
     let isUnique = false;
-    
+
     while (!isUnique) {
       // Tạo mã 8 ký tự gồm chữ hoa và số
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -54,25 +54,25 @@ export class FamilyService {
       for (let i = 0; i < 8; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-      
+
       // Kiểm tra mã đã tồn tại chưa
       const existing = await this.familyRepository.findOne({
         where: { invitation_code: code },
       });
-      
+
       if (!existing) {
         isUnique = true;
       }
     }
-    
+
     return code;
   }
 
   async createFamily(name: string, ownerId: number, user: JwtUser): Promise<Family> {
     // Tạo mã mời khi tạo family
     const invitationCode = await this.generateInvitationCode();
-    const family = this.familyRepository.create({ 
-      name, 
+    const family = this.familyRepository.create({
+      name,
       owner_id: ownerId,
       invitation_code: invitationCode,
     });
@@ -97,7 +97,7 @@ export class FamilyService {
 
   async getAllFamilies() {
     return this.familyRepository.find({
-      relations: ['members'],
+      relations: ['members', 'members.user'],
     });
   }
 
@@ -153,7 +153,7 @@ export class FamilyService {
     // Lấy các family cùng members
     const families = await this.familyRepository.find({
       where: { id: In(familyIds) },
-      relations: ['members'],
+      relations: ['members', 'members.user'],
     });
 
     // Add memberCount to each family
@@ -195,7 +195,7 @@ export class FamilyService {
    */
   async getInvitationCode(familyId: number, userId: number, role: string) {
     const family = await this.findFamilyOrFail(familyId);
-    
+
     // Chỉ owner hoặc admin mới có thể xem mã mời
     this.ensureOwnerOrAdmin(family, userId, role);
 

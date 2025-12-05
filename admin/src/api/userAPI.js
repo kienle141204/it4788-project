@@ -1,6 +1,6 @@
 // User API Service - Using centralized auth fetch utility
 
-import { get, post, put, del } from './authFetch';
+import { get, post, put, del, patch } from './authFetch';
 
 // Get users with optional pagination and filtering
 export const fetchUsers = async (params = {}) => {
@@ -33,10 +33,10 @@ export const createUser = async (userData) => {
 // Update an existing user
 export const updateUser = async (id, userData) => {
   console.log('API call: updateUser', id, userData);
-  
+
   try {
     // Real API call:
-    return await put(`/users/${id}`, userData);
+    return await patch(`/users/${id}`, userData);
   } catch (error) {
     console.error('Error updating user:', error);
     throw error;

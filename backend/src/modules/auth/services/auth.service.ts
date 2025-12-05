@@ -273,9 +273,9 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
-    // Tạo access token (hết hạn sau 15 phút)
+    // Tạo access token (hết hạn sau 7 ngày)
     const accessPayload = { sub: user.id, email: user.email, type: 'access' };
-    const access_token = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
+    const access_token = this.jwtService.sign(accessPayload, { expiresIn: '7d' });
 
     // Tạo refresh token (hết hạn sau 7 ngày)
     const refreshPayload = { sub: user.id, email: user.email, type: 'refresh' };
@@ -335,9 +335,9 @@ export class AuthService {
         throw new UnauthorizedException('Refresh token không hợp lệ');
       }
 
-      // Tạo access token mới
+      // Tạo access token mới (hết hạn sau 7 ngày)
       const accessPayload = { sub: user.id, email: user.email, type: 'access' };
-      const newAccessToken = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
+      const newAccessToken = this.jwtService.sign(accessPayload, { expiresIn: '7d' });
 
       // Tạo refresh token mới
       const refreshPayload = { sub: user.id, email: user.email, type: 'refresh' };

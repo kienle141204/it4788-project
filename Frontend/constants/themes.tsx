@@ -16,5 +16,7 @@ export const COLORS = {
   lightBlue: '#E0F2FE',
   darkGrey: '#374151',
   lightGrey: '#F3F4F6',
-  shadow: 'rgba(0,0,0,0.4)'
+  shadow: 'rgba(0,0,0,0.4)',
+  warningBackground: '#FFF9C4', // Light Yellow
+  warningText: '#A16207', // Dark Yellow/Brown
 } as const;

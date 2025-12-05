@@ -199,7 +199,7 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ 
     summary: 'Đăng nhập',
-    description: 'API này cho phép người dùng đăng nhập bằng email và password. Trả về access token (hết hạn sau 15 phút) và refresh token (hết hạn sau 7 ngày) để sử dụng cho các API tiếp theo.'
+    description: 'API này cho phép người dùng đăng nhập bằng email và password. Trả về access token (hết hạn sau 7 ngày) và refresh token (hết hạn sau 7 ngày) để sử dụng cho các API tiếp theo.'
   })
   @ApiBody({
     type: LoginDto,
@@ -270,7 +270,7 @@ export class AuthController {
   @Post('refresh-token')
   @ApiOperation({ 
     summary: 'Làm mới access token',
-    description: 'API này cho phép người dùng làm mới access token bằng refresh token khi access token đã hết hạn. Refresh token cũng sẽ được làm mới và có hiệu lực trong 7 ngày.'
+    description: 'API này cho phép người dùng làm mới access token bằng refresh token khi access token đã hết hạn. Access token mới và refresh token mới đều có hiệu lực trong 7 ngày.'
   })
   @ApiBody({
     type: RefreshTokenDto,

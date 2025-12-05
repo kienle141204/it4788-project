@@ -44,7 +44,8 @@ export default function HomePage() {
     { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
     { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
     { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
-    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) }
+    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
+    { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
   ];
 
   const handleNotificationPress = () => {
@@ -84,9 +85,9 @@ export default function HomePage() {
           </View>
 
           <NotificationCard
-            title="Thông báo quan trọng"
-            message="Thực phẩm hết hạn hay gì đó (thông báo quan trọng)"
-            progress={75}
+            title="Thực phẩm sắp hết hạn"
+            message="Kiểm tra tủ lạnh của bạn ngay!"
+            type="warning"
           />
         </View>
 
@@ -98,6 +99,7 @@ export default function HomePage() {
           </View>
           <FeatureGrid features={features} />
         </View>
+
       </ScrollView>
     </View>
   );
