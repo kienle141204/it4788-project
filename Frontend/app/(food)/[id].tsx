@@ -556,8 +556,8 @@ export default function FoodDetailPage() {
 
   if (loading) {
     return (
-    <SafeAreaView style={foodDetailStyles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={foodDetailStyles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
           <Text style={foodDetailStyles.loadingText}>Đang tải...</Text>
@@ -568,8 +568,8 @@ export default function FoodDetailPage() {
 
   if (!dish) {
     return (
-    <SafeAreaView style={foodDetailStyles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={foodDetailStyles.headerWrapper}>
           <View style={foodDetailStyles.header}>
             <TouchableOpacity onPress={handleBack} style={foodDetailStyles.headerButton}>
@@ -625,7 +625,7 @@ export default function FoodDetailPage() {
   ];
 
   return (
-    <SafeAreaView style={foodDetailStyles.container} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       <View style={foodDetailStyles.headerWrapper}>

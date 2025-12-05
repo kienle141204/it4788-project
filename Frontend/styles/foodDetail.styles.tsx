@@ -9,10 +9,9 @@ export const foodDetailStyles = StyleSheet.create({
   headerWrapper: {
     backgroundColor: COLORS.white,
     paddingHorizontal: 20,
-    paddingTop: 0,
+    paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 0,
-    marginTop: -20,
   },
   header: {
     flexDirection: 'row',
