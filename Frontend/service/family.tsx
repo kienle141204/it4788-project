@@ -1,15 +1,5 @@
 import { getAccess, postAccess, patchAccess, deleteAccess } from '../utils/api';
 
-<<<<<<< HEAD
-/**
- * Lấy danh sách các gia đình mà user là thành viên
- * GET /api/families/my-family
- */
-export const getMyFamilies = async () => {
-  try {
-    const res = await getAccess('families/my-family');
-    return res;
-=======
 export interface FamilyMember {
   id: number;
   user_id: number;
@@ -59,20 +49,12 @@ export const getMyFamilies = async (): Promise<Family[]> => {
     }
 
     throw new Error('Invalid families response');
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
   } catch (error) {
     console.error('Error getting my families:', error);
     throw error;
   }
 };
 
-<<<<<<< HEAD
-/**
- * Lấy thông tin chi tiết của một gia đình
- * GET /api/families/:id
- */
-export const getFamilyById = async (id: number) => {
-=======
 export const getMyFamily = async (): Promise<Family[]> => {
   try {
     const res: GetMyFamilyResponse = await getAccess('families/my-family');
@@ -84,7 +66,6 @@ export const getMyFamily = async (): Promise<Family[]> => {
 };
 
 export const getFamilyById = async (id: number): Promise<Family> => {
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
   try {
     const res = await getAccess(`families/${id}`);
     return res;
@@ -96,18 +77,12 @@ export const getFamilyById = async (id: number): Promise<Family> => {
 
 /**
  * Tạo gia đình mới
-<<<<<<< HEAD
- * POST /api/families
- */
-export const createFamily = async (data: { name: string; owner_id?: number }) => {
-=======
  * POST /families
  */
 export const createFamily = async (data: {
   name: string;
   owner_id?: number;
 }) => {
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
   try {
     const res = await postAccess('families', data);
     return res;
@@ -118,14 +93,6 @@ export const createFamily = async (data: {
 };
 
 /**
-<<<<<<< HEAD
- * Tham gia gia đình bằng mã mời
- * POST /api/families/join-by-code
- */
-export const joinFamilyByCode = async (invitation_code: string) => {
-  try {
-    const res = await postAccess('families/join-by-code', { invitation_code });
-=======
  * Cập nhật thông tin gia đình
  * PUT /families/:id
  */
@@ -198,7 +165,6 @@ export const getFamilyInvitationCode = async (familyId: number) => {
 export const joinFamilyByCode = async (invitationCode: string) => {
   try {
     const res = await postAccess('families/join', { invitation_code: invitationCode });
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
     return res;
   } catch (error) {
     console.error('Error joining family by code:', error);
@@ -208,16 +174,6 @@ export const joinFamilyByCode = async (invitationCode: string) => {
 
 /**
  * Rời khỏi gia đình
-<<<<<<< HEAD
- * POST /api/families/:id/leave
- */
-export const leaveFamily = async (id: number) => {
-  try {
-    const res = await postAccess(`families/${id}/leave`, {});
-    return res;
-  } catch (error) {
-    console.error(`Error leaving family ${id}:`, error);
-=======
  * POST /families/:id/leave
  */
 export const leaveFamily = async (familyId: number) => {
@@ -226,23 +182,11 @@ export const leaveFamily = async (familyId: number) => {
     return res;
   } catch (error) {
     console.error(`Error leaving family ${familyId}:`, error);
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
     throw error;
   }
 };
 
 /**
-<<<<<<< HEAD
- * Lấy mã mời và QR code
- * GET /api/families/:id/invitation
- */
-export const getInvitationCode = async (id: number) => {
-  try {
-    const res = await getAccess(`families/${id}/invitation`);
-    return res;
-  } catch (error) {
-    console.error(`Error getting invitation code for family ${id}:`, error);
-=======
  * Lấy tất cả gia đình (admin only)
  * GET /families
  */
@@ -252,27 +196,11 @@ export const getAllFamilies = async () => {
     return res;
   } catch (error) {
     console.error('Error getting all families:', error);
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
     throw error;
   }
 };
 
 /**
-<<<<<<< HEAD
- * Lấy thống kê shopping list của family
- * GET /api/shopping-statistics/family/:familyId
- */
-export const getFamilyShoppingStatistics = async (familyId: number) => {
-  try {
-    const res = await getAccess(`shopping-statistics/family/${familyId}`);
-    return res;
-  } catch (error) {
-    console.error(`Error getting shopping statistics for family ${familyId}:`, error);
-    throw error;
-  }
-};
-
-=======
  * Lấy danh sách thành viên của gia đình kèm thông tin chi tiết
  * GET /families/:id/members
  */
@@ -285,4 +213,3 @@ export const getFamilyMembers = async (familyId: number) => {
     throw error;
   }
 };
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368

@@ -17,7 +17,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getFamilyById, getFamilyMembers, getFamilyInvitationCode } from '../../service/family';
+import { getFamilyById, getFamilyInvitationCode } from '../../service/family';
 import {
   getShoppingListsByFamily,
   createShoppingList,
@@ -53,6 +53,19 @@ interface Family {
   owner_id: number;
   created_at: string;
   invitation_code?: string | null;
+  members?: Array<{
+    id: number;
+    user_id: number;
+    role: string;
+    joined_at: string;
+    user?: {
+      id: number;
+      full_name?: string;
+      fullname?: string;
+      email: string;
+      avatar_url?: string | null;
+    };
+  }>;
 }
 
 // Helper function to decode JWT and get user ID
@@ -158,14 +171,44 @@ export default function GroupDetailPage() {
       }
       setError(null);
 
-      // Fetch family details, members, and shopping lists in parallel
-      const [familyData, membersData, shoppingListsData] = await Promise.all([
-        getFamilyById(familyId),
-        getFamilyMembers(familyId),
-        getShoppingListsByFamily(familyId),
-      ]);
+      // Fetch family details
+      const familyData = await getFamilyById(familyId);
+      // Cast to local Family type
+      setFamily({
+        id: familyData.id,
+        name: familyData.name,
+        owner_id: familyData.owner_id,
+        created_at: familyData.created_at,
+        invitation_code: (familyData as any).invitation_code || null,
+        members: familyData.members as any,
+      });
 
-      setFamily(familyData);
+      // Extract members from family object and transform to Member[] format
+      let membersData: Member[] = [];
+      if (familyData.members && Array.isArray(familyData.members)) {
+        membersData = familyData.members.map((member: any) => ({
+          id: member.id,
+          user_id: member.user_id,
+          role: member.role,
+          joined_at: member.joined_at,
+          user: {
+            id: member.user?.id || member.user_id,
+            full_name: member.user?.full_name || member.user?.fullname || '',
+            email: member.user?.email || '',
+            avatar_url: member.user?.avatar_url || null,
+          },
+        }));
+      }
+
+      // Fetch shopping lists (handle error gracefully)
+      let shoppingListsData: ShoppingList[] = [];
+      try {
+        shoppingListsData = await getShoppingListsByFamily(familyId);
+      } catch (shoppingError: any) {
+        console.warn('Could not fetch shopping lists:', shoppingError);
+        // Continue without shopping lists if endpoint fails
+      }
+
       setMembers(membersData);
       setShoppingLists(shoppingListsData);
     } catch (err: any) {

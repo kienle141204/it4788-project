@@ -49,25 +49,11 @@ export default function login() {
       const access = res?.access_token
       const refresh = res?.refresh_token
       
-<<<<<<< HEAD
-      if (access && refresh) {
-        await AsyncStorage.setItem('access_token', access as any)
-        await AsyncStorage.setItem('refresh_token', refresh as any)
-        const key = await AsyncStorage.getAllKeys()
-        console.log(key)
-        route.push('../(home)');
-      }
-      else {
-        Alert.alert('Lỗi', res?.message);
-        return;
-      }
-=======
       await AsyncStorage.setItem('access_token', access as any)
       await AsyncStorage.setItem('refresh_token', refresh as any)
       const key = await AsyncStorage.getAllKeys()
       console.log(key)
       route.push('../(tabs)/home');
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
     } catch (error) {
       console.error(error);
       Alert.alert('Lỗi', 'Đăng nhập thất bại, vui lòng thử lại sau.');

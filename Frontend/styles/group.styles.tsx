@@ -12,13 +12,7 @@ export const groupStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-<<<<<<< HEAD
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGrey,
-=======
     backgroundColor: COLORS.background,
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
   },
   headerIcon: {
     padding: 4,
@@ -41,11 +35,6 @@ export const groupStyles = StyleSheet.create({
     paddingBottom: 100, // Space for FAB
     gap: 16,
     backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   familyCard: {
     backgroundColor: COLORS.white,
@@ -134,13 +123,12 @@ export const groupStyles = StyleSheet.create({
     color: COLORS.darkGrey,
     textAlign: 'center',
   },
-<<<<<<< HEAD
   emptyStateSubtext: {
     fontSize: 14,
     color: COLORS.grey,
     textAlign: 'center',
     paddingHorizontal: 40,
-=======
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -807,6 +795,5 @@ export const groupStyles = StyleSheet.create({
   ownerName: {
     fontSize: 12,
     color: COLORS.grey,
->>>>>>> 4dc2326c500fcc081ef0c5cb36d6471112135368
   },
 });
