@@ -112,7 +112,33 @@ export class FamilyController {
 
   /** Join family by invitation code */
   @Post('join-by-code')
-  @ApiOperation({ summary: 'Tham gia gia đình bằng mã mời' })
+  @ApiOperation({ 
+    summary: 'Tham gia gia đình bằng mã mời',
+    description: 'Người dùng nhập mã mời hợp lệ để trở thành thành viên của gia đình tương ứng.'
+  })
+  @ApiBody({
+    type: JoinByCodeDto,
+    examples: {
+      default: {
+        summary: 'Gia nhập bằng mã',
+        value: {
+          invitation_code: 'FAM-123-XYZ'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gia nhập gia đình thành công',
+    example: {
+      family_id: 5,
+      member_id: 12,
+      role: 'member',
+      joined_at: '2024-03-15T12:00:00.000Z'
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Mã mời không hợp lệ hoặc đã hết hạn' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình tương ứng với mã mời' })
   async joinByCode(
     @Body() dto: JoinByCodeDto,
     @User() user: JwtUser,
@@ -122,7 +148,21 @@ export class FamilyController {
 
   /** Leave family */
   @Post(':id/leave')
-  @ApiOperation({ summary: 'Rời khỏi gia đình' })
+  @ApiOperation({ 
+    summary: 'Rời khỏi gia đình',
+    description: 'Cho phép thành viên rời khỏi một gia đình cụ thể. Owner phải chuyển quyền trước khi rời nhóm.'
+  })
+  @ApiParam({ name: 'id', type: 'number', example: 3, description: 'ID gia đình muốn rời khỏi' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rời gia đình thành công',
+    example: {
+      message: 'Bạn đã rời gia đình thành công',
+      family_id: 3
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền rời gia đình (ví dụ: owner chưa chuyển quyền)' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình' })
   async leaveFamily(
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,
@@ -131,7 +171,27 @@ export class FamilyController {
   }
 
   @Post('test-push')
-  @ApiOperation({ summary: 'Thử gửi thông báo đến thiết bị có body.token' })
+  @ApiOperation({ 
+    summary: 'Thử gửi thông báo đến thiết bị có body.token',
+    description: 'Dùng nội bộ để kiểm tra cấu hình Firebase Cloud Messaging bằng cách gửi thông báo thử đến một token thiết bị.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', example: 'fcm_device_token_here', description: 'FCM registration token của thiết bị' }
+      },
+      required: ['token']
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gửi thông báo thành công',
+    example: {
+      messageId: 'projects/demo/messages/0:1700000000000000%1234567890abcdef',
+      success: true
+    }
+  })
   async sendTestPush(@Body() body: { token: string }) {
     return this.firebaseService.sendNotification(
       body.token,
@@ -170,9 +230,59 @@ export class FamilyController {
     return this.familyService.getMyFamily(user.id)
   }
 
+  /** Get family members with user details */
+  @Get(':id/members')
+  @ApiOperation({ 
+    summary: 'Lấy danh sách thành viên của gia đình kèm thông tin chi tiết',
+    description: 'API này trả về danh sách thành viên của gia đình với thông tin user (tên, email, avatar, vai trò). Chỉ members của gia đình mới có thể xem.'
+  })
+  @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách thành viên thành công',
+    example: [
+      {
+        id: 1,
+        user_id: 1,
+        role: 'manager',
+        joined_at: '2024-01-01T00:00:00.000Z',
+        user: {
+          id: 1,
+          full_name: 'Nguyễn Văn A',
+          email: 'nguyenvana@example.com',
+          avatar_url: 'https://example.com/avatar.jpg'
+        }
+      }
+    ]
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền xem danh sách thành viên' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình' })
+  async getFamilyMembers(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: JwtUser,
+  ) {
+    return this.familyService.getFamilyMembersWithDetails(id, user.id);
+  }
+
   /** Get invitation code and QR code */
   @Get(':id/invitation')
-  @ApiOperation({ summary: 'Lấy mã mời và QR code của gia đình' })
+  @ApiOperation({ 
+    summary: 'Lấy mã mời và QR code của gia đình',
+    description: 'Owner hoặc admin có thể lấy mã mời và QR code để chia sẻ với người dùng khác.'
+  })
+  @ApiParam({ name: 'id', type: 'number', example: 4, description: 'ID của gia đình cần lấy mã mời' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy mã mời thành công',
+    example: {
+      family_id: 4,
+      invitation_code: 'FAM-XYZ-789',
+      qr_code: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...',
+      expired_at: '2024-04-01T00:00:00.000Z'
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền lấy mã mời của gia đình này' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình' })
   async getInvitationCode(
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,

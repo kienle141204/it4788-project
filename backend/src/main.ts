@@ -22,8 +22,8 @@ async function bootstrap() {
   });
   
   const config = new DocumentBuilder()
-    .setTitle('E-Learning api')
-    .setDescription('API Documentation for E-learning simple version')
+    .setTitle('Market app api')
+    .setDescription('API Documentation for Market App simple version')
     .setVersion('1.0')
     .addBearerAuth(
       {

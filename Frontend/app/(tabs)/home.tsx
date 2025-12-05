@@ -1,21 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import { BackHandler, ToastAndroid } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
-import Header from '../../components/Header';
-import TaskSummaryCard from '../../components/TaskSummaryCard';
-import NotificationCard from '../../components/NotificationCard';
-import FeatureGrid from '../../components/FeatureGrid';
-import BottomNavigation from '../../components/BottomNavigation';
-import { COLORS } from '../../constants/themes';
+import Header from '@/components/Header';
+import TaskSummaryCard from '@/components/TaskSummaryCard';
+import NotificationCard from '@/components/NotificationCard';
+import FeatureGrid from '@/components/FeatureGrid';
+import { COLORS } from '@/constants/themes';
 
 export default function HomePage() {
   const router = useRouter();
   const backPressCount = useRef(0);
-  const [activeTab, setActiveTab] = useState('home');
 
   console.log('🏠 Đang ở HOME');
 
@@ -50,10 +48,6 @@ export default function HomePage() {
     { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
   ];
 
-  const handleGoToMarket = () => {
-    router.push('/(market)/market_screen');
-  };
-
   const handleNotificationPress = () => {
     Alert.alert('Thông báo', 'Bạn có 6 thông báo mới');
   };
@@ -66,15 +60,6 @@ export default function HomePage() {
     Alert.alert('Nhiệm vụ', 'Xem danh sách nhiệm vụ');
   };
 
-  const handleTabPress = (tab: string) => {
-    setActiveTab(tab);
-    if (tab === 'add') {
-      Alert.alert('Thêm mới', 'Tạo nội dung mới');
-    } else if (tab === 'calendar') {
-      router.push('/(task)');
-    }
-  };
-
   return (
     <View style={styles.container}>
       <ScrollView
@@ -82,7 +67,6 @@ export default function HomePage() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-
         <Header
           userName="Livia Vaccaro"
           onNotificationPress={handleNotificationPress}
@@ -117,11 +101,6 @@ export default function HomePage() {
         </View>
 
       </ScrollView>
-
-      <BottomNavigation
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
     </View>
   );
 }

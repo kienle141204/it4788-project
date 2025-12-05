@@ -9,6 +9,7 @@ export const COLORS = {
   grey: "#9CA3AF",
   blue: '#1c67c9ff',
   orange: '#c9792eff',
+  red: '#DC2626',
   // New colors for home page
   purple: '#16A34A', // Dùng làm accent xanh
   lightPurple: '#86EFAC',
