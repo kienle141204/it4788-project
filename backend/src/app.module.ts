@@ -18,6 +18,8 @@ import { NutrientModule } from './modules/nutrient/nutrient.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
 import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
+import { RemindersModule } from './reminders/reminders.module';
+
 import { MarketModule } from './modules/market/market.module';
 @Module({
   imports: [
@@ -76,6 +78,7 @@ import { MarketModule } from './modules/market/market.module';
     UploadModule,
     ShoppingStatisticsModule,
     ConsumptionHistoryModule,
+    RemindersModule,
     MarketModule,
   ],
   controllers: [AppController],

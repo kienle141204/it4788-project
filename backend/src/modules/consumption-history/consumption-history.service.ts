@@ -1,7 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { ConsumptionHistory } from '../../entities/consumption-history.entity';
+import { Family } from '../../entities/family.entity';
+import { FamilyMember } from '../../entities/family-member.entity';
+import { FridgeDish } from '../../entities/fridge-dish.entity';
+import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
 import { CreateConsumptionHistoryDto } from './dto/create-consumption-history.dto';
 import { UpdateConsumptionHistoryDto } from './dto/update-consumption-history.dto';
 import type { JwtUser } from 'src/common/types/user.type';
@@ -11,6 +15,18 @@ export class ConsumptionHistoryService {
   constructor(
     @InjectRepository(ConsumptionHistory)
     private readonly consumptionRepo: Repository<ConsumptionHistory>,
+
+    @InjectRepository(Family)
+    private readonly familyRepo: Repository<Family>,
+
+    @InjectRepository(FamilyMember)
+    private readonly memberRepo: Repository<FamilyMember>,
+
+    @InjectRepository(FridgeDish)
+    private readonly fridgeDishRepo: Repository<FridgeDish>,
+
+    @InjectRepository(FridgeIngredient)
+    private readonly fridgeIngredientRepo: Repository<FridgeIngredient>,
   ) { }
 
   private checkPermission(user: JwtUser, targetUserId?: number) {
@@ -58,7 +74,7 @@ export class ConsumptionHistoryService {
     return this.consumptionRepo.save(entry);
   }
 
-  async monthlyStatistics(year: number, userId: number, user: JwtUser) {
+  async monthlyStatisticsUser(year: number, userId: number, user: JwtUser) {
     this.checkPermission(user, userId);
     const start = new Date(year, 0, 1);
     const records = await this.consumptionRepo.find({
@@ -74,7 +90,7 @@ export class ConsumptionHistoryService {
       .sort((a, b) => a.month.localeCompare(b.month));
   }
 
-  async topConsumed(type: 'dish' | 'ingredient', limit = 5, user: JwtUser, userId?: number) {
+  async topConsumedUser(type: 'dish' | 'ingredient', limit = 5, user: JwtUser, userId?: number) {
     if (userId) this.checkPermission(user, userId);
     const where: any = { consume_type: type };
     if (userId) where.user_id = userId;
@@ -84,6 +100,90 @@ export class ConsumptionHistoryService {
     const map = new Map<number, number>();
     records.forEach(r => map.set(r.item_id, (map.get(r.item_id) || 0) + r.stock));
 
+    return Array.from(map.entries())
+      .map(([id, total]) => ({ id, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit);
+  }
+
+  async monthlyStatisticsFamily(year: number, family_id: number, user: JwtUser) {
+    // 1. Kiểm tra user thuộc family nào
+    const members = await this.memberRepo.find({
+      where: { user_id: user.id }
+    });
+
+    if (members.length === 0) {
+      throw new NotFoundException("Bạn chưa thuộc gia đình nào");
+    }
+
+    const belongs = members.some(m => m.family_id === family_id);
+
+    if (!belongs) {
+      throw new UnauthorizedException("Bạn không thuộc gia đình này");
+    }
+
+    // 3. Lấy dữ liệu của năm
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+
+    const records = await this.consumptionRepo.find({
+      where: {
+        family_id,
+        created_at: MoreThanOrEqual(start),
+      },
+    });
+
+    // 4. Nhóm theo tháng
+    const monthMap = new Map<string, number>();
+
+    records.forEach(r => {
+      const month = r.created_at.toISOString().slice(0, 7);
+      monthMap.set(month, (monthMap.get(month) || 0) + r.stock);
+    });
+
+    return Array.from(monthMap.entries())
+      .map(([month, total_consumed]) => ({ month, total_consumed }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+
+
+  async topConsumedFamily(
+    type: 'dish' | 'ingredient',
+    limit = 5,
+    user: JwtUser,
+    family_id: number,
+  ) {
+    // 1. Kiểm tra user có thuộc family không
+    const members = await this.memberRepo.find({
+      where: { user_id: user.id }
+    });
+
+    if (members.length === 0) {
+      throw new NotFoundException("Bạn chưa thuộc gia đình nào");
+    }
+
+    const belongs = members.some(m => m.family_id === family_id);
+
+    if (!belongs) {
+      throw new UnauthorizedException("Bạn không thuộc gia đình này");
+    }
+
+    // 2. Điều kiện query
+    const where = {
+      consume_type: type,
+      family_id: family_id,
+    };
+
+    // 3. Lấy records
+    const records = await this.consumptionRepo.find({ where });
+
+    // 4. Gom theo item_id
+    const map = new Map<number, number>();
+    records.forEach(r => {
+      map.set(r.item_id, (map.get(r.item_id) ?? 0) + r.stock);
+    });
+
+    // 5. Trả về top limit
     return Array.from(map.entries())
       .map(([id, total]) => ({ id, total }))
       .sort((a, b) => b.total - a.total)
