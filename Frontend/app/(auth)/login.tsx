@@ -53,7 +53,7 @@ export default function login() {
       await AsyncStorage.setItem('refresh_token', refresh as any)
       const key = await AsyncStorage.getAllKeys()
       console.log(key)
-      route.push('../(home)');
+      route.push('../(tabs)/home');
     } catch (error) {
       console.error(error);
       Alert.alert('Lỗi', 'Đăng nhập thất bại, vui lòng thử lại sau.');
