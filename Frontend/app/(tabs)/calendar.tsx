@@ -293,7 +293,7 @@ export default function TaskPage() {
 
                 {/* Items */}
                 {list.items && list.items.length > 0 ? (
-                  [...list.items].reverse().map(item => renderShoppingItem(item, list.id))
+                  list.items.map(item => renderShoppingItem(item, list.id))
                 ) : (
                   <View style={taskStyles.emptyState}>
                     <Text style={taskStyles.emptyStateText}>

@@ -32,6 +32,29 @@ export interface GetMyFamilyResponse {
   data: Family[];
 }
 
+/**
+ * Lấy danh sách các gia đình mà người dùng là thành viên
+ * GET /families/my-family
+ */
+export const getMyFamilies = async (): Promise<Family[]> => {
+  try {
+    const res: GetMyFamilyResponse | Family[] = await getAccess('families/my-family');
+
+    // API may return array directly or wrapped in { data }
+    if (Array.isArray(res)) {
+      return res;
+    }
+    if (Array.isArray(res?.data)) {
+      return res.data;
+    }
+
+    throw new Error('Invalid families response');
+  } catch (error) {
+    console.error('Error getting my families:', error);
+    throw error;
+  }
+};
+
 export const getMyFamily = async (): Promise<Family[]> => {
   try {
     const res: GetMyFamilyResponse = await getAccess('families/my-family');
@@ -187,18 +210,6 @@ export const getFamilyMembers = async (familyId: number) => {
     return res;
   } catch (error) {
     console.error(`Error getting members for family ${familyId}:`, error);
-    throw error;
-  }
-};
-
- * Rời family
- */
-export const leaveFamily = async (id: number) => {
-  try {
-    const res = await deleteAccess(`families/leave/${id}`);
-    return res;
-  } catch (error) {
-    console.error(`Error leaving family ${id}:`, error);
     throw error;
   }
 };
