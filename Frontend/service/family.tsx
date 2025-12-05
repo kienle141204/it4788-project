@@ -1,26 +1,48 @@
 import { getAccess, postAccess, patchAccess, deleteAccess } from '../utils/api';
 
-// Family APIs
+export interface FamilyMember {
+  id: number;
+  user_id: number;
+  family_id: number;
+  user: {
+    id: number;
+    email: string;
+    fullname: string;
+    avatar_url?: string;
+  };
+}
 
-/**
- * Lấy danh sách các gia đình mà người dùng là thành viên
- * GET /families/my-family
- */
-export const getMyFamilies = async () => {
+export interface Family {
+  id: number;
+  name: string;
+  owner_id: number;
+  created_at: string;
+  updated_at: string;
+  members: FamilyMember[];
+  owner: {
+    id: number;
+    email: string;
+    fullname: string;
+    avatar_url?: string;
+  };
+}
+
+export interface GetMyFamilyResponse {
+  message: string;
+  data: Family[];
+}
+
+export const getMyFamily = async (): Promise<Family[]> => {
   try {
-    const res = await getAccess('families/my-family');
-    return res;
+    const res: GetMyFamilyResponse = await getAccess('families/my-family');
+    return res.data;
   } catch (error) {
-    console.error('Error getting my families:', error);
+    console.error('Error getting my family:', error);
     throw error;
   }
 };
 
-/**
- * Lấy chi tiết gia đình theo ID
- * GET /families/:id
- */
-export const getFamilyById = async (id: number) => {
+export const getFamilyById = async (id: number): Promise<Family> => {
   try {
     const res = await getAccess(`families/${id}`);
     return res;
@@ -169,3 +191,14 @@ export const getFamilyMembers = async (familyId: number) => {
   }
 };
 
+ * Rời family
+ */
+export const leaveFamily = async (id: number) => {
+  try {
+    const res = await deleteAccess(`families/leave/${id}`);
+    return res;
+  } catch (error) {
+    console.error(`Error leaving family ${id}:`, error);
+    throw error;
+  }
+};

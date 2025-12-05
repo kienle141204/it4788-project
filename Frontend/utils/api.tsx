@@ -267,18 +267,21 @@ const ensureTokenValid = async (): Promise<boolean> => {
 };
 
 export const getAccess = async (path: string, params: object = {}, retryCount = 0) : Promise<any> =>  {
+  console.log('getAccess called:', { path, params, retryCount });
   let tokenHeader = {};
   try {
     await ensureTokenValid();
     tokenHeader = await getTokenHeader();
-    console.log('API_DOMAIN + path', API_DOMAIN + path);
+    console.log('Making API request to:', API_DOMAIN + path, 'with params:', params, 'and headers:', tokenHeader);
     const result = await axios.get(API_DOMAIN + path, {
       ...config,
       headers: { ...config.headers, ...tokenHeader },
-      params, 
+      params,
     });
+    console.log('API response received:', result.data);
     return result.data;
   } catch (error: any) {
+    console.error('getAccess error:', error?.response?.data || error?.message || error);
     if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
       throw error;
     }
