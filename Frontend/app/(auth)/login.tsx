@@ -30,7 +30,7 @@ export default function login() {
 
       const res = await loginUSer(data);
       let message = res?.message;
-      if (res.statusCode) {
+      if (res?.statusCode) {
         if (Array.isArray(message)) {
           message = message.join('\n'); // Ghép mảng lại thành 1 chuỗi
         }
@@ -39,14 +39,20 @@ export default function login() {
         return;
       }
 
-      const access = res.access_token
-      const refresh = res.refresh_token
+      const access = res?.access_token
+      const refresh = res?.refresh_token
       
-      await AsyncStorage.setItem('access_token', access as any)
-      await AsyncStorage.setItem('refresh_token', refresh as any)
-      const key = await AsyncStorage.getAllKeys()
-      console.log(key)
-      route.push('../(home)');
+      if (access && refresh) {
+        await AsyncStorage.setItem('access_token', access as any)
+        await AsyncStorage.setItem('refresh_token', refresh as any)
+        const key = await AsyncStorage.getAllKeys()
+        console.log(key)
+        route.push('../(home)');
+      }
+      else {
+        Alert.alert('Lỗi', res?.message);
+        return;
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Lỗi', 'Đăng nhập thất bại, vui lòng thử lại sau.');

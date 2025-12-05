@@ -39,6 +39,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép ứng dụng truy cập camera để quét QR code."
+        }
       ]
     ],
     "experiments": {

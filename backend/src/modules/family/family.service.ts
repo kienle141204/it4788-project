@@ -24,7 +24,7 @@ export class FamilyService {
   private async findFamilyOrFail(id: number) {
     const family = await this.familyRepository.findOne({
       where: { id },
-      relations: ['members'],
+      relations: ['members', 'members.user'],
     });
     if (!family) throw new NotFoundException(`Không tìm thấy gia đình ${id}`);
     return family;

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_DOMAIN = process.env.API || 'http://localhost:8090/api/';
+const API_DOMAIN = process.env.API || 'https://it4788-deploy-8.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
     headers: {
@@ -65,6 +65,47 @@ export const upImage = async (path: string, data: object) => {
         console.log(e)
     }
 }
+
+export const uploadFileAccess = async (formData: FormData, folder?: string, retryCount = 0): Promise<any> => {
+  let tokenHeader = {};
+  try {
+    await ensureTokenValid();
+    tokenHeader = await getTokenHeader();
+    
+    if (folder) {
+      formData.append('folder', folder);
+    }
+    
+    const res = await axios.post(API_DOMAIN + 'upload/file', formData, {
+      headers: {
+        ...tokenHeader,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  } catch (error: any) {
+    if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
+      throw error;
+    }
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401 && retryCount === 0) {
+        console.log('🔄 Token expired, attempting to refresh...');
+        await refreshAccessToken();
+        return uploadFileAccess(formData, folder, retryCount + 1);
+      }
+      if (error.response?.status === 401) {
+        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
+        console.error('Token header:', tokenHeader);
+        console.error('Request URL:', API_DOMAIN + 'upload/file');
+      }
+      console.log('API Error:', error.response?.data || error.message);
+      throw error;
+    } else {
+      console.error('Unknown error:', error);
+      throw error;
+    }
+  }
+};
 
 // Helper to decode JWT without verification (just to check expiration)
 const decodeJWT = (token: string) => {
