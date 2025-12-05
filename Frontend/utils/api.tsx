@@ -1,25 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
-const getApiDomain = () => {
-  if (process.env.API) {
-    return process.env.API;
-  }
-  
-
-  if (Platform.OS === 'web') {
-    return 'http://localhost:8090/api/';
-  } else if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8090/api/';
-  } else {
-    // iOS and other platforms use localhost
-    return 'http://localhost:8090/api/';
-  }
-};
-
-const API_DOMAIN = getApiDomain();
-// const API_DOMAIN = 'https://it4788-deploy-8.onrender.com/api/';
+const API_DOMAIN = process.env.API || 'https://it4788-deploy-8.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
     headers: {
@@ -27,7 +9,8 @@ const config = {
         "Content-Type": "application/json",
     },
 }
-export const get = async (path: String) => {
+
+export const get = async (path: string) => {
     try {
         const result = await axios.get(API_DOMAIN + path, { withCredentials: true });
         return result;
@@ -71,10 +54,9 @@ export const post = async (path: string, data: object) => {
   }
 };
 
-
-export const patch = async (path: String, data: object) => {
+export const patch = async (path: string, data: object) => {
     try{
-        const res = await axios.patch(API_DOMAIN +path, data, config)
+        const res = await axios.patch(API_DOMAIN + path, data, config)
         return res
     } catch (error: any) {
         if (axios.isAxiosError(error)) {
@@ -114,10 +96,7 @@ export const deleteData = async (path: String) => {
     }
 }
 
-
-
-
-export const upImage = async (path: String, data: object) => {
+export const upImage = async (path: string, data: object) => {
     try{
         const response = await axios.post(API_DOMAIN + path, data, { headers: { 'Content-Type': 'multipart/form-data' } })
         return response
@@ -138,7 +117,46 @@ export const upImage = async (path: String, data: object) => {
     }
 }
 
-
+export const uploadFileAccess = async (formData: FormData, folder?: string, retryCount = 0): Promise<any> => {
+  let tokenHeader = {};
+  try {
+    await ensureTokenValid();
+    tokenHeader = await getTokenHeader();
+    
+    if (folder) {
+      formData.append('folder', folder);
+    }
+    
+    const res = await axios.post(API_DOMAIN + 'upload/file', formData, {
+      headers: {
+        ...tokenHeader,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  } catch (error: any) {
+    if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
+      throw error;
+    }
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401 && retryCount === 0) {
+        console.log('🔄 Token expired, attempting to refresh...');
+        await refreshAccessToken();
+        return uploadFileAccess(formData, folder, retryCount + 1);
+      }
+      if (error.response?.status === 401) {
+        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
+        console.error('Token header:', tokenHeader);
+        console.error('Request URL:', API_DOMAIN + 'upload/file');
+      }
+      console.log('API Error:', error.response?.data || error.message);
+      throw error;
+    } else {
+      console.error('Unknown error:', error);
+      throw error;
+    }
+  }
+};
 
 // Helper to decode JWT without verification (just to check expiration)
 const decodeJWT = (token: string) => {
@@ -304,7 +322,6 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
     }
   }
 };
-
 
 export const postAccess = async (path: string, data: object, retryCount = 0) : Promise<any> => {
   let tokenHeader = {};

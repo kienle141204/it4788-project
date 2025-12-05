@@ -17,7 +17,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getFamilyById, getFamilyMembers } from '../../service/family';
+import { getFamilyById, getFamilyInvitationCode } from '../../service/family';
 import {
   getShoppingListsByFamily,
   createShoppingList,
@@ -31,6 +31,8 @@ import {
 import { searchIngredients } from '../../service/market';
 import { getAccess } from '../../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ActionMenu from '../../components/ActionMenu';
+import InvitationModal from '../../components/InvitationModal';
 
 interface Member {
   id: number;
@@ -50,6 +52,20 @@ interface Family {
   name: string;
   owner_id: number;
   created_at: string;
+  invitation_code?: string | null;
+  members?: Array<{
+    id: number;
+    user_id: number;
+    role: string;
+    joined_at: string;
+    user?: {
+      id: number;
+      full_name?: string;
+      fullname?: string;
+      email: string;
+      avatar_url?: string | null;
+    };
+  }>;
 }
 
 // Helper function to decode JWT and get user ID
@@ -127,6 +143,12 @@ export default function GroupDetailPage() {
   const [selectedIngredient, setSelectedIngredient] = useState<any>(null);
   const [loadingIngredients, setLoadingIngredients] = useState<boolean>(false);
 
+  // Menu states
+  const [showFamilyMenu, setShowFamilyMenu] = useState(false);
+  const [showMemberMenu, setShowMemberMenu] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [showInvitationModal, setShowInvitationModal] = useState(false);
+
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
       'Phiên đăng nhập hết hạn',
@@ -149,14 +171,44 @@ export default function GroupDetailPage() {
       }
       setError(null);
 
-      // Fetch family details, members, and shopping lists in parallel
-      const [familyData, membersData, shoppingListsData] = await Promise.all([
-        getFamilyById(familyId),
-        getFamilyMembers(familyId),
-        getShoppingListsByFamily(familyId),
-      ]);
+      // Fetch family details
+      const familyData = await getFamilyById(familyId);
+      // Cast to local Family type
+      setFamily({
+        id: familyData.id,
+        name: familyData.name,
+        owner_id: familyData.owner_id,
+        created_at: familyData.created_at,
+        invitation_code: (familyData as any).invitation_code || null,
+        members: familyData.members as any,
+      });
 
-      setFamily(familyData);
+      // Extract members from family object and transform to Member[] format
+      let membersData: Member[] = [];
+      if (familyData.members && Array.isArray(familyData.members)) {
+        membersData = familyData.members.map((member: any) => ({
+          id: member.id,
+          user_id: member.user_id,
+          role: member.role,
+          joined_at: member.joined_at,
+          user: {
+            id: member.user?.id || member.user_id,
+            full_name: member.user?.full_name || member.user?.fullname || '',
+            email: member.user?.email || '',
+            avatar_url: member.user?.avatar_url || null,
+          },
+        }));
+      }
+
+      // Fetch shopping lists (handle error gracefully)
+      let shoppingListsData: ShoppingList[] = [];
+      try {
+        shoppingListsData = await getShoppingListsByFamily(familyId);
+      } catch (shoppingError: any) {
+        console.warn('Could not fetch shopping lists:', shoppingError);
+        // Continue without shopping lists if endpoint fails
+      }
+
       setMembers(membersData);
       setShoppingLists(shoppingListsData);
     } catch (err: any) {
@@ -190,7 +242,7 @@ export default function GroupDetailPage() {
   useFocusEffect(
     useCallback(() => {
       fetchFamilyData(true); // Skip loading state for smoother UX
-    }, [])
+    }, [fetchFamilyData])
   );
 
   // Find current member and check if they are a manager
@@ -223,6 +275,157 @@ export default function GroupDetailPage() {
 
   const handleBack = () => {
     router.back();
+  };
+
+  const handleMenu = () => {
+    setShowFamilyMenu(true);
+  };
+
+  const getFamilyMenuOptions = () => {
+    if (!family) return [];
+    
+    return [
+      {
+        label: 'Mã mời',
+        icon: 'qr-code-outline' as const,
+        onPress: () => {
+          setShowInvitationModal(true);
+        },
+      },
+      {
+        label: 'Chỉnh sửa thông tin',
+        icon: 'create-outline' as const,
+        onPress: () => {
+          // TODO: Navigate to edit family
+          console.log('Edit family');
+        },
+      },
+      {
+        label: 'Cài đặt',
+        icon: 'settings-outline' as const,
+        onPress: () => {
+          // TODO: Navigate to settings
+          console.log('Navigate to settings');
+        },
+      },
+      {
+        label: 'Rời khỏi nhóm',
+        icon: 'log-out-outline' as const,
+        onPress: () => {
+          Alert.alert(
+            'Xác nhận',
+            'Bạn có chắc chắn muốn rời khỏi nhóm này?',
+            [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Rời nhóm',
+                style: 'destructive',
+                onPress: () => {
+                  // TODO: Implement leave family
+                  console.log('Leave family:', family.id);
+                },
+              },
+            ]
+          );
+        },
+        destructive: true,
+      },
+    ];
+  };
+
+  const handleMemberMenu = (member: Member) => {
+    setSelectedMember(member);
+    setShowMemberMenu(true);
+  };
+
+  const getMemberMenuOptions = () => {
+    if (!selectedMember) return [];
+    
+    const isCurrentUser = selectedMember.user_id === currentUserId;
+    const isMemberManager = selectedMember.role === 'manager';
+    const options = [];
+
+    options.push({
+      label: 'Xem thông tin',
+      icon: 'person-outline' as const,
+      onPress: () => {
+        Alert.alert(
+          'Thông tin thành viên',
+          `Tên: ${selectedMember.user?.full_name || 'N/A'}\nEmail: ${selectedMember.user?.email || 'N/A'}\nVai trò: ${isMemberManager ? 'Quản trị viên' : 'Thành viên'}`,
+        );
+      },
+    });
+
+    if (!isCurrentUser && isManager) {
+      if (isMemberManager) {
+        options.push({
+          label: 'Bỏ quyền quản trị',
+          icon: 'shield-outline' as const,
+          onPress: () => {
+            Alert.alert(
+              'Xác nhận',
+              'Bạn có chắc chắn muốn bỏ quyền quản trị của thành viên này?',
+              [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                  text: 'Xác nhận',
+                  onPress: () => {
+                    // TODO: Remove manager role
+                    console.log('Remove manager role:', selectedMember.id);
+                  },
+                },
+              ]
+            );
+          },
+        });
+      } else {
+        options.push({
+          label: 'Cấp quyền quản trị',
+          icon: 'shield-checkmark-outline' as const,
+          onPress: () => {
+            Alert.alert(
+              'Xác nhận',
+              'Bạn có chắc chắn muốn cấp quyền quản trị cho thành viên này?',
+              [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                  text: 'Xác nhận',
+                  onPress: () => {
+                    // TODO: Grant manager role
+                    console.log('Grant manager role:', selectedMember.id);
+                  },
+                },
+              ]
+            );
+          },
+        });
+      }
+
+      options.push({
+        label: 'Xóa khỏi nhóm',
+        icon: 'person-remove-outline' as const,
+        onPress: () => {
+          Alert.alert(
+            'Xác nhận',
+            'Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?',
+            [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Xóa',
+                style: 'destructive',
+                onPress: () => {
+                  // TODO: Remove member
+                  console.log('Remove member:', selectedMember.id);
+                },
+              },
+            ]
+          );
+        },
+        destructive: true,
+      });
+    }
+
+    return options;
   };
 
   const handleRefresh = () => {
@@ -484,7 +687,12 @@ export default function GroupDetailPage() {
     return (
       <View style={groupStyles.membersList}>
         {filteredMembers.map(member => (
-          <View key={member.id} style={groupStyles.memberCard}>
+          <TouchableOpacity
+            key={member.id}
+            style={groupStyles.memberCard}
+            onPress={() => handleMemberMenu(member)}
+            activeOpacity={0.7}
+          >
             <View style={groupStyles.memberAvatar}>
               {member.user.avatar_url ? (
                 <Image 
@@ -518,7 +726,7 @@ export default function GroupDetailPage() {
                 {member.role === 'manager' ? 'Quản lý' : 'Thành viên'}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
     );
@@ -721,7 +929,7 @@ export default function GroupDetailPage() {
 
       {/* Header */}
       <View style={groupStyles.header}>
-        <TouchableOpacity onPress={handleBack} style={groupStyles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={groupStyles.headerIcon}>
           <Ionicons name='arrow-back' size={24} color={COLORS.darkGrey} />
         </TouchableOpacity>
 
@@ -729,7 +937,16 @@ export default function GroupDetailPage() {
           {family?.name || 'Chi tiết nhóm'}
         </Text>
 
-        <View style={{ width: 32 }} />
+        <TouchableOpacity
+          onPress={handleMenu}
+          style={groupStyles.headerIcon}
+        >
+          <Ionicons
+            name="ellipsis-vertical"
+            size={24}
+            color={COLORS.darkGrey}
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
@@ -849,6 +1066,40 @@ export default function GroupDetailPage() {
         >
           <Ionicons name="add" size={28} color={COLORS.white} />
         </TouchableOpacity>
+      )}
+
+      {/* Family Menu */}
+      <ActionMenu
+        visible={showFamilyMenu}
+        onClose={() => setShowFamilyMenu(false)}
+        title={family?.name || 'Gia đình'}
+        options={getFamilyMenuOptions()}
+      />
+
+      {/* Member Menu */}
+      <ActionMenu
+        visible={showMemberMenu}
+        onClose={() => {
+          setShowMemberMenu(false);
+          setSelectedMember(null);
+        }}
+        title={selectedMember?.user?.full_name || 'Thành viên'}
+        options={getMemberMenuOptions()}
+      />
+
+      {/* Invitation Modal */}
+      {family && (
+        <InvitationModal
+          visible={showInvitationModal}
+          onClose={() => setShowInvitationModal(false)}
+          familyId={family.id}
+          familyName={family.name}
+          onFetchInvitation={async (id: number) => {
+            const response = await getFamilyInvitationCode(id);
+            // Handle both direct object and wrapped response
+            return response?.data || response;
+          }}
+        />
       )}
 
       {/* Add Shopping List Modal */}
@@ -1228,4 +1479,3 @@ export default function GroupDetailPage() {
     </View>
   );
 }
-

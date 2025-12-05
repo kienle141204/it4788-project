@@ -9,10 +9,9 @@ export const foodDetailStyles = StyleSheet.create({
   headerWrapper: {
     backgroundColor: COLORS.white,
     paddingHorizontal: 20,
-    paddingTop: 0,
+    paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 0,
-    marginTop: -20,
   },
   header: {
     flexDirection: 'row',
@@ -507,6 +506,24 @@ export const foodDetailStyles = StyleSheet.create({
     color: COLORS.grey,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  loadMoreButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.purple,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadMoreButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.purple,
   },
   userReviewCard: {
     backgroundColor: '#F0E6FF',

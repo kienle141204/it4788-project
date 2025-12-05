@@ -42,7 +42,7 @@ export default function HomePage() {
     { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
     { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
     { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
-    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => Alert.alert('Cá nhân', 'Chức năng cá nhân') },
+    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => router.push('/(profile)') },
     { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
     { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
     { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }

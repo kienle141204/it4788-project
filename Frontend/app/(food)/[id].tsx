@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { foodDetailStyles } from '../../styles/foodDetail.styles';
-import { getAccess, postAccess } from '../../utils/api';
+import { getAccess, postAccess, patchAccess, deleteAccess } from '../../utils/api';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -57,6 +57,7 @@ interface ReviewStats {
 export default function FoodDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const dishId = id ? parseInt(id, 10) : null;
   const sessionExpiredRef = useRef(false);
   const [dish, setDish] = useState<Dish | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +71,10 @@ export default function FoodDetailPage() {
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsHasMore, setReviewsHasMore] = useState(true);
+  const [reviewsLoadingMore, setReviewsLoadingMore] = useState(false);
+  const REVIEWS_PER_PAGE = 3;
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [newRating, setNewRating] = useState(5);
@@ -92,13 +97,89 @@ export default function FoodDetailPage() {
     ]);
   }, [router]);
 
+  const fetchReviews = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (!dishId) return;
+    
+    if (!append) {
+      setReviewsLoading(true);
+      setReviewsError(null);
+    } else {
+      setReviewsLoadingMore(true);
+    }
+
+    try {
+      // Ensure page and limit are valid numbers
+      const validPage = Math.max(1, Math.floor(page) || 1);
+      const validLimit = Math.max(1, Math.floor(REVIEWS_PER_PAGE) || 3);
+      
+      const payload = await getAccess(`dishes/${dishId}/reviews`, {
+        page: validPage,
+        limit: validLimit,
+      });
+
+      if (!payload?.success) {
+        throw new Error(payload?.message || 'Không thể tải đánh giá');
+      }
+
+      if (Array.isArray(payload.data)) {
+        if (append) {
+          setReviews((prev) => [...prev, ...payload.data]);
+        } else {
+          setReviews(payload.data);
+        }
+        
+        // Check if there are more reviews
+        setReviewsHasMore(payload.data.length === validLimit);
+      } else {
+        if (!append) {
+          setReviews([]);
+        }
+        setReviewsHasMore(false);
+      }
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      
+      // If pagination fails with 500, try without pagination as fallback
+      if (err?.response?.status === 500 && !append) {
+        console.warn('Pagination failed, trying without pagination...');
+        try {
+          const fallbackPayload = await getAccess(`dishes/${dishId}/reviews`);
+          if (fallbackPayload?.success && Array.isArray(fallbackPayload.data)) {
+            // Client-side pagination: only show first 3
+            const firstPage = fallbackPayload.data.slice(0, REVIEWS_PER_PAGE);
+            setReviews(firstPage);
+            setReviewsHasMore(fallbackPayload.data.length > REVIEWS_PER_PAGE);
+            setReviewsError(null);
+            return;
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback also failed:', fallbackErr);
+        }
+      }
+      
+      console.log(err);
+      if (!append) {
+        setReviews([]);
+        setReviewsError('Không thể tải đánh giá. Vui lòng thử lại.');
+      }
+      setReviewsHasMore(false);
+    } finally {
+      setReviewsLoading(false);
+      setReviewsLoadingMore(false);
+    }
+  }, [dishId, handleSessionExpired]);
+
   useEffect(() => {
     const fetchDish = async () => {
       setLoading(true);
       setError(null);
       
       try {
-        const payload = await getAccess(`dishes/get-info-dish-by-id/${id}`);
+        if (!dishId) return;
+        const payload = await getAccess(`dishes/get-info-dish-by-id/${dishId}`);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải thông tin món ăn');
@@ -128,7 +209,8 @@ export default function FoodDetailPage() {
       setRecipeError(null);
 
       try {
-        const payload = await getAccess(`recipes/by-dish/${id}`);
+        if (!dishId) return;
+        const payload = await getAccess(`recipes/by-dish/${dishId}`);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải công thức');
@@ -155,40 +237,13 @@ export default function FoodDetailPage() {
       }
     };
 
-    const fetchReviews = async () => {
-      setReviewsLoading(true);
-      setReviewsError(null);
-
-      try {
-        const payload = await getAccess(`dishes/${id}/reviews`);
-
-        if (!payload?.success) {
-          throw new Error(payload?.message || 'Không thể tải đánh giá');
-        }
-
-        if (Array.isArray(payload.data)) {
-          setReviews(payload.data);
-        } else {
-          setReviews([]);
-        }
-      } catch (err: any) {
-        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
-          handleSessionExpired();
-          return;
-        }
-        console.log(err);
-        setReviews([]);
-        setReviewsError('Không thể tải đánh giá. Vui lòng thử lại.');
-      } finally {
-        setReviewsLoading(false);
-      }
-    };
 
     const fetchReviewStats = async () => {
       setStatsLoading(true);
 
       try {
-        const payload = await getAccess(`dishes/${id}/reviews/stats`);
+        if (!dishId) return;
+        const payload = await getAccess(`dishes/${dishId}/reviews/stats`);
 
         if (payload?.success && payload.data) {
           setReviewStats(payload.data);
@@ -209,7 +264,8 @@ export default function FoodDetailPage() {
 
     const fetchUserReview = async () => {
       try {
-        const payload = await getAccess(`dishes/${id}/reviews/my-review`);
+        if (!dishId) return;
+        const payload = await getAccess(`dishes/${dishId}/reviews/my-review`);
         if (payload?.success && payload.data) {
           setUserReview(payload.data);
         }
@@ -223,14 +279,23 @@ export default function FoodDetailPage() {
       }
     };
 
-    if (id) {
+    if (dishId) {
       fetchDish();
       fetchRecipe();
-      fetchReviews();
+      fetchReviews(1, false);
+      setReviewsPage(1);
       fetchReviewStats();
       fetchUserReview();
     }
-  }, [id, handleSessionExpired]);
+  }, [dishId, handleSessionExpired, fetchReviews]);
+
+  const handleLoadMoreReviews = useCallback(() => {
+    if (!reviewsLoadingMore && reviewsHasMore) {
+      const nextPage = reviewsPage + 1;
+      setReviewsPage(nextPage);
+      fetchReviews(nextPage, true);
+    }
+  }, [reviewsPage, reviewsHasMore, reviewsLoadingMore, fetchReviews]);
 
   const handleBack = () => {
     router.back();
@@ -310,10 +375,10 @@ export default function FoodDetailPage() {
     setSubmittingReview(true);
 
     try {
-      const response = await postAccess(`dishes/${id}/reviews/${userReview.id}`, {
+      const response = await patchAccess(`dishes/${dishId}/reviews/${String(userReview.id)}`, {
         rating: newRating,
         comment: newComment.trim(),
-      }, 'PUT');
+      });
 
       if (response?.success) {
         Alert.alert('Thành công', 'Cập nhật đánh giá thành công');
@@ -321,17 +386,16 @@ export default function FoodDetailPage() {
         setIsEditingReview(false);
         
         // Refresh user review and all reviews
-        const userReviewPayload = await getAccess(`dishes/${id}/reviews/my-review`);
+        const userReviewPayload = await getAccess(`dishes/${dishId}/reviews/my-review`);
         if (userReviewPayload?.success && userReviewPayload.data) {
           setUserReview(userReviewPayload.data);
         }
 
-        const reviewsPayload = await getAccess(`dishes/${id}/reviews`);
-        if (reviewsPayload?.success && Array.isArray(reviewsPayload.data)) {
-          setReviews(reviewsPayload.data);
-        }
+        // Reset pagination and fetch first page
+        setReviewsPage(1);
+        await fetchReviews(1, false);
 
-        const statsPayload = await getAccess(`dishes/${id}/reviews/stats`);
+        const statsPayload = await getAccess(`dishes/${dishId}/reviews/stats`);
         if (statsPayload?.success && statsPayload.data) {
           setReviewStats(statsPayload.data);
         }
@@ -363,7 +427,7 @@ export default function FoodDetailPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await postAccess(`dishes/${id}/reviews/${userReview.id}`, {}, 'DELETE');
+              const response = await deleteAccess(`dishes/${dishId}/reviews/${String(userReview.id)}`);
 
               if (response?.success) {
                 Alert.alert('Thành công', 'Đã xóa đánh giá');
@@ -373,13 +437,11 @@ export default function FoodDetailPage() {
                 setNewRating(5);
                 setNewComment('');
                 
-                // Refresh reviews and stats
-                const reviewsPayload = await getAccess(`dishes/${id}/reviews`);
-                if (reviewsPayload?.success && Array.isArray(reviewsPayload.data)) {
-                  setReviews(reviewsPayload.data);
-                }
+                // Reset pagination and refresh reviews
+                setReviewsPage(1);
+                await fetchReviews(1, false);
 
-                const statsPayload = await getAccess(`dishes/${id}/reviews/stats`);
+                const statsPayload = await getAccess(`dishes/${dishId}/reviews/stats`);
                 if (statsPayload?.success && statsPayload.data) {
                   setReviewStats(statsPayload.data);
                 }
@@ -414,7 +476,7 @@ export default function FoodDetailPage() {
     setSubmittingReview(true);
 
     try {
-      const response = await postAccess(`dishes/${id}/reviews`, {
+      const response = await postAccess(`dishes/${dishId}/reviews`, {
         rating: newRating,
         comment: newComment.trim(),
       });
@@ -425,13 +487,11 @@ export default function FoodDetailPage() {
         setNewRating(5);
         setShowReviewForm(false);
         
-        // Refresh reviews and stats
-        const reviewsPayload = await getAccess(`dishes/${id}/reviews`);
-        if (reviewsPayload?.success && Array.isArray(reviewsPayload.data)) {
-          setReviews(reviewsPayload.data);
-        }
+        // Reset pagination and refresh reviews
+        setReviewsPage(1);
+        await fetchReviews(1, false);
 
-        const statsPayload = await getAccess(`dishes/${id}/reviews/stats`);
+        const statsPayload = await getAccess(`dishes/${dishId}/reviews/stats`);
         if (statsPayload?.success && statsPayload.data) {
           setReviewStats(statsPayload.data);
         }
@@ -457,7 +517,7 @@ export default function FoodDetailPage() {
               onPress: async () => {
                 // Fetch lại user review
                 try {
-                  const payload = await getAccess(`dishes/${id}/reviews/my-review`);
+                  const payload = await getAccess(`dishes/${dishId}/reviews/my-review`);
                   if (payload?.success && payload.data) {
                     setUserReview(payload.data);
                     setNewRating(payload.data.rating);
@@ -496,8 +556,8 @@ export default function FoodDetailPage() {
 
   if (loading) {
     return (
-    <SafeAreaView style={foodDetailStyles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={foodDetailStyles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
           <Text style={foodDetailStyles.loadingText}>Đang tải...</Text>
@@ -508,8 +568,8 @@ export default function FoodDetailPage() {
 
   if (!dish) {
     return (
-    <SafeAreaView style={foodDetailStyles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={foodDetailStyles.headerWrapper}>
           <View style={foodDetailStyles.header}>
             <TouchableOpacity onPress={handleBack} style={foodDetailStyles.headerButton}>
@@ -565,7 +625,7 @@ export default function FoodDetailPage() {
   ];
 
   return (
-    <SafeAreaView style={foodDetailStyles.container} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       <View style={foodDetailStyles.headerWrapper}>
@@ -947,38 +1007,61 @@ export default function FoodDetailPage() {
                   )}
 
                   {!reviewsLoading && reviews.length > 0 && (
-                    <View style={foodDetailStyles.reviewsList}>
-                      {reviews.map((review) => (
-                        <View key={review.id} style={foodDetailStyles.reviewCard}>
-                          <View style={foodDetailStyles.reviewHeader}>
-                            <View style={foodDetailStyles.reviewUserInfo}>
-                              {review.user?.avatar_url ? (
-                                <Image
-                                  source={{ uri: review.user.avatar_url }}
-                                  style={foodDetailStyles.avatar}
-                                />
-                              ) : (
-                                <View style={foodDetailStyles.avatarPlaceholder}>
-                                  <Ionicons name="person" size={20} color={COLORS.grey} />
+                    <>
+                      <View style={foodDetailStyles.reviewsList}>
+                        {reviews.map((review) => (
+                          <View key={review.id} style={foodDetailStyles.reviewCard}>
+                            <View style={foodDetailStyles.reviewHeader}>
+                              <View style={foodDetailStyles.reviewUserInfo}>
+                                {review.user?.avatar_url ? (
+                                  <Image
+                                    source={{ uri: review.user.avatar_url }}
+                                    style={foodDetailStyles.avatar}
+                                  />
+                                ) : (
+                                  <View style={foodDetailStyles.avatarPlaceholder}>
+                                    <Ionicons name="person" size={20} color={COLORS.grey} />
+                                  </View>
+                                )}
+                                <View style={foodDetailStyles.reviewUserDetails}>
+                                  <Text style={foodDetailStyles.reviewUserName}>
+                                    {review.user?.full_name || 'Người dùng'}
+                                  </Text>
+                                  <Text style={foodDetailStyles.reviewDate}>
+                                    {formatDate(review.created_at)}
+                                  </Text>
                                 </View>
-                              )}
-                              <View style={foodDetailStyles.reviewUserDetails}>
-                                <Text style={foodDetailStyles.reviewUserName}>
-                                  {review.user?.full_name || 'Người dùng'}
-                                </Text>
-                                <Text style={foodDetailStyles.reviewDate}>
-                                  {formatDate(review.created_at)}
-                                </Text>
                               </View>
+                              {renderStars(review.rating)}
                             </View>
-                            {renderStars(review.rating)}
+                            {review.comment && (
+                              <Text style={foodDetailStyles.reviewComment}>{review.comment}</Text>
+                            )}
                           </View>
-                          {review.comment && (
-                            <Text style={foodDetailStyles.reviewComment}>{review.comment}</Text>
+                        ))}
+                      </View>
+                      
+                      {reviewsHasMore && (
+                        <TouchableOpacity
+                          style={foodDetailStyles.loadMoreButton}
+                          onPress={handleLoadMoreReviews}
+                          disabled={reviewsLoadingMore}
+                          activeOpacity={0.7}
+                        >
+                          {reviewsLoadingMore ? (
+                            <>
+                              <ActivityIndicator size="small" color={COLORS.purple} />
+                              <Text style={foodDetailStyles.loadMoreButtonText}>Đang tải...</Text>
+                            </>
+                          ) : (
+                            <>
+                              <Ionicons name="chevron-down" size={20} color={COLORS.purple} />
+                              <Text style={foodDetailStyles.loadMoreButtonText}>Xem thêm đánh giá</Text>
+                            </>
                           )}
-                        </View>
-                      ))}
-                    </View>
+                        </TouchableOpacity>
+                      )}
+                    </>
                   )}
                 </>
               )}
