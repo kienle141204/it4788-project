@@ -17,6 +17,7 @@ import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
 import { NutrientModule } from './modules/nutrient/nutrient.module';
 import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
 import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { ConsumptionHistoryModule } from './modules/consumption-history/consumpt
     NutrientModule,
     ShoppingStatisticsModule,
     ConsumptionHistoryModule,
+    RemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -11,6 +11,7 @@ import { FamilyMember } from './family-member.entity';
 import { Recipe } from './recipe.entity';
 import { ShoppingList } from './shopping-list.entity';
 import { FamilyNote } from './family-note.entity';
+import { DeviceToken } from './device-token.entity'
 
 @Entity('users')
 export class User {
@@ -47,7 +48,7 @@ export class User {
     default: 'user',
   })
   role: string;
-  
+
   @Column({ name: 'address', nullable: true, length: 255 })
   @Exclude()
   address: string;
@@ -67,4 +68,8 @@ export class User {
 
   @OneToMany(() => FamilyNote, (familyNote) => familyNote.owner)
   familyNotes: FamilyNote[];
+
+  @OneToMany(() => DeviceToken, (token) => token.user)
+  deviceTokens: DeviceToken[];
+
 }
