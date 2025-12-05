@@ -1,55 +1,12 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import { COLORS } from '../../constants/themes';
+import { getMonthlyCost, getCheckedItemsCount, getTopIngredientsByQuantity, getTopIngredientsByCost, getFamilyStatistics, getUserStatistics } from '../../service/statistics';
+import { getMyFamily } from '../../service/family';
+import { getUserProfile } from '../../service/auth';
 
 const screenWidth = Dimensions.get('window').width;
-
-const PIE_DATA = [
-    {
-        name: 'Thịt',
-        population: 40,
-        color: '#EF4444',
-        legendFontColor: '#1F2937',
-        legendFontSize: 14,
-        legendFontFamily: 'System',
-    },
-    {
-        name: 'Rau củ',
-        population: 30,
-        color: '#10B981',
-        legendFontColor: '#1F2937',
-        legendFontSize: 14,
-        legendFontFamily: 'System',
-    },
-    {
-        name: 'Hải sản',
-        population: 20,
-        color: '#3B82F6',
-        legendFontColor: '#1F2937',
-        legendFontSize: 14,
-        legendFontFamily: 'System',
-    },
-    {
-        name: 'Khác',
-        population: 10,
-        color: '#F59E0B',
-        legendFontColor: '#1F2937',
-        legendFontSize: 14,
-        legendFontFamily: 'System',
-    },
-];
-
-const LINE_DATA = {
-    labels: ['1/11', '2/11', '3/11', '4/11', '5/11', '6/11', '7/11', '8/11', '9/11', '10/11', '11/11', '12/11', '13/11', '14/11', '15/11'],
-    datasets: [
-        {
-            data: [200, 150, 450, 280, 800, 590, 430, 620, 350, 520, 480, 720, 650, 400, 550],
-            color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
-            strokeWidth: 3
-        }
-    ],
-};
 
 const CHART_CONFIG = {
     backgroundGradientFrom: "#ffffff",
@@ -78,14 +35,208 @@ const CHART_CONFIG = {
 };
 
 export default function SpendingCharts() {
-    const data = LINE_DATA.datasets[0].data;
-    const maxValue = Math.max(...data);
+    const [monthlyCostData, setMonthlyCostData] = useState<any[]>([]);
+    const [checkedItemsCount, setCheckedItemsCount] = useState<number>(0);
+    const [topIngredientsByQuantity, setTopIngredientsByQuantity] = useState<any[]>([]);
+    const [topIngredientsByCost, setTopIngredientsByCost] = useState<any[]>([]);
+    const [familyStats, setFamilyStats] = useState<any>(null);
+    const [userStats, setUserStats] = useState<any>(null);
+    const [currentFamilyId, setCurrentFamilyId] = useState<number | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                console.log('Fetching user profile...');
+                // Get user profile to get userId
+                const userProfile = await getUserProfile();
+                console.log('User profile fetched:', userProfile);
+                setCurrentUserId(userProfile.id);
+
+                console.log('Fetching user families...');
+                // Get user's families
+                const families = await getMyFamily();
+                console.log('Families fetched:', families);
+                if (families && families.length > 0) {
+                    // Use the first family as the current one (in a real app, user might select which family to view)
+                    setCurrentFamilyId(families[0].id);
+                    console.log('Family ID set:', families[0].id);
+                } else {
+                    console.log('No families found, using default');
+                    setCurrentFamilyId(1);
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+                // If there's an error, try to continue with a default family ID
+                // In a real app, you might show an error message and let the user choose what to do
+                setCurrentFamilyId(1);
+            }
+        };
+
+        fetchUserData();
+    }, []);
+
+    useEffect(() => {
+        const fetchAllData = async () => {
+            if (!currentFamilyId || !currentUserId) {
+                console.log('Missing familyId or userId, skipping fetch');
+                return;
+            }
+
+            console.log('Fetching statistics data with:', { currentFamilyId, currentUserId });
+            try {
+                setLoading(true);
+
+                // Fetch all statistics data
+                const promises = [
+                    getMonthlyCost(new Date().getFullYear(), currentFamilyId)
+                        .then(result => {
+                            console.log('getMonthlyCost result:', result);
+                            return result;
+                        })
+                        .catch(error => {
+                            console.error('getMonthlyCost error:', error);
+                            return [];
+                        }),
+                    getCheckedItemsCount(currentFamilyId)
+                        .then(result => {
+                            console.log('getCheckedItemsCount result:', result);
+                            return result;
+                        })
+                        .catch(error => {
+                            console.error('getCheckedItemsCount error:', error);
+                            return 0;
+                        }),
+                    getTopIngredientsByQuantity(currentFamilyId)
+                        .then(result => {
+                            console.log('getTopIngredientsByQuantity result:', result);
+                            return result;
+                        })
+                        .catch(error => {
+                            console.error('getTopIngredientsByQuantity error:', error);
+                            return [];
+                        }),
+                    getTopIngredientsByCost(currentFamilyId)
+                        .then(result => {
+                            console.log('getTopIngredientsByCost result:', result);
+                            return result;
+                        })
+                        .catch(error => {
+                            console.error('getTopIngredientsByCost error:', error);
+                            return [];
+                        }),
+                    getFamilyStatistics(currentFamilyId)
+                        .then(result => {
+                            console.log('getFamilyStatistics result:', result);
+                            return result;
+                        })
+                        .catch(error => {
+                            console.error('getFamilyStatistics error:', error);
+                            return null;
+                        }),
+                    getUserStatistics(currentUserId)  // Fetch user statistics as well
+                        .then(result => {
+                            console.log('getUserStatistics result:', result);
+                            return result;
+                        })
+                        .catch(error => {
+                            console.error('getUserStatistics error:', error);
+                            return null;
+                        })
+                ];
+
+                const [monthlyCost, checkedCount, topQuantities, topCosts, familyStat, userStat] = await Promise.all(promises);
+
+                console.log('All data fetched:', { monthlyCost, checkedCount, topQuantities, topCosts, familyStat, userStat });
+
+                setMonthlyCostData(monthlyCost || []);
+                setCheckedItemsCount(checkedCount || 0);
+                setTopIngredientsByQuantity(topQuantities || []);
+                setTopIngredientsByCost(topCosts || []);
+                setFamilyStats(familyStat || null);
+                setUserStats(userStat || null);
+            } catch (error) {
+                console.error('Error fetching statistics:', error);
+                // Set empty defaults
+                setMonthlyCostData([]);
+                setCheckedItemsCount(0);
+                setTopIngredientsByQuantity([]);
+                setTopIngredientsByCost([]);
+                setFamilyStats(null);
+                setUserStats(null);
+            } finally {
+                setLoading(false);
+                console.log('Finished fetching statistics, loading set to false');
+            }
+        };
+
+        fetchAllData();
+    }, [currentFamilyId, currentUserId]);
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.purple} />
+            </View>
+        );
+    }
+
+    // Prepare data for pie chart based on top ingredients by cost
+    const preparePieData = () => {
+        return topIngredientsByCost.slice(0, 4).map((item, index) => {
+            const colors = ['#EF4444', '#10B981', '#3B82F6', '#F59E0B'];
+            return {
+                name: item.ingredient_name || `Nguyên liệu ${index + 1}`,
+                population: item.total_cost || 0,
+                color: colors[index % colors.length],
+                legendFontColor: '#1F2937',
+                legendFontSize: 14,
+                legendFontFamily: 'System',
+            };
+        });
+    };
+
+    const pieData = preparePieData();
+
+    // Prepare data for line chart based on monthly cost
+    const prepareLineData = () => {
+        // Create labels for all months
+        const months = Array.from({ length: 12 }, (_, i) => {
+            const month = i + 1;
+            return `${month}/`;
+        });
+        
+        // Create data points for each month
+        const dataPoints = Array(12).fill(0);
+        monthlyCostData.forEach((item) => {
+            // Extract month from the month string (format: "YYYY-MM")
+            const monthStr = item.month || '';
+            if (monthStr.includes('-')) {
+                const month = parseInt(monthStr.split('-')[1]);
+                if (month >= 1 && month <= 12) {
+                    dataPoints[month - 1] = Math.round(item.total_cost / 1000); // Convert to thousands for display
+                }
+            }
+        });
+
+        return {
+            labels: months,
+            datasets: [
+                {
+                    data: dataPoints,
+                    color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
+                    strokeWidth: 3
+                }
+            ],
+        };
+    };
+
+    const lineData = prepareLineData();
+    const data = lineData.datasets[0].data;
+    const maxValue = Math.max(...data, 100); // Ensure minimum value for scaling
     const chartHeight = 220;
-    const paddingLeft = 60;
-    const paddingTop = 20;
-    const paddingRight = 20;
     const chartWidth = screenWidth - 60;
-    const dataWidth = chartWidth - paddingLeft - paddingRight;
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -93,42 +244,48 @@ export default function SpendingCharts() {
             <View style={styles.summaryRow}>
                 <View style={[styles.summaryCard, { backgroundColor: '#F3E8FF' }]}>
                     <Text style={styles.summaryLabel}>Tổng chi tiêu</Text>
-                    <Text style={styles.summaryValue}>3.320k đ</Text>
-                    <Text style={styles.summarySubtext}>Tuần này</Text>
+                    <Text style={styles.summaryValue}>{(familyStats?.total_cost / 1000).toFixed(0)}k đ</Text>
+                    <Text style={styles.summarySubtext}>Gia đình</Text>
                 </View>
                 <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
-                    <Text style={styles.summaryLabel}>Trung bình / ngày</Text>
-                    <Text style={styles.summaryValue}>474k đ</Text>
-                    <Text style={styles.summarySubtext}>7 ngày</Text>
+                    <Text style={styles.summaryLabel}>Chi tiêu cá nhân</Text>
+                    <Text style={styles.summaryValue}>{(userStats?.total_cost / 1000).toFixed(0)}k đ</Text>
+                    <Text style={styles.summarySubtext}>Cá nhân</Text>
                 </View>
             </View>
 
             {/* Pie Chart */}
             <View style={styles.chartContainer}>
                 <View style={styles.chartHeader}>
-                    <Text style={styles.chartTitle}>Phân loại thực phẩm</Text>
+                    <Text style={styles.chartTitle}>Top nguyên liệu theo chi phí</Text>
                     <Text style={styles.chartSubtitle}>Theo % giá trị</Text>
                 </View>
                 <View style={styles.chartWrapper}>
-                    <PieChart
-                        data={PIE_DATA}
-                        width={screenWidth - 60}
-                        height={220}
-                        chartConfig={CHART_CONFIG}
-                        accessor={"population"}
-                        backgroundColor={"transparent"}
-                        paddingLeft={"15"}
-                        center={[0, 0]}
-                        absolute
-                        hasLegend={true}
-                    />
+                    {pieData.length > 0 ? (
+                        <PieChart
+                            data={pieData}
+                            width={screenWidth - 60}
+                            height={220}
+                            chartConfig={CHART_CONFIG}
+                            accessor={"population"}
+                            backgroundColor={"transparent"}
+                            paddingLeft={"15"}
+                            center={[0, 0]}
+                            absolute
+                            hasLegend={true}
+                        />
+                    ) : (
+                        <View style={styles.emptyChart}>
+                            <Text style={styles.emptyChartText}>Không có dữ liệu</Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
             {/* Line Chart */}
             <View style={styles.chartContainer}>
                 <View style={styles.chartHeader}>
-                    <Text style={styles.chartTitle}>Chi tiêu theo tuần</Text>
+                    <Text style={styles.chartTitle}>Chi tiêu theo tháng</Text>
                     <Text style={styles.chartSubtitle}>Đơn vị: nghìn đồng</Text>
                 </View>
                 <ScrollView
@@ -138,7 +295,7 @@ export default function SpendingCharts() {
                     contentContainerStyle={styles.chartScrollContent}
                 >
                     <LineChart
-                        data={LINE_DATA}
+                        data={lineData}
                         width={Math.max(screenWidth * 1.5, chartWidth * 1.5)} // Make the chart wider for horizontal scrolling
                         height={chartHeight}
                         chartConfig={CHART_CONFIG}
@@ -154,11 +311,11 @@ export default function SpendingCharts() {
                         segments={4}
                         formatYLabel={(value) => `${value}k`}
                         decorator={() => {
-                            return LINE_DATA.datasets[0].data.map((value, index) => {
-                                if (value === undefined || value === null) return null;
+                            return lineData.datasets[0].data.map((value, index) => {
+                                if (value === undefined || value === null || value === 0) return null;
 
                                 // Calculate x position based on index and chart dimensions
-                                const xPosition = (Math.max(screenWidth * 1.5, chartWidth * 1.5) - 120) / (LINE_DATA.labels.length - 1) * index + 60;
+                                const xPosition = (Math.max(screenWidth * 1.5, chartWidth * 1.5) - 120) / (lineData.labels.length - 1) * index + 60;
                                 // Calculate y position based on value
                                 const yPosition = chartHeight - 40 - ((value / maxValue) * (chartHeight - 60));
 
@@ -184,7 +341,7 @@ export default function SpendingCharts() {
                 <View style={styles.legendContainer}>
                     <View style={styles.legendItem}>
                         <View style={[styles.legendDot, { backgroundColor: '#A855F7' }]} />
-                        <Text style={styles.legendText}>Chi tiêu hằng ngày</Text>
+                        <Text style={styles.legendText}>Chi tiêu hằng tháng</Text>
                     </View>
                 </View>
             </View>
@@ -198,6 +355,13 @@ export default function SpendingCharts() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#F9FAFB',
+        padding: 20,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: '#F9FAFB',
         padding: 20,
     },
@@ -312,5 +476,16 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 10,
         fontWeight: 'bold',
+    },
+    emptyChart: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 200,
+    },
+    emptyChartText: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
     },
 });
