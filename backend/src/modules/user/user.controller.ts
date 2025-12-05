@@ -63,14 +63,14 @@ export class UserController {
     return await this.userService.createUser(dto);
   }
 
-  /** Admin: get all users */
+  /** Get all users - Admin and User */
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'user')
   @Get()
   @ApiOperation({ 
     summary: 'Lấy tất cả người dùng',
-    description: 'API này trả về danh sách tất cả các người dùng trong hệ thống. Yêu cầu quyền admin.'
+    description: 'API này trả về danh sách tất cả các người dùng trong hệ thống. Yêu cầu đăng nhập (admin hoặc user).'
   })
   @ApiResponse({ 
     status: 200, 
@@ -85,18 +85,19 @@ export class UserController {
     ]
   })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
-  @ApiResponse({ status: 403, description: 'Không có quyền admin' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
   async getAllUsers(@User() user: JwtUser) {
     return this.userService.getAllUsers();
   }
 
-  /** Get user by ID */
+  /** Get user by ID - Admin and User */
   @ApiBearerAuth('JWT-auth')
-  @UseGuards(JwtAuthGuard, SelfOrAdminGuard('id'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'user')
   @Get(':id')
   @ApiOperation({ 
     summary: 'Lấy thông tin người dùng theo ID',
-    description: 'API này trả về thông tin chi tiết của một người dùng theo ID. Người dùng chỉ có thể xem thông tin của chính mình hoặc admin có thể xem tất cả.'
+    description: 'API này trả về thông tin chi tiết của một người dùng theo ID. Yêu cầu đăng nhập (admin hoặc user có thể xem bất kỳ user nào).'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của người dùng' })
   @ApiResponse({ 
@@ -112,7 +113,7 @@ export class UserController {
       created_at: '2024-01-01T00:00:00.000Z'
     }
   })
-  @ApiResponse({ status: 403, description: 'Không có quyền xem thông tin người dùng này' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy người dùng' })
   async getUser(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
     return this.userService.getUserById(id);

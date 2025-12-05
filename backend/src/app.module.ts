@@ -15,10 +15,12 @@ import { MenuModule } from './modules/menu/menu.module';
 import { IngredientModule } from './modules/ingredient/ingredient.module';
 import { RefrigeratorModule } from './modules/refrigerator/refrigerator.module';
 import { NutrientModule } from './modules/nutrient/nutrient.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
 import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
 import { RemindersModule } from './reminders/reminders.module';
 
+import { MarketModule } from './modules/market/market.module';
 @Module({
   imports: [
     // Cấu hình biến môi trường (toàn cục)
@@ -73,9 +75,11 @@ import { RemindersModule } from './reminders/reminders.module';
     IngredientModule,
     RefrigeratorModule,
     NutrientModule,
+    UploadModule,
     ShoppingStatisticsModule,
     ConsumptionHistoryModule,
     RemindersModule,
+    MarketModule,
   ],
   controllers: [AppController],
   providers: [AppService],
