@@ -1,21 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import { BackHandler, ToastAndroid } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
-import Header from '../../components/Header';
-import TaskSummaryCard from '../../components/TaskSummaryCard';
-import NotificationCard from '../../components/NotificationCard';
-import FeatureGrid from '../../components/FeatureGrid';
-import BottomNavigation from '../../components/BottomNavigation';
-import { COLORS } from '../../constants/themes';
+import Header from '@/components/Header';
+import TaskSummaryCard from '@/components/TaskSummaryCard';
+import NotificationCard from '@/components/NotificationCard';
+import FeatureGrid from '@/components/FeatureGrid';
+import { COLORS } from '@/constants/themes';
 
 export default function HomePage() {
   const router = useRouter();
   const backPressCount = useRef(0);
-  const [activeTab, setActiveTab] = useState('home');
 
   console.log('🏠 Đang ở HOME');
 
@@ -46,12 +44,9 @@ export default function HomePage() {
     { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
     { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => router.push('/(profile)') },
     { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
-    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) }
+    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
+    { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
   ];
-
-  const handleGoToMarket = () => {
-    router.push('/(market)/market_screen');
-  };
 
   const handleNotificationPress = () => {
     Alert.alert('Thông báo', 'Bạn có 6 thông báo mới');
@@ -65,15 +60,6 @@ export default function HomePage() {
     Alert.alert('Nhiệm vụ', 'Xem danh sách nhiệm vụ');
   };
 
-  const handleTabPress = (tab: string) => {
-    setActiveTab(tab);
-    if (tab === 'add') {
-      Alert.alert('Thêm mới', 'Tạo nội dung mới');
-    } else if (tab === 'calendar') {
-      router.push('/(task)');
-    }
-  };
-
   return (
     <View style={styles.container}>
       <ScrollView
@@ -81,19 +67,16 @@ export default function HomePage() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-
         <Header
           userName="Livia Vaccaro"
           onNotificationPress={handleNotificationPress}
           onMenuPress={handleMenuPress}
         />
 
-
         <TaskSummaryCard
           totalTasks={10}
           onViewTasks={handleViewTasks}
         />
-
 
         <View style={styles.notificationSection}>
           <View style={styles.sectionHeader}>
@@ -102,9 +85,9 @@ export default function HomePage() {
           </View>
 
           <NotificationCard
-            title="Thông báo quan trọng"
-            message="Thực phẩm hết hạn hay gì đó (thông báo quan trọng)"
-            progress={75}
+            title="Thực phẩm sắp hết hạn"
+            message="Kiểm tra tủ lạnh của bạn ngay!"
+            type="warning"
           />
         </View>
 
@@ -116,13 +99,8 @@ export default function HomePage() {
           </View>
           <FeatureGrid features={features} />
         </View>
+
       </ScrollView>
-
-
-      <BottomNavigation
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
     </View>
   );
 }

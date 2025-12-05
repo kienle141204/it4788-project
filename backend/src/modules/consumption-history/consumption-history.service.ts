@@ -1,105 +1,208 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { ConsumptionHistory } from '../../entities/consumption-history.entity';
+import { Family } from '../../entities/family.entity';
+import { FamilyMember } from '../../entities/family-member.entity';
+import { FridgeDish } from '../../entities/fridge-dish.entity';
+import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
 import { CreateConsumptionHistoryDto } from './dto/create-consumption-history.dto';
 import { UpdateConsumptionHistoryDto } from './dto/update-consumption-history.dto';
+import type { JwtUser } from 'src/common/types/user.type';
 
 @Injectable()
 export class ConsumptionHistoryService {
   constructor(
     @InjectRepository(ConsumptionHistory)
     private readonly consumptionRepo: Repository<ConsumptionHistory>,
+
+    @InjectRepository(Family)
+    private readonly familyRepo: Repository<Family>,
+
+    @InjectRepository(FamilyMember)
+    private readonly memberRepo: Repository<FamilyMember>,
+
+    @InjectRepository(FridgeDish)
+    private readonly fridgeDishRepo: Repository<FridgeDish>,
+
+    @InjectRepository(FridgeIngredient)
+    private readonly fridgeIngredientRepo: Repository<FridgeIngredient>,
   ) { }
 
-  async create(dto: CreateConsumptionHistoryDto) {
+  private checkPermission(user: JwtUser, targetUserId?: number) {
+    if (user.role === 'admin') return;
+    if (targetUserId && user.id !== targetUserId) {
+      throw new ForbiddenException('You do not have permission to access this data');
+    }
+  }
+
+  async create(dto: CreateConsumptionHistoryDto, user: JwtUser) {
+    this.checkPermission(user, dto.user_id);
     const record = this.consumptionRepo.create(dto);
     return await this.consumptionRepo.save(record);
   }
 
-  async findAll() {
-    return await this.consumptionRepo.find({
-      order: { created_at: 'DESC' },
-    });
+  async findAll(user: JwtUser) {
+    if (user.role !== 'admin') {
+      // normal user chỉ xem dữ liệu của mình
+      return this.consumptionRepo.find({ where: { user_id: user.id }, order: { created_at: 'DESC' } });
+    }
+    return this.consumptionRepo.find({ order: { created_at: 'DESC' } });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user: JwtUser) {
     const record = await this.consumptionRepo.findOne({ where: { id } });
     if (!record) throw new NotFoundException('Consumption record not found');
+    this.checkPermission(user, record.user_id);
     return record;
   }
 
-  async update(id: number, dto: UpdateConsumptionHistoryDto) {
-    const record = await this.findOne(id);
+  async update(id: number, dto: UpdateConsumptionHistoryDto, user: JwtUser) {
+    const record = await this.findOne(id, user);
     Object.assign(record, dto);
-    return await this.consumptionRepo.save(record);
+    return this.consumptionRepo.save(record);
   }
 
-  async remove(id: number) {
-    const record = await this.findOne(id);
-    return await this.consumptionRepo.remove(record);
+  async remove(id: number, user: JwtUser) {
+    const record = await this.findOne(id, user);
+    return this.consumptionRepo.remove(record);
   }
-  /** Ghi log tiêu thụ */
-  async logConsumption(data: {
-    user_id: number;
-    family_id?: number;
-    consume_type: 'dish' | 'ingredient';
-    stock: number;
-  }) {
-    const entry = this.consumptionRepo.create(data);
+
+  async logConsumption(dto: CreateConsumptionHistoryDto, user: JwtUser) {
+    this.checkPermission(user, dto.user_id);
+    const entry = this.consumptionRepo.create(dto);
     return this.consumptionRepo.save(entry);
   }
 
-  /** Thống kê theo tháng */
-  async monthlyStatistics(year: number, userId: number) {
-    return this.consumptionRepo
-      .createQueryBuilder('c')
-      .select("DATE_TRUNC('month', c.created_at)", 'month')
-      .addSelect('SUM(c.stock)', 'total_consumed')
-      .where('c.user_id = :userId', { userId })
-      .andWhere('EXTRACT(YEAR FROM c.created_at) = :year', { year })
-      .groupBy("DATE_TRUNC('month', c.created_at)")
-      .orderBy("DATE_TRUNC('month', c.created_at)", 'ASC')
-      .getRawMany();
+  async monthlyStatisticsUser(year: number, userId: number, user: JwtUser) {
+    this.checkPermission(user, userId);
+    const start = new Date(year, 0, 1);
+    const records = await this.consumptionRepo.find({
+      where: { user_id: userId, created_at: MoreThanOrEqual(start) },
+    });
+    const monthMap = new Map<string, number>();
+    records.forEach(r => {
+      const month = r.created_at.toISOString().slice(0, 7);
+      monthMap.set(month, (monthMap.get(month) || 0) + r.stock);
+    });
+    return Array.from(monthMap.entries())
+      .map(([month, total_consumed]) => ({ month, total_consumed }))
+      .sort((a, b) => a.month.localeCompare(b.month));
   }
 
-  /** Top nguyên liệu / món tiêu thụ */
-  async topConsumed(type: 'dish' | 'ingredient', limit = 5, userId?: number) {
-    const qb = this.consumptionRepo
-      .createQueryBuilder('c')
-      .select('c.consume_type', 'type')
-      .addSelect('c.consume_type = :type', 'filter_type')
-      .addSelect('c.consume_type_id', 'id') // cần thêm column consume_type_id nếu muốn group by
-      .addSelect('SUM(c.stock)', 'total')
-      .where('c.consume_type = :type', { type });
+  async topConsumedUser(type: 'dish' | 'ingredient', limit = 5, user: JwtUser, userId?: number) {
+    if (userId) this.checkPermission(user, userId);
+    const where: any = { consume_type: type };
+    if (userId) where.user_id = userId;
 
-    if (userId) {
-      qb.andWhere('c.user_id = :userId', { userId });
+    const records = await this.consumptionRepo.find({ where });
+
+    const map = new Map<number, number>();
+    records.forEach(r => map.set(r.item_id, (map.get(r.item_id) || 0) + r.stock));
+
+    return Array.from(map.entries())
+      .map(([id, total]) => ({ id, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit);
+  }
+
+  async monthlyStatisticsFamily(year: number, family_id: number, user: JwtUser) {
+    // 1. Kiểm tra user thuộc family nào
+    const members = await this.memberRepo.find({
+      where: { user_id: user.id }
+    });
+
+    if (members.length === 0) {
+      throw new NotFoundException("Bạn chưa thuộc gia đình nào");
     }
 
-    return qb.groupBy('c.consume_type_id')
-      .orderBy('total', 'DESC')
-      .limit(limit)
-      .getRawMany();
+    const belongs = members.some(m => m.family_id === family_id);
+
+    if (!belongs) {
+      throw new UnauthorizedException("Bạn không thuộc gia đình này");
+    }
+
+    // 3. Lấy dữ liệu của năm
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+
+    const records = await this.consumptionRepo.find({
+      where: {
+        family_id,
+        created_at: MoreThanOrEqual(start),
+      },
+    });
+
+    // 4. Nhóm theo tháng
+    const monthMap = new Map<string, number>();
+
+    records.forEach(r => {
+      const month = r.created_at.toISOString().slice(0, 7);
+      monthMap.set(month, (monthMap.get(month) || 0) + r.stock);
+    });
+
+    return Array.from(monthMap.entries())
+      .map(([month, total_consumed]) => ({ month, total_consumed }))
+      .sort((a, b) => a.month.localeCompare(b.month));
   }
 
-  /** Thống kê theo user */
-  async statisticsByUser(userId: number) {
-    const total = await this.consumptionRepo
-      .createQueryBuilder('c')
-      .select('SUM(c.stock)', 'total')
-      .where('c.user_id = :userId', { userId })
-      .getRawOne();
-    return { total_consumed: Number(total.total || 0) };
+
+  async topConsumedFamily(
+    type: 'dish' | 'ingredient',
+    limit = 5,
+    user: JwtUser,
+    family_id: number,
+  ) {
+    // 1. Kiểm tra user có thuộc family không
+    const members = await this.memberRepo.find({
+      where: { user_id: user.id }
+    });
+
+    if (members.length === 0) {
+      throw new NotFoundException("Bạn chưa thuộc gia đình nào");
+    }
+
+    const belongs = members.some(m => m.family_id === family_id);
+
+    if (!belongs) {
+      throw new UnauthorizedException("Bạn không thuộc gia đình này");
+    }
+
+    // 2. Điều kiện query
+    const where = {
+      consume_type: type,
+      family_id: family_id,
+    };
+
+    // 3. Lấy records
+    const records = await this.consumptionRepo.find({ where });
+
+    // 4. Gom theo item_id
+    const map = new Map<number, number>();
+    records.forEach(r => {
+      map.set(r.item_id, (map.get(r.item_id) ?? 0) + r.stock);
+    });
+
+    // 5. Trả về top limit
+    return Array.from(map.entries())
+      .map(([id, total]) => ({ id, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit);
   }
 
-  /** Thống kê theo family */
-  async statisticsByFamily(familyId: number) {
-    const total = await this.consumptionRepo
-      .createQueryBuilder('c')
-      .select('SUM(c.stock)', 'total')
-      .where('c.family_id = :familyId', { familyId })
-      .getRawOne();
-    return { total_consumed: Number(total.total || 0) };
+  async statisticsByUser(userId: number, user: JwtUser) {
+    this.checkPermission(user, userId);
+    const records = await this.consumptionRepo.find({ where: { user_id: userId } });
+    const total_consumed = records.reduce((sum, r) => sum + r.stock, 0);
+    return { total_consumed };
+  }
+
+  async statisticsByFamily(familyId: number, user: JwtUser) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('You do not have permission to access family statistics');
+    }
+    const records = await this.consumptionRepo.find({ where: { family_id: familyId } });
+    const total_consumed = records.reduce((sum, r) => sum + r.stock, 0);
+    return { total_consumed };
   }
 }

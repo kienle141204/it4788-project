@@ -20,12 +20,22 @@ const UsersPage = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
+  // Utility function to normalize user object field names for consistent display
+  const normalizeUserObject = (user) => {
+    return {
+      ...user,
+      // Ensure 'role' field is used instead of 'group' for consistency
+      role: user.role || user.group || ''
+    };
+  };
+
   const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone: '',
-    group: '',
-    address: ''
+    'full_name': '',
+    'email': '',
+    'phone': '',
+    'role': '',
+    'address': ''
   });
 
   // Load users on component mount
@@ -66,7 +76,10 @@ const UsersPage = () => {
         return aId - bId;
       });
 
-      setUsers(usersData);
+      // Normalize all users to ensure consistent field names
+      const normalizedUsers = usersData.map(normalizeUserObject);
+
+      setUsers(normalizedUsers);
       setTotalPages(responseTotalPages || 1);
       setTotalItems(responseTotalItems || 0);
     } catch (error) {
@@ -82,19 +95,21 @@ const UsersPage = () => {
     { header: 'Họ tên', key: 'full_name' },
     { header: 'Email', key: 'email' },
     { header: 'Số điện thoại', key: 'phone' },
-    { header: 'Nhóm', key: 'group' },
+    { header: 'Nhóm', key: 'role' },
     { header: 'Địa chỉ', key: 'address' },
   ];
 
   const handleEdit = (user) => {
-    setEditingUser(user);
-    // Map the user data to match form field names
+    // Normalize user object to ensure consistent field names
+    const normalizedUser = normalizeUserObject(user);
+    setEditingUser(normalizedUser);
+    // Map the user data to match form field names, converting null to empty string
     setFormData({
-      full_name: user.full_name,
-      email: user.email,
-      phone: user.phone,
-      group: user.group,
-      address: user.address
+      full_name: normalizedUser.full_name || '',
+      email: normalizedUser.email || '',
+      phone: normalizedUser.phone || '',
+      role: normalizedUser.role || '',
+      address: normalizedUser.address || ''
     });
     setIsModalOpen(true);
   };
@@ -117,14 +132,14 @@ const UsersPage = () => {
     try {
       if (editingUser) {
         // Update existing user
-        const updatedUser = await updateUser(editingUser.id, formData);
-        // Update user in local state
-        setUsers(users.map(u => u.id === editingUser.id ? updatedUser : u));
+        await updateUser(editingUser.id, formData);
+        // Reload user data to ensure consistency with backend
+        await loadUsers();
       } else {
         // Create new user
-        const newUser = await createUser(formData);
-        // Add new user to local state
-        setUsers([...users, newUser]);
+        await createUser(formData);
+        // Reload user data to ensure consistency with backend
+        await loadUsers();
       }
       handleCloseModal();
     } catch (error) {
@@ -136,12 +151,12 @@ const UsersPage = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingUser(null);
-    setFormData({ full_name: '', email: '', phone: '', group: '', address: '' });
+    setFormData({ full_name: '', email: '', phone: '', role: '', address: '' });
   };
 
   const handleOpenModal = () => {
     setEditingUser(null);
-    setFormData({ full_name: '', email: '', phone: '', group: '', address: '' });
+    setFormData({ full_name: '', email: '', phone: '', role: '', address: '' });
     setIsModalOpen(true);
   };
 
@@ -174,7 +189,10 @@ const UsersPage = () => {
         responseTotalItems = response.pagination?.totalItems || usersData.length;
       }
 
-      setUsers(usersData);
+      // Normalize all users to ensure consistent field names
+      const normalizedUsers = usersData.map(normalizeUserObject);
+
+      setUsers(normalizedUsers);
       setTotalPages(responseTotalPages || 1);
       setTotalItems(responseTotalItems || 0);
       setCurrentPage(1); // Reset to first page after search
@@ -185,7 +203,9 @@ const UsersPage = () => {
         u.full_name.toLowerCase().includes(searchValue.toLowerCase()) ||
         u.email.toLowerCase().includes(searchValue.toLowerCase())
       );
-      setUsers(filtered);
+      // Normalize all users to ensure consistent field names
+      const normalizedUsers = filtered.map(normalizeUserObject);
+      setUsers(normalizedUsers);
     } finally {
       setLoading(false);
     }
@@ -273,12 +293,11 @@ const UsersPage = () => {
           />
           <Select
             label="Nhóm người dùng"
-            value={formData.group}
-            onChange={(e) => setFormData({...formData, group: e.target.value})}
+            value={formData.role}
+            onChange={(e) => setFormData({...formData, role: e.target.value})}
             options={[
-              { value: 'Admin', label: 'Admin' },
-              { value: 'Người dùng', label: 'Người dùng' },
-              { value: 'Người dùng VIP', label: 'Người dùng VIP' }
+              { value: 'admin', label: 'Admin' },
+              { value: 'user', label: 'Người dùng' }
             ]}
             required
           />

@@ -14,12 +14,19 @@ export const get = async (path: string) => {
     try {
         const result = await axios.get(API_DOMAIN + path, { withCredentials: true });
         return result;
-    } catch (e){
-        if(e) {
-            console.log(e)
-        }
-        else {
-            console.log("Network connect failed")
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Network connect failed'
+            };
         }
     }
 }
@@ -31,10 +38,18 @@ export const post = async (path: string, data: object) => {
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
       console.log('API Error:', error.response?.data || error.message);
-      return error.response?.data; 
+      // Return error response data or structured error object
+      return error.response?.data || { 
+        statusCode: error.response?.status || 500, 
+        message: error.message || 'Network Error' 
+      }; 
     } else {
       console.error('Unknown error:', error);
-      throw error;
+      // Return structured error instead of throwing
+      return {
+        statusCode: 500,
+        message: error?.message || 'Unknown error occurred'
+      };
     }
   }
 };
@@ -43,17 +58,41 @@ export const patch = async (path: string, data: object) => {
     try{
         const res = await axios.patch(API_DOMAIN + path, data, config)
         return res
-    } catch (e) {
-        return e; 
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Unknown error occurred'
+            };
+        }
     }
 }
 
-export const deleteData = async (path: string) => {
+export const deleteData = async (path: String) => {
     try{
         const res = await axios.delete(API_DOMAIN + path)
         return res
-    } catch (e) {
-        console.log(e)
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Unknown error occurred'
+            };
+        }
     }
 }
 
@@ -61,8 +100,20 @@ export const upImage = async (path: string, data: object) => {
     try{
         const response = await axios.post(API_DOMAIN + path, data, { headers: { 'Content-Type': 'multipart/form-data' } })
         return response
-    } catch(e) {
-        console.log(e)
+    } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            console.log('API Error:', error.response?.data || error.message);
+            return error.response?.data || { 
+                statusCode: error.response?.status || 500, 
+                message: error.message || 'Network Error' 
+            };
+        } else {
+            console.error('Unknown error:', error);
+            return {
+                statusCode: 500,
+                message: error?.message || 'Unknown error occurred'
+            };
+        }
     }
 }
 
@@ -234,17 +285,21 @@ const ensureTokenValid = async (): Promise<boolean> => {
 };
 
 export const getAccess = async (path: string, params: object = {}, retryCount = 0) : Promise<any> =>  {
+  console.log('getAccess called:', { path, params, retryCount });
   let tokenHeader = {};
   try {
     await ensureTokenValid();
     tokenHeader = await getTokenHeader();
+    console.log('Making API request to:', API_DOMAIN + path, 'with params:', params, 'and headers:', tokenHeader);
     const result = await axios.get(API_DOMAIN + path, {
       ...config,
       headers: { ...config.headers, ...tokenHeader },
-      params, 
+      params,
     });
+    console.log('API response received:', result.data);
     return result.data;
   } catch (error: any) {
+    console.error('getAccess error:', error?.response?.data || error?.message || error);
     if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
       throw error;
     }

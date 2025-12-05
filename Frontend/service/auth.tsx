@@ -1,4 +1,4 @@
-import {  post } from "@/utils/api";
+import { getAccess, post } from '../utils/api';
 
 
 export interface LoginResponse {
@@ -59,4 +59,26 @@ export interface RefreshTokenResponse {
 export const refreshToken = async (refresh_token: string): Promise<RefreshTokenResponse> => {
   const res = await post('auth/refresh-token', { refresh_token });
   return res;
+}
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  fullname: string;
+  avatar_url?: string;
+  address?: string;
+  phone?: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const getUserProfile = async (): Promise<UserProfile> => {
+  try {
+    const res = await getAccess('auth/profile');
+    return res;
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    throw error;
+  }
 }

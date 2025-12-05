@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ScrollView,
   StatusBar,
@@ -14,31 +14,15 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getMyFamilies, getFamilyShoppingStatistics, getInvitationCode, joinFamilyByCode } from '../../service/family';
+import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, type Family } from '../../service/family';
 import { getFamilySharedLists } from '../../service/shopping';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import JoinFamilyModal from '../../components/JoinFamilyModal';
 
-interface FamilyMember {
-  id: number;
-  family_id: number;
-  user_id: number;
-  role: string;
-  joined_at: string;
-}
-
-interface Family {
-  id: number;
-  name: string;
-  owner_id: number;
-  invitation_code: string | null;
-  created_at: string;
-  members: FamilyMember[];
-}
-
 interface FamilyWithStats extends Family {
   memberCount: number;
+  invitation_code?: string | null;
   shoppingListInfo?: {
     thisWeekItems?: number;
     boughtItems?: number;
@@ -49,31 +33,45 @@ interface FamilyWithStats extends Family {
 export default function GroupPage() {
   const router = useRouter();
   const [families, setFamilies] = useState<FamilyWithStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [showFamilyMenu, setShowFamilyMenu] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<FamilyWithStats | null>(null);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
 
-  useEffect(() => {
-    fetchFamilies();
-  }, []);
+  const handleSessionExpired = useCallback(() => {
+    Alert.alert(
+      'Phiên đăng nhập hết hạn',
+      'Vui lòng đăng nhập lại',
+      [
+        {
+          text: 'OK',
+          onPress: () => router.replace('/(auth)/login' as any),
+        },
+      ],
+    );
+  }, [router]);
 
-  const fetchFamilies = async () => {
+  const fetchFamilies = useCallback(async (isRefreshing = false) => {
     try {
-      setLoading(true);
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
       const response = await getMyFamilies();
       
-      // Handle both direct array and wrapped response
-      const familiesData = Array.isArray(response) 
-        ? response 
-        : (response?.data || response || []);
+      // getMyFamilies always returns an array
+      const familiesData = Array.isArray(response) ? response : [];
       
       // Fetch shopping list statistics for each family
-      const familiesWithStats = await Promise.all(
-        familiesData.map(async (family: Family) => {
+      const familiesWithStats: FamilyWithStats[] = await Promise.all(
+        familiesData.map(async (family) => {
           const memberCount = family.members?.length || 0;
           
           // Get shopping lists for this family
@@ -87,7 +85,7 @@ export default function GroupPage() {
             startOfWeek.setDate(now.getDate() - now.getDay());
             startOfWeek.setHours(0, 0, 0, 0);
             
-            const thisWeekLists = sharedLists.filter((list: any) => {
+            const thisWeekLists = (sharedLists || []).filter((list: any) => {
               const listDate = new Date(list.created_at || list.shopping_date);
               return listDate >= startOfWeek;
             });
@@ -124,24 +122,23 @@ export default function GroupPage() {
       );
       
       setFamilies(familiesWithStats);
-    } catch (error: any) {
-      console.error('Error fetching families:', error);
-      if (error?.message === 'SESSION_EXPIRED' || error?.response?.status === 401) {
-        Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
-        router.replace('/(auth)/login');
-      } else {
-        Alert.alert('Lỗi', 'Không thể tải danh sách nhóm. Vui lòng thử lại.');
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
       }
+      console.error('Error fetching families:', err);
+      setError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
+      setFamilies([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [handleSessionExpired]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
+  useEffect(() => {
     fetchFamilies();
-  };
+  }, [fetchFamilies]);
 
   const handleBack = () => {
     router.back();
@@ -332,6 +329,10 @@ export default function GroupPage() {
     );
   };
 
+  const handleRefresh = () => {
+    fetchFamilies(true);
+  };
+
   return (
     <View style={groupStyles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -353,6 +354,7 @@ export default function GroupPage() {
       {loading ? (
         <View style={groupStyles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
+          <Text style={groupStyles.loadingText}>Đang tải...</Text>
         </View>
       ) : (
         <ScrollView
@@ -368,7 +370,18 @@ export default function GroupPage() {
             />
           }
         >
-          {families.length === 0 ? (
+          {error ? (
+            <View style={groupStyles.errorContainer}>
+              <Ionicons name='alert-circle-outline' size={48} color={COLORS.red} />
+              <Text style={groupStyles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={groupStyles.retryButton}
+                onPress={() => fetchFamilies()}
+              >
+                <Text style={groupStyles.retryButtonText}>Thử lại</Text>
+              </TouchableOpacity>
+            </View>
+          ) : families.length === 0 ? (
             <View style={groupStyles.emptyState}>
               <Ionicons name="people-outline" size={48} color={COLORS.grey} />
               <Text style={groupStyles.emptyStateText}>
@@ -425,7 +438,7 @@ export default function GroupPage() {
           familyId={selectedFamily.id}
           familyName={selectedFamily.name}
           onFetchInvitation={async (id: number) => {
-            const response = await getInvitationCode(id);
+            const response = await getFamilyInvitationCode(id);
             // Handle both direct object and wrapped response
             return response?.data || response;
           }}

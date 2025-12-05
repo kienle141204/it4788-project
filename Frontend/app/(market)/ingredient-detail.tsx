@@ -40,10 +40,18 @@ export default function IngredientDetailScreen() {
         setLoading(true);
         const res = await getIngredientById(ingredientId);
         
+        // Check if response exists
+        if (!res) {
+          setError("Không thể kết nối đến máy chủ");
+          return;
+        }
+        
         if (res?.data) {
           setIngredient(res.data);
         } else if (res?.statusCode) {
           setError(res.message || "Không tìm thấy nguyên liệu");
+        } else {
+          setError("Phản hồi không hợp lệ từ máy chủ");
         }
       } catch (e: any) {
         console.error("Error fetching ingredient:", e);

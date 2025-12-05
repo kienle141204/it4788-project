@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/co
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ShoppingList } from '../../entities/shopping-list.entity';
+import { ShoppingItem } from '../../entities/shopping-item.entity';
 import { CreateShoppingListDto } from './dto/create-shopping-list.dto';
 import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
 import { FamilyService } from '../family/family.service';
@@ -13,6 +14,9 @@ export class ShoppingListService {
   constructor(
     @InjectRepository(ShoppingList)
     private readonly shoppingListRepo: Repository<ShoppingList>,
+
+    @InjectRepository(ShoppingItem)
+    private readonly shoppingItemRepo: Repository<ShoppingItem>,
 
     private readonly familyService: FamilyService,
     private readonly memberService: MemberService,
@@ -37,8 +41,15 @@ export class ShoppingListService {
       }
 
       const family = await this.familyService.getFamilyById(data.family_id);
-      if (family.owner_id !== user.id) {
-        throw new UnauthorizedException('Bạn không phải là trưởng nhóm');
+      
+      // Kiểm tra user có phải là manager không
+      const members = await this.memberService.getMembersByFamily(data.family_id);
+      const currentMember = members.find(member => member.user_id === user.id);
+      const isManager = currentMember?.role === 'manager';
+      
+      // Chỉ manager mới có quyền giao task
+      if (!isManager) {
+        throw new UnauthorizedException('Bạn không có quyền giao nhiệm vụ cho người khác');
       }
     }
 
@@ -74,10 +85,10 @@ export class ShoppingListService {
       throw new UnauthorizedException('Bạn không thuộc gia đình này');
     }
 
-    // Lấy các shopping list được chia sẻ trong family
+    // Lấy các shopping list được chia sẻ trong family với owner info
     return this.shoppingListRepo.find({
       where: { family_id, is_shared: true },
-      relations: ['family', 'items', 'items.ingredient'],
+      relations: ['family', 'owner', 'items', 'items.ingredient'],
       order: { created_at: 'DESC' },
     });
   }
@@ -120,6 +131,40 @@ export class ShoppingListService {
   /** Xóa danh sách */
   async remove(id: number, user: JwtUser): Promise<void> {
     const list = await this.findOne(id, user);
+    
+    // Xóa tất cả items trong list trước
+    await this.shoppingItemRepo.delete({ list_id: id });
+    
+    // Sau đó xóa list
     await this.shoppingListRepo.remove(list);
+  }
+
+  /** Tính toán lại tổng chi phí của shopping list dựa trên items */
+  async recalculateShoppingListCost(listId: number): Promise<ShoppingList> {
+    const list = await this.shoppingListRepo.findOne({
+      where: { id: listId },
+      relations: ['items'],
+    });
+
+    if (!list) {
+      throw new NotFoundException(`Shopping list with ID ${listId} not found`);
+    }
+
+    // Tính tổng: SUM(price * stock / 1000) cho tất cả items
+    // price là đơn giá /kg, stock là gram => chia 1000 để ra đơn vị đồng
+    let totalCost = 0;
+    if (list.items && list.items.length > 0) {
+      totalCost = list.items.reduce((sum, item) => {
+        const price = Number(item.price) || 0;
+        const stock = Number(item.stock) || 0;
+        // price/kg * gram / 1000 = giá cuối cùng
+        return sum + (price * stock / 1000);
+      }, 0);
+    }
+
+    // Làm tròn 2 chữ số thập phân
+    list.cost = Number(totalCost.toFixed(2));
+    
+    return await this.shoppingListRepo.save(list);
   }
 }

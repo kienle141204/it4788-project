@@ -9,11 +9,14 @@ export const COLORS = {
   grey: "#9CA3AF",
   blue: '#1c67c9ff',
   orange: '#c9792eff',
+  red: '#DC2626',
   // New colors for home page
   purple: '#16A34A', // Dùng làm accent xanh
   lightPurple: '#86EFAC',
   lightBlue: '#E0F2FE',
   darkGrey: '#374151',
   lightGrey: '#F3F4F6',
-  shadow: 'rgba(0,0,0,0.4)'
+  shadow: 'rgba(0,0,0,0.4)',
+  warningBackground: '#FFF9C4', // Light Yellow
+  warningText: '#A16207', // Dark Yellow/Brown
 } as const;
