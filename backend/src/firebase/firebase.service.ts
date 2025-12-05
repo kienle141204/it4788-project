@@ -1,17 +1,32 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { getMessaging } from 'firebase-admin/messaging';
+import { join } from 'path';
+import { readFileSync } from 'fs';
 
 @Injectable()
 export class FirebaseService implements OnModuleInit {
     onModuleInit() {
         const serviceAccountB64 = process.env.FIREBASE_ACCOUNT_B64;
-        const serviceAccountJson = serviceAccountB64
-            ? Buffer.from(serviceAccountB64, 'base64').toString('utf8')
-            : process.env.FIREBASE_ACCOUNT_JSON;
+        const serviceAccountJsonEnv = process.env.FIREBASE_ACCOUNT_JSON;
+        const serviceAccountKeyPath = process.env.FIREBASE_ACCOUNT_KEY;
+
+        // Ưu tiên: B64 -> JSON env -> đọc file path (giữ backward-compatible)
+        let serviceAccountJson: string | undefined;
+        if (serviceAccountB64) {
+            serviceAccountJson = Buffer.from(serviceAccountB64, 'base64').toString('utf8');
+        } else if (serviceAccountJsonEnv) {
+            serviceAccountJson = serviceAccountJsonEnv;
+        } else if (serviceAccountKeyPath) {
+            // Cho phép dùng đường dẫn (relative hoặc absolute)
+            const absolutePath = serviceAccountKeyPath.startsWith('/')
+                ? serviceAccountKeyPath
+                : join(process.cwd(), serviceAccountKeyPath);
+            serviceAccountJson = readFileSync(absolutePath, 'utf8');
+        }
 
         if (!serviceAccountJson) {
-            throw new Error('❌ FIREBASE_ACCOUNT_JSON/FIREBASE_ACCOUNT_B64 not found in env');
+            throw new Error('❌ FIREBASE_ACCOUNT_JSON/FIREBASE_ACCOUNT_B64/FIREBASE_ACCOUNT_KEY not found');
         }
 
         let serviceAccount: admin.ServiceAccount;
