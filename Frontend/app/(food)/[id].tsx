@@ -54,6 +54,11 @@ interface ReviewStats {
   };
 }
 
+interface Nutrient {
+  id: string | number;
+  description: string;
+}
+
 export default function FoodDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -83,6 +88,10 @@ export default function FoodDetailPage() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [isEditingReview, setIsEditingReview] = useState(false);
+  const [nutrients, setNutrients] = useState<Nutrient[]>([]);
+  const [nutrientsLoading, setNutrientsLoading] = useState(true);
+  const [nutrientsError, setNutrientsError] = useState<string | null>(null);
+  const [isNutrientsExpanded, setIsNutrientsExpanded] = useState(false);
 
   const handleSessionExpired = useCallback(() => {
     if (sessionExpiredRef.current) {
@@ -279,6 +288,37 @@ export default function FoodDetailPage() {
       }
     };
 
+    const fetchNutrients = async () => {
+      setNutrientsLoading(true);
+      setNutrientsError(null);
+
+      try {
+        if (!dishId) return;
+        const payload = await getAccess(`nutrients/dish/${dishId}`);
+
+        if (!payload?.success) {
+          throw new Error(payload?.message || 'Không thể tải thông tin dinh dưỡng');
+        }
+
+        if (payload.data?.nutrients && Array.isArray(payload.data.nutrients)) {
+          setNutrients(payload.data.nutrients);
+        } else {
+          setNutrients([]);
+          setNutrientsError('Chưa có thông tin dinh dưỡng cho món ăn này');
+        }
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        console.log(err);
+        setNutrients([]);
+        setNutrientsError('Không thể tải thông tin dinh dưỡng. Vui lòng thử lại.');
+      } finally {
+        setNutrientsLoading(false);
+      }
+    };
+
     if (dishId) {
       fetchDish();
       fetchRecipe();
@@ -286,6 +326,7 @@ export default function FoodDetailPage() {
       setReviewsPage(1);
       fetchReviewStats();
       fetchUserReview();
+      fetchNutrients();
     }
   }, [dishId, handleSessionExpired, fetchReviews]);
 
@@ -800,6 +841,74 @@ export default function FoodDetailPage() {
                           </View>
                           <Text style={foodDetailStyles.stepDescription}>
                             {step.description || 'Chưa có mô tả cho bước này'}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
+            <View style={foodDetailStyles.sectionCard}>
+              <TouchableOpacity
+                style={foodDetailStyles.sectionCardHeader}
+                onPress={() => setIsNutrientsExpanded((prev) => !prev)}
+                activeOpacity={0.8}
+              >
+                <View style={foodDetailStyles.sectionCardTitleGroup}>
+                  <Text style={foodDetailStyles.sectionCardTitle}>Dinh dưỡng</Text>
+                  <Text style={foodDetailStyles.sectionCardSubtitle}>
+                    {isNutrientsExpanded
+                      ? 'Thu gọn danh sách'
+                      : nutrients.length > 0
+                        ? `${nutrients.length} chất dinh dưỡng`
+                        : 'Chạm để xem chi tiết'}
+                  </Text>
+                </View>
+                <View style={foodDetailStyles.sectionCardIcon}>
+                  <Ionicons
+                    name={isNutrientsExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={COLORS.darkGrey}
+                  />
+                </View>
+              </TouchableOpacity>
+
+              {isNutrientsExpanded && (
+                <>
+                  <View style={foodDetailStyles.sectionDivider} />
+
+                  {nutrientsLoading && (
+                    <View style={foodDetailStyles.infoRow}>
+                      <ActivityIndicator size="small" color={COLORS.purple} />
+                      <Text style={foodDetailStyles.loadingText}>Đang tải thông tin dinh dưỡng...</Text>
+                    </View>
+                  )}
+
+                  {!nutrientsLoading && nutrientsError && (
+                    <Text style={foodDetailStyles.recipeError}>{nutrientsError}</Text>
+                  )}
+
+                  {!nutrientsLoading && nutrients.length === 0 && !nutrientsError && (
+                    <Text style={foodDetailStyles.emptyReviewsText}>
+                      Chưa có thông tin dinh dưỡng cho món ăn này
+                    </Text>
+                  )}
+
+                  {!nutrientsLoading && nutrients.length > 0 && (
+                    <View style={foodDetailStyles.listContainer}>
+                      {nutrients.map((nutrient) => (
+                        <View key={nutrient.id} style={foodDetailStyles.listItem}>
+                          <View style={foodDetailStyles.listItemIcon}>
+                            <Ionicons
+                              name="nutrition-outline"
+                              size={16}
+                              color={COLORS.purple}
+                            />
+                          </View>
+                          <Text style={foodDetailStyles.listItemText}>
+                            {nutrient.description}
                           </Text>
                         </View>
                       ))}

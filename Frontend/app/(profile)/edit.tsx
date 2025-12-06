@@ -115,28 +115,75 @@ export default function EditProfileScreen() {
   const uploadImage = async (imageUri: string) => {
     setUploadingImage(true);
     try {
-      const uriParts = imageUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
+      console.log('📷 Image URI:', imageUri);
+      
+      // Ensure URI is in correct format for React Native
+      // It should start with file:// or content://
+      const normalizedUri = imageUri.startsWith('file://') || imageUri.startsWith('content://') 
+        ? imageUri 
+        : `file://${imageUri}`;
+      
+      const uriParts = normalizedUri.split('.');
+      const fileType = uriParts[uriParts.length - 1].toLowerCase();
+      
+      // Determine correct MIME type
+      let mimeType = `image/${fileType}`;
+      if (fileType === 'jpg' || fileType === 'jpeg') {
+        mimeType = 'image/jpeg';
+      } else if (fileType === 'png') {
+        mimeType = 'image/png';
+      } else if (fileType === 'gif') {
+        mimeType = 'image/gif';
+      } else if (fileType === 'webp') {
+        mimeType = 'image/webp';
+      }
+      
+      console.log('📷 File type:', fileType, 'MIME type:', mimeType);
       
       const formData = new FormData();
-      formData.append('file', {
-        uri: imageUri,
+      const fileObject = {
+        uri: normalizedUri,
         name: `avatar.${fileType}`,
-        type: `image/${fileType}`,
-      } as any);
-      formData.append('folder', 'avatars');
+        type: mimeType,
+      };
+      
+      console.log('📷 File object:', fileObject);
+      
+      formData.append('file', fileObject as any);
+      // Don't append folder here, let uploadFileAccess handle it
 
+      console.log('📤 Starting upload...');
       const response = await uploadFileAccess(formData, 'avatars');
       
       if (response && response.success && response.data) {
-        setAvatarUrl(response.data.url || response.data.secure_url);
+        const imageUrl = response.data.url || response.data.secure_url || response.data;
+        setAvatarUrl(imageUrl);
         Alert.alert('Thành công', 'Upload ảnh đại diện thành công.');
       } else {
-        throw new Error('Upload failed');
+        throw new Error(response?.message || 'Upload failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Lỗi', 'Không thể upload ảnh. Vui lòng thử lại.');
+      
+      let errorMessage = 'Không thể upload ảnh. Vui lòng thử lại.';
+      const errorData = error?.response?.data;
+      
+      // Handle network errors
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'Upload quá lâu. Vui lòng kiểm tra kết nối mạng và thử lại.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+        errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.';
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+        // If it's a Cloudinary config error, show a more user-friendly message
+        if (errorData.message.includes('api_key')) {
+          errorMessage = 'Lỗi cấu hình server. Vui lòng liên hệ quản trị viên.';
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Lỗi', errorMessage);
       setSelectedImageUri(null);
     } finally {
       setUploadingImage(false);
