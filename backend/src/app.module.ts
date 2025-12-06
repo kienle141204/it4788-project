@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
@@ -19,12 +20,14 @@ import { UploadModule } from './modules/upload/upload.module';
 import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping-statistics.module';
 import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
 import { RemindersModule } from './reminders/reminders.module';
-
 import { MarketModule } from './modules/market/market.module';
 @Module({
   imports: [
     // Cấu hình biến môi trường (toàn cục)
     ConfigModule.forRoot({ isGlobal: true }),
+    
+    // Cấu hình Schedule cho Cron jobs
+    ScheduleModule.forRoot(),
 
     // Kết nối MySQL qua TypeORM, đọc từ biến môi trường
     TypeOrmModule.forRootAsync({
