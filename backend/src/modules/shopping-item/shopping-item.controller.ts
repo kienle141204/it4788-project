@@ -24,7 +24,7 @@ export class ShoppingItemController {
   constructor(private readonly shoppingItemService: ShoppingItemService) { }
 
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Tạo item mới trong danh sách mua sắm',
     description: 'API này cho phép người dùng thêm một item mới vào danh sách mua sắm.'
   })
@@ -34,21 +34,21 @@ export class ShoppingItemController {
       example1: {
         summary: 'Thêm item mới với đầy đủ thông tin',
         value: {
-          list_id: 1,
-          ingredient_id: 5,
+          shopping_list_id: 1,
+          ingredient_id: 1,
           stock: 500,
-          price: 150000,
+          price: 100000,
           is_checked: false
         }
       },
       example2: {
         summary: 'Thêm item đã mua',
         value: {
-          list_id: 1,
-          ingredient_id: 8,
-          stock: 2,
-          price: 50000,
-          is_checked: true
+          shopping_list_id: 1,
+          ingredient_id: 3,
+          stock: 1,
+          price: 20000,
+          is_checked: false
         }
       },
       example3: {
@@ -60,16 +60,16 @@ export class ShoppingItemController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Tạo item thành công',
     type: ShoppingItem,
     example: {
       id: 1,
-      list_id: 1,
-      ingredient_id: 5,
+      shopping_list_id: 1,
+      ingredient_id: 1,
       stock: 500,
-      price: 150000,
+      price: 100000,
       is_checked: false,
       created_at: '2024-01-01T00:00:00.000Z'
     }
@@ -84,20 +84,20 @@ export class ShoppingItemController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles('admin')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy tất cả item',
     description: 'API này trả về danh sách tất cả các shopping items trong hệ thống. Yêu cầu quyền admin.'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách item thành công',
     example: [
       {
         id: 1,
-        list_id: 1,
-        ingredient_id: 5,
+        shopping_list_id: 1,
+        ingredient_id: 1,
         stock: 500,
-        price: 150000,
+        price: 100000,
         is_checked: false
       }
     ]
@@ -108,20 +108,20 @@ export class ShoppingItemController {
   }
 
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Xem chi tiết item',
     description: 'API này trả về thông tin chi tiết của một shopping item theo ID.'
   })
   @ApiParam({ name: 'id', type: 'string', example: '1', description: 'ID của shopping item' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy thông tin item thành công',
     example: {
       id: 1,
-      list_id: 1,
-      ingredient_id: 5,
+      shopping_list_id: 1,
+      ingredient_id: 1,
       stock: 500,
-      price: 150000,
+      price: 100000,
       is_checked: false,
       created_at: '2024-01-01T00:00:00.000Z'
     }
@@ -133,18 +133,19 @@ export class ShoppingItemController {
   }
 
   @Patch('check/:id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Đánh dấu đã mua item',
     description: 'API này cho phép đánh dấu một item là đã mua (check/uncheck).'
   })
   @ApiParam({ name: 'id', type: 'string', example: '1', description: 'ID của shopping item' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật trạng thái thành công',
     example: {
-      id: 1,
-      list_id: 1,
-      ingredient_id: 5,
+      shopping_list_id: 1,
+      ingredient_id: 1,
+      stock: 500,
+      price: 100000,
       is_checked: true,
       message: 'Item đã được đánh dấu là đã mua'
     }
@@ -156,13 +157,13 @@ export class ShoppingItemController {
   }
 
   @Patch(':id/toggle')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Toggle trạng thái checked của item',
     description: 'API này cho phép chuyển đổi trạng thái checked/unchecked của một shopping item.'
   })
   @ApiParam({ name: 'id', type: 'string', example: '1', description: 'ID của shopping item' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Toggle trạng thái thành công',
     type: ShoppingItem,
     example: {
@@ -182,7 +183,7 @@ export class ShoppingItemController {
   }
 
   @Patch(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Cập nhật item',
     description: 'API này cho phép cập nhật thông tin của một shopping item như tên, số lượng, đơn vị.'
   })
@@ -193,8 +194,8 @@ export class ShoppingItemController {
       example1: {
         summary: 'Cập nhật số lượng và giá',
         value: {
-          stock: 1000,
-          price: 200000
+          stock: 100,
+          price: 50000,
         }
       },
       example2: {
@@ -205,8 +206,8 @@ export class ShoppingItemController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật item thành công',
     example: {
       id: 1,
@@ -225,13 +226,13 @@ export class ShoppingItemController {
   }
 
   @Delete(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Xóa item',
     description: 'API này cho phép xóa một shopping item khỏi danh sách mua sắm.'
   })
   @ApiParam({ name: 'id', type: 'string', example: '1', description: 'ID của shopping item' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Xóa item thành công',
     example: {
       message: 'Item đã được xóa thành công'
