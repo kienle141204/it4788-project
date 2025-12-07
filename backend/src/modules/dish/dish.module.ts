@@ -7,11 +7,12 @@ import { DishReviewService } from './dish-review.service';
 import { Dish } from '../../entities/dish.entity';
 import { DishReview } from '../../entities/dish-review.entity';
 import { User } from '../../entities/user.entity';
+import { MenuDish } from '../../entities/menu-dish.entity';
 import { NutrientModule } from '../nutrient/nutrient.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Dish, DishReview, User]),
+    TypeOrmModule.forFeature([Dish, DishReview, User, MenuDish]),
     NutrientModule,
   ],
   controllers: [DishController, DishReviewController],

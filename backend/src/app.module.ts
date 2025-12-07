@@ -21,6 +21,7 @@ import { ShoppingStatisticsModule } from './modules/shopping-statistics/shopping
 import { ConsumptionHistoryModule } from './modules/consumption-history/consumption-history.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { MarketModule } from './modules/market/market.module';
+import { FavoriteDishModule } from './modules/favorite-dish/favorite-dish.module';
 @Module({
   imports: [
     // Cấu hình biến môi trường (toàn cục)
@@ -83,6 +84,7 @@ import { MarketModule } from './modules/market/market.module';
     ConsumptionHistoryModule,
     RemindersModule,
     MarketModule,
+    FavoriteDishModule,
   ],
   controllers: [AppController],
   providers: [AppService],
