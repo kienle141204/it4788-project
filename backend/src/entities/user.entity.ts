@@ -53,6 +53,13 @@ export class User {
   @Exclude()
   address: string;
 
+  @Column({
+    name: 'profile_status',
+    type: 'enum',
+    enum: ['public', 'private'],
+    default: 'public',
+  })
+  profile_status: string;
 
   @OneToMany(() => Family, (family) => family.owner)
   ownedFamilies: Family[];

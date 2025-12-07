@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -34,14 +35,36 @@ export class UserService {
     return await this.userRepository.find();
   }
 
-  async getUserById(id: number): Promise<User> {
+  async getUserById(
+    id: number,
+    currentUserId?: number,
+    currentUserRole?: string,
+  ): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
+
+    // Admin có thể xem tất cả user
+    if (currentUserRole === 'admin') {
+      return user;
+    }
+
+    // User có thể xem chính mình
+    if (currentUserId && currentUserId === id) {
+      return user;
+    }
+
+    // Kiểm tra profile_status: nếu private thì không cho phép user khác xem
+    if (user.profile_status === 'private') {
+      throw new ForbiddenException('Tài khoản này đang ở trạng thái riêng tư');
+    }
+
+    // Nếu profile_status là public, cho phép xem
     return user;
   }
 
   async updateUser(id: number, dto: UpdateUserDto): Promise<User> {
-    const user = await this.getUserById(id);
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException(`User ${id} not found`);
 
     // Kiểm tra email trùng (nếu có thay đổi email)
     if (dto.email && dto.email !== user.email) {

@@ -41,7 +41,6 @@ export class ShoppingList {
   @JoinColumn({ name: 'family_id' })
   family: Family;
 
-  // Quan hệ với ShoppingItem (sử dụng forwardRef để tránh circular dependency)
   @OneToMany('ShoppingItem', 'shoppingList')
   items: any[];
 }
