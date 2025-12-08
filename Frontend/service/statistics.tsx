@@ -2,6 +2,21 @@ import { getAccess, postAccess, patchAccess, deleteAccess } from '../utils/api';
 
 // Shopping Statistics APIs
 
+// Get my shopping lists
+export const getMyShoppingLists = async () => {
+  console.log('API CALL: getMyShoppingLists');
+  try {
+    const res = await getAccess(`shopping-lists/my-list`);
+    console.log('API RESPONSE: getMyShoppingLists', res);
+    return res;
+  } catch (error) {
+    console.error('Error getting my shopping lists:', error);
+    throw error;
+  }
+};
+
+
+
 /**
  * Lấy tổng chi phí theo tháng
  * GET /shopping-statistics/monthly-cost
@@ -77,8 +92,9 @@ export const getTopIngredientsByCost = async (familyId: number, limit: number = 
   }
 };
 
+
 /**
- * Lấy thống kê theo user
+ * Lấy thống kê theo user (cá nhân)
  * GET /shopping-statistics/user/:userId
  */
 export const getUserStatistics = async (userId: number) => {
