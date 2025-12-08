@@ -5,11 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/themes';
 import ShoppingHistory from '../../components/Statistics/ShoppingHistory';
 import SpendingCharts from '../../components/Statistics/SpendingCharts';
-import DetailedStats from '../../components/Statistics/DetailedStats';
+// import DetailedStats from '../../components/Statistics/DetailedStats';
 
 export default function StatisticsScreen() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'overview' | 'charts' | 'details'>('overview');
+    const [activeTab, setActiveTab] = useState<'details' | 'charts'>('details');
 
     return (
         <SafeAreaView style={styles.container}>
@@ -25,11 +25,11 @@ export default function StatisticsScreen() {
             {/* Tabs */}
             <View style={styles.tabContainer}>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-                    onPress={() => setActiveTab('overview')}
+                    style={[styles.tab, activeTab === 'details' && styles.activeTab]}
+                    onPress={() => setActiveTab('details')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
-                        Tổng quan
+                    <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
+                        Chi tiết
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -40,21 +40,11 @@ export default function StatisticsScreen() {
                         Biểu đồ
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'details' && styles.activeTab]}
-                    onPress={() => setActiveTab('details')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
-                        Chi tiết
-                    </Text>
-                </TouchableOpacity>
             </View>
 
             {/* Content */}
             <View style={styles.content}>
-                {activeTab === 'overview' ? <ShoppingHistory /> : 
-                 activeTab === 'charts' ? <SpendingCharts /> : 
-                 <DetailedStats />}
+                {activeTab === 'details' ? <ShoppingHistory /> : <SpendingCharts />}
             </View>
         </SafeAreaView>
     );
