@@ -97,7 +97,7 @@ export class UserController {
   @Get(':id')
   @ApiOperation({ 
     summary: 'Lấy thông tin người dùng theo ID',
-    description: 'API này trả về thông tin chi tiết của một người dùng theo ID. Yêu cầu đăng nhập (admin hoặc user có thể xem bất kỳ user nào).'
+    description: 'API này trả về thông tin chi tiết của một người dùng theo ID. Admin có thể xem tất cả user. User chỉ có thể xem chính mình hoặc user khác có profile_status = public. Nếu user khác có profile_status = private, sẽ trả về lỗi "Tài khoản này đang ở trạng thái riêng tư".'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của người dùng' })
   @ApiResponse({ 
@@ -113,10 +113,15 @@ export class UserController {
       created_at: '2024-01-01T00:00:00.000Z'
     }
   })
-  @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập hoặc tài khoản đang ở trạng thái riêng tư' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy người dùng' })
   async getUser(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
-    return this.userService.getUserById(id);
+    const userData = await this.userService.getUserById(id, user.id, user.role);
+    return {
+      success: true,
+      message: 'Lấy thông tin người dùng thành công',
+      data: userData,
+    };
   }
 
   /** Update user */

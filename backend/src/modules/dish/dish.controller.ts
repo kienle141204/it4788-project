@@ -21,6 +21,7 @@ import {
 import { DishService } from './dish.service';
 import { CreateDishDto } from './dto/create-dish.dto';
 import { PaginationDto, SearchDishDto } from './dto/pagination.dto';
+import { TopRatedDishesDto, TopDishesDto } from './dto/top-dishes.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../../entities/user.entity';
 import { NutrientService } from '../nutrient/nutrient.service';
@@ -282,6 +283,170 @@ export class DishController {
         nutrients: nutrients,
       },
       total: nutrients.length,
+    };
+  }
+
+  /**
+   * Lấy top món ăn theo số sao trung bình của review
+   * GET /api/dishes/top-rated
+   */
+  @Get('top-rated')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Lấy top món ăn theo số sao trung bình',
+    description: 'API này trả về top món ăn (3, 10, hoặc 20) được đánh giá cao nhất trong một tháng, với điều kiện số sao trung bình >= minRating.',
+  })
+  @ApiQuery({ name: 'top', required: true, type: Number, example: 10, description: 'Số lượng món ăn (3, 10, hoặc 20)' })
+  @ApiQuery({ name: 'minRating', required: true, type: Number, example: 4, description: 'Mốc số sao tối thiểu (1-5)' })
+  @ApiQuery({ name: 'month', required: false, type: Number, example: 12, description: 'Tháng (1-12), mặc định tháng hiện tại' })
+  @ApiQuery({ name: 'year', required: false, type: Number, example: 2024, description: 'Năm, mặc định năm hiện tại' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy top món ăn theo rating thành công',
+    example: {
+      success: true,
+      message: 'Lấy top 10 món ăn theo rating tháng 12/2024 thành công',
+      data: [
+        {
+          id: 1,
+          name: 'Phở Bò',
+          description: 'Món phở truyền thống',
+          image_url: 'https://example.com/pho.jpg',
+          avgRating: 4.5,
+          reviewCount: 20,
+        },
+      ],
+      filters: {
+        top: 10,
+        minRating: 4,
+        month: 12,
+        year: 2024,
+      },
+    },
+  })
+  async getTopRatedDishes(
+    @Query('top', ParseIntPipe) top: number,
+    @Query('minRating', ParseIntPipe) minRating: number,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    const now = new Date();
+    let targetMonth = now.getMonth() + 1;
+    let targetYear = now.getFullYear();
+
+    if (month) {
+      const monthNum = parseInt(month, 10);
+      if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+        targetMonth = monthNum;
+      }
+    }
+
+    if (year) {
+      const yearNum = parseInt(year, 10);
+      if (!isNaN(yearNum) && yearNum >= 2000 && yearNum <= 2100) {
+        targetYear = yearNum;
+      }
+    }
+
+    const dto: TopRatedDishesDto = {
+      top,
+      minRating,
+      month: targetMonth,
+      year: targetYear,
+    };
+
+    const dishes = await this.dishService.getTopRatedDishes(dto);
+    
+    return {
+      success: true,
+      message: `Lấy top ${top} món ăn theo rating tháng ${targetMonth}/${targetYear} thành công`,
+      data: dishes,
+      filters: {
+        top,
+        minRating,
+        month: targetMonth,
+        year: targetYear,
+      },
+    };
+  }
+
+  /**
+   * Lấy top món ăn được thêm vào menu nhiều nhất
+   * GET /api/dishes/top-menu
+   */
+  @Get('top-menu')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Lấy top món ăn được thêm vào menu nhiều nhất',
+    description: 'API này trả về top món ăn (3, 10, hoặc 20) được thêm vào menu nhiều nhất trong một tháng.',
+  })
+  @ApiQuery({ name: 'top', required: true, type: Number, example: 10, description: 'Số lượng món ăn (3, 10, hoặc 20)' })
+  @ApiQuery({ name: 'month', required: false, type: Number, example: 12, description: 'Tháng (1-12), mặc định tháng hiện tại' })
+  @ApiQuery({ name: 'year', required: false, type: Number, example: 2024, description: 'Năm, mặc định năm hiện tại' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy top món ăn được thêm vào menu nhiều nhất thành công',
+    example: {
+      success: true,
+      message: 'Lấy top 10 món ăn được thêm vào menu tháng 12/2024 thành công',
+      data: [
+        {
+          id: 1,
+          name: 'Phở Bò',
+          description: 'Món phở truyền thống',
+          image_url: 'https://example.com/pho.jpg',
+          menuCount: 15,
+        },
+      ],
+      filters: {
+        top: 10,
+        month: 12,
+        year: 2024,
+      },
+    },
+  })
+  async getTopMenuDishes(
+    @Query('top', ParseIntPipe) top: number,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    const now = new Date();
+    let targetMonth = now.getMonth() + 1;
+    let targetYear = now.getFullYear();
+
+    if (month) {
+      const monthNum = parseInt(month, 10);
+      if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+        targetMonth = monthNum;
+      }
+    }
+
+    if (year) {
+      const yearNum = parseInt(year, 10);
+      if (!isNaN(yearNum) && yearNum >= 2000 && yearNum <= 2100) {
+        targetYear = yearNum;
+      }
+    }
+
+    const dto: TopDishesDto = {
+      top,
+      month: targetMonth,
+      year: targetYear,
+    };
+
+    const dishes = await this.dishService.getTopMenuDishes(dto);
+    
+    return {
+      success: true,
+      message: `Lấy top ${top} món ăn được thêm vào menu tháng ${targetMonth}/${targetYear} thành công`,
+      data: dishes,
+      filters: {
+        top,
+        month: targetMonth,
+        year: targetYear,
+      },
     };
   }
 }

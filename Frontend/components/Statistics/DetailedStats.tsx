@@ -1,332 +1,275 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS } from '../../constants/themes';
-import { getMonthlyCost, getCheckedItemsCount, getTopIngredientsByQuantity, getTopIngredientsByCost, getFamilyStatistics, getUserStatistics } from '../../service/statistics';
-import { getMyFamily } from '../../service/family';
-import { getUserProfile } from '../../service/auth';
-import TopIngredients from './TopIngredients';
+// import React, { useEffect, useState } from 'react';
+// import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+// import { COLORS } from '../../constants/themes';
+// import { getMyShoppingLists } from '../../service/statistics';
+// import { Ionicons } from '@expo/vector-icons';
 
-export default function DetailedStats() {
-    const [monthlyCostData, setMonthlyCostData] = useState<any[]>([]);
-    const [checkedItemsCount, setCheckedItemsCount] = useState<number>(0);
-    const [topIngredientsByQuantity, setTopIngredientsByQuantity] = useState<any[]>([]);
-    const [topIngredientsByCost, setTopIngredientsByCost] = useState<any[]>([]);
-    const [familyStats, setFamilyStats] = useState<any>(null);
-    const [userStats, setUserStats] = useState<any>(null);
-    const [currentFamilyId, setCurrentFamilyId] = useState<number | null>(null);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-    const [loading, setLoading] = useState(true);
+// interface ShoppingList {
+//     id: number;
+//     cost: number;
+//     shopping_date: string;
+//     is_shared: boolean;
+//     items?: any[];
+// }
 
-    useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                console.log('DetailedStats: Fetching user profile...');
-                // Get user profile to get userId
-                const userProfile = await getUserProfile();
-                console.log('DetailedStats: User profile fetched:', userProfile);
-                setCurrentUserId(userProfile.id);
+// export default function DetailedStats() {
+//     const [myLists, setMyLists] = useState<ShoppingList[]>([]);
+//     const [loading, setLoading] = useState(true);
+//     const [stats, setStats] = useState({
+//         totalCost: 0,
+//         totalLists: 0,
+//         totalItems: 0,
+//         sharedLists: 0,
+//     });
 
-                console.log('DetailedStats: Fetching user families...');
-                // Get user's families
-                const families = await getMyFamily();
-                console.log('DetailedStats: Families fetched:', families);
-                if (families && families.length > 0) {
-                    // Use the first family as the current one (in a real app, user might select which family to view)
-                    setCurrentFamilyId(families[0].id);
-                    console.log('DetailedStats: Family ID set:', families[0].id);
-                } else {
-                    console.log('DetailedStats: No families found, using default');
-                    setCurrentFamilyId(1);
-                }
-            } catch (error) {
-                console.error('DetailedStats: Error fetching user data:', error);
-                // If there's an error, try to continue with a default family ID
-                // In a real app, you might show an error message and let the user choose what to do
-                setCurrentFamilyId(1);
-            }
-        };
+//     useEffect(() => {
+//         const fetchMyLists = async () => {
+//             try {
+//                 setLoading(true);
+//                 const lists = await getMyShoppingLists();
+//                 setMyLists(lists || []);
 
-        fetchUserData();
-    }, []);
+//                 // Calculate statistics
+//                 const totalCost = lists?.reduce((sum: number, list: ShoppingList) => sum + (list.cost || 0), 0) || 0;
+//                 const totalItems = lists?.reduce((sum: number, list: ShoppingList) => sum + (list.items?.length || 0), 0) || 0;
+//                 const sharedLists = lists?.filter((list: ShoppingList) => list.is_shared).length || 0;
 
-    useEffect(() => {
-        const fetchAllData = async () => {
-            if (!currentFamilyId || !currentUserId) {
-                console.log('DetailedStats: Missing familyId or userId, skipping fetch');
-                return;
-            }
+//                 setStats({
+//                     totalCost,
+//                     totalLists: lists?.length || 0,
+//                     totalItems,
+//                     sharedLists,
+//                 });
+//             } catch (error) {
+//                 console.error('Error fetching my shopping lists:', error);
+//                 setMyLists([]);
+//             } finally {
+//                 setLoading(false);
+//             }
+//         };
 
-            console.log('DetailedStats: Fetching statistics data with:', { currentFamilyId, currentUserId });
-            try {
-                setLoading(true);
+//         fetchMyLists();
+//     }, []);
 
-                // Fetch all statistics data
-                const promises = [
-                    getMonthlyCost(new Date().getFullYear(), currentFamilyId)
-                        .then(result => {
-                            console.log('DetailedStats getMonthlyCost result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('DetailedStats getMonthlyCost error:', error);
-                            return [];
-                        }),
-                    getCheckedItemsCount(currentFamilyId)
-                        .then(result => {
-                            console.log('DetailedStats getCheckedItemsCount result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('DetailedStats getCheckedItemsCount error:', error);
-                            return 0;
-                        }),
-                    getTopIngredientsByQuantity(currentFamilyId)
-                        .then(result => {
-                            console.log('DetailedStats getTopIngredientsByQuantity result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('DetailedStats getTopIngredientsByQuantity error:', error);
-                            return [];
-                        }),
-                    getTopIngredientsByCost(currentFamilyId)
-                        .then(result => {
-                            console.log('DetailedStats getTopIngredientsByCost result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('DetailedStats getTopIngredientsByCost error:', error);
-                            return [];
-                        }),
-                    getFamilyStatistics(currentFamilyId)
-                        .then(result => {
-                            console.log('DetailedStats getFamilyStatistics result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('DetailedStats getFamilyStatistics error:', error);
-                            return null;
-                        }),
-                    getUserStatistics(currentUserId)  // Fetch user statistics as well
-                        .then(result => {
-                            console.log('DetailedStats getUserStatistics result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('DetailedStats getUserStatistics error:', error);
-                            return null;
-                        })
-                ];
+//     const formatCurrency = (amount: number) => {
+//         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+//     };
 
-                const [monthlyCost, checkedCount, topQuantities, topCosts, familyStat, userStat] = await Promise.all(promises);
+//     const formatDate = (dateString: string) => {
+//         const date = new Date(dateString);
+//         return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+//     };
 
-                console.log('DetailedStats: All data fetched:', { monthlyCost, checkedCount, topQuantities, topCosts, familyStat, userStat });
+//     if (loading) {
+//         return (
+//             <View style={styles.loadingContainer}>
+//                 <ActivityIndicator size="large" color={COLORS.purple} />
+//             </View>
+//         );
+//     }
 
-                setMonthlyCostData(monthlyCost || []);
-                setCheckedItemsCount(checkedCount || 0);
-                setTopIngredientsByQuantity(topQuantities || []);
-                setTopIngredientsByCost(topCosts || []);
-                setFamilyStats(familyStat || null);
-                setUserStats(userStat || null);
-            } catch (error) {
-                console.error('DetailedStats: Error fetching statistics:', error);
-                // Set empty defaults
-                setMonthlyCostData([]);
-                setCheckedItemsCount(0);
-                setTopIngredientsByQuantity([]);
-                setTopIngredientsByCost([]);
-                setFamilyStats(null);
-                setUserStats(null);
-            } finally {
-                setLoading(false);
-                console.log('DetailedStats: Finished fetching statistics, loading set to false');
-            }
-        };
+//     return (
+//         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+//             {/* Summary Cards */}
+//             <View style={styles.summarySection}>
+//                 <Text style={styles.sectionTitle}>Thống kê chi tiêu cá nhân</Text>
+//                 <View style={styles.summaryRow}>
+//                     <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
+//                         <Ionicons name="wallet" size={24} color="#3B82F6" style={styles.cardIcon} />
+//                         <Text style={styles.summaryLabel}>Tổng chi tiêu</Text>
+//                         <Text style={styles.summaryValue}>{formatCurrency(stats.totalCost)}</Text>
+//                     </View>
+//                     <View style={[styles.summaryCard, { backgroundColor: '#DCFCE7' }]}>
+//                         <Ionicons name="list" size={24} color="#10B981" style={styles.cardIcon} />
+//                         <Text style={styles.summaryLabel}>Danh sách</Text>
+//                         <Text style={styles.summaryValue}>{stats.totalLists}</Text>
+//                     </View>
+//                 </View>
+//                 <View style={styles.summaryRow}>
+//                     <View style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]}>
+//                         <Ionicons name="cart" size={24} color="#F59E0B" style={styles.cardIcon} />
+//                         <Text style={styles.summaryLabel}>Tổng sản phẩm</Text>
+//                         <Text style={styles.summaryValue}>{stats.totalItems}</Text>
+//                     </View>
+//                     <View style={[styles.summaryCard, { backgroundColor: '#F3E8FF' }]}>
+//                         <Ionicons name="people" size={24} color="#A855F7" style={styles.cardIcon} />
+//                         <Text style={styles.summaryLabel}>Đã chia sẻ</Text>
+//                         <Text style={styles.summaryValue}>{stats.sharedLists}</Text>
+//                     </View>
+//                 </View>
+//             </View>
 
-        fetchAllData();
-    }, [currentFamilyId, currentUserId]);
+//             {/* Detailed List */}
+//             <View style={styles.detailSection}>
+//                 <Text style={styles.sectionTitle}>Chi tiết danh sách</Text>
+//                 {myLists.length > 0 ? (
+//                     myLists.map((list) => (
+//                         <View key={list.id} style={styles.detailCard}>
+//                             <View style={styles.detailHeader}>
+//                                 <View style={styles.detailDate}>
+//                                     <Ionicons name="calendar" size={16} color={COLORS.purple} />
+//                                     <Text style={styles.dateText}>{formatDate(list.shopping_date)}</Text>
+//                                 </View>
+//                                 {list.is_shared && (
+//                                     <View style={styles.sharedBadge}>
+//                                         <Ionicons name="people" size={12} color={COLORS.purple} />
+//                                         <Text style={styles.sharedText}>Chia sẻ</Text>
+//                                     </View>
+//                                 )}
+//                             </View>
+//                             <View style={styles.detailBody}>
+//                                 <View style={styles.detailRow}>
+//                                     <Text style={styles.detailLabel}>Số sản phẩm:</Text>
+//                                     <Text style={styles.detailValue}>{list.items?.length || 0}</Text>
+//                                 </View>
+//                                 <View style={styles.detailRow}>
+//                                     <Text style={styles.detailLabel}>Chi phí:</Text>
+//                                     <Text style={[styles.detailValue, styles.costValue]}>
+//                                         {formatCurrency(list.cost || 0)}
+//                                     </Text>
+//                                 </View>
+//                             </View>
+//                         </View>
+//                     ))
+//                 ) : (
+//                     <View style={styles.emptyContainer}>
+//                         <Ionicons name="document-text-outline" size={64} color={COLORS.grey} />
+//                         <Text style={styles.emptyText}>Chưa có danh sách chi tiết</Text>
+//                     </View>
+//                 )}
+//             </View>
+//         </ScrollView>
+//     );
+// }
 
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.purple} />
-            </View>
-        );
-    }
-
-    return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* User Summary Cards */}
-            {userStats && (
-                <View style={styles.summarySection}>
-                    <Text style={styles.sectionTitle}>Thống kê cá nhân</Text>
-                    <View style={styles.summaryRow}>
-                        <View style={[styles.summaryCard, { backgroundColor: '#F3E8FF' }]}>
-                            <Text style={styles.summaryLabel}>Chi tiêu cá nhân</Text>
-                            <Text style={styles.summaryValue}>{(userStats?.total_cost / 1000).toFixed(0)}k</Text>
-                            <Text style={styles.summarySubtext}>Tất cả thời gian</Text>
-                        </View>
-                        <View style={[styles.summaryCard, { backgroundColor: '#DCFCE7' }]}>
-                            <Text style={styles.summaryLabel}>Sản phẩm cá nhân</Text>
-                            <Text style={styles.summaryValue}>{userStats?.total_items}</Text>
-                            <Text style={styles.summarySubtext}>Đã mua</Text>
-                        </View>
-                        <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
-                            <Text style={styles.summaryLabel}>Đã check</Text>
-                            <Text style={styles.summaryValue}>{userStats?.checked_items}</Text>
-                            <Text style={styles.summarySubtext}>Sản phẩm</Text>
-                        </View>
-                    </View>
-                </View>
-            )}
-
-            {/* Family Summary Cards */}
-            <View style={styles.summarySection}>
-                <Text style={styles.sectionTitle}>Tổng quan gia đình</Text>
-                <View style={styles.summaryRow}>
-                    <View style={[styles.summaryCard, { backgroundColor: '#F3E8FF' }]}>
-                        <Text style={styles.summaryLabel}>Tổng chi tiêu</Text>
-                        <Text style={styles.summaryValue}>{(familyStats?.total_cost / 1000).toFixed(0)}k</Text>
-                        <Text style={styles.summarySubtext}>Tất cả thời gian</Text>
-                    </View>
-                    <View style={[styles.summaryCard, { backgroundColor: '#DCFCE7' }]}>
-                        <Text style={styles.summaryLabel}>Tổng món</Text>
-                        <Text style={styles.summaryValue}>{familyStats?.total_items}</Text>
-                        <Text style={styles.summarySubtext}>Đã mua</Text>
-                    </View>
-                    <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
-                        <Text style={styles.summaryLabel}>Đã check</Text>
-                        <Text style={styles.summaryValue}>{familyStats?.checked_items}</Text>
-                        <Text style={styles.summarySubtext}>Sản phẩm</Text>
-                    </View>
-                </View>
-            </View>
-
-            {/* Top Ingredients by Quantity */}
-            <View style={styles.statsSection}>
-                <Text style={styles.sectionTitle}>Top nguyên liệu theo số lượng</Text>
-                <TopIngredients
-                    title="Top nguyên liệu"
-                    subtitle="Số lượng mua"
-                    ingredients={topIngredientsByQuantity}
-                    showQuantity={true}
-                />
-            </View>
-
-            {/* Top Ingredients by Cost */}
-            <View style={styles.statsSection}>
-                <Text style={styles.sectionTitle}>Top nguyên liệu theo chi phí</Text>
-                <TopIngredients
-                    title="Top nguyên liệu"
-                    subtitle="Giá tiền"
-                    ingredients={topIngredientsByCost}
-                    showQuantity={false}
-                />
-            </View>
-
-            {/* Monthly Cost */}
-            <View style={styles.statsSection}>
-                <Text style={styles.sectionTitle}>Chi tiêu theo tháng ({new Date().getFullYear()})</Text>
-                <View style={styles.monthlyCostContainer}>
-                    {monthlyCostData.length > 0 ? (
-                        monthlyCostData.map((item, index) => (
-                            <View key={index} style={styles.monthRow}>
-                                <Text style={styles.monthText}>{item.month}</Text>
-                                <Text style={styles.monthCost}>{(item.total_cost / 1000).toFixed(0)}k</Text>
-                            </View>
-                        ))
-                    ) : (
-                        <Text style={styles.noDataText}>Không có dữ liệu</Text>
-                    )}
-                </View>
-            </View>
-        </ScrollView>
-    );
-}
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.backgroundLight,
-        padding: 16,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.backgroundLight,
-    },
-    summarySection: {
-        marginBottom: 20,
-    },
-    statsSection: {
-        marginBottom: 20,
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 16,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.darkGrey,
-        marginBottom: 12,
-    },
-    summaryRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    summaryCard: {
-        flex: 1,
-        padding: 12,
-        borderRadius: 12,
-        marginHorizontal: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    summaryLabel: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginBottom: 4,
-        fontWeight: '600',
-    },
-    summaryValue: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#1F2937',
-        marginBottom: 2,
-    },
-    summarySubtext: {
-        fontSize: 10,
-        color: '#9CA3AF',
-    },
-    monthlyCostContainer: {
-        backgroundColor: '#F9FAFB',
-        borderRadius: 12,
-        padding: 12,
-    },
-    monthRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-    },
-    monthText: {
-        fontSize: 14,
-        color: COLORS.darkGrey,
-        fontWeight: '600',
-    },
-    monthCost: {
-        fontSize: 14,
-        color: COLORS.purple,
-        fontWeight: 'bold',
-    },
-    noDataText: {
-        textAlign: 'center',
-        paddingVertical: 20,
-        color: COLORS.grey,
-    },
-});
+// const styles = StyleSheet.create({
+//     container: {
+//         flex: 1,
+//         backgroundColor: COLORS.backgroundLight,
+//         padding: 16,
+//     },
+//     loadingContainer: {
+//         flex: 1,
+//         justifyContent: 'center',
+//         alignItems: 'center',
+//         backgroundColor: COLORS.backgroundLight,
+//     },
+//     summarySection: {
+//         marginBottom: 20,
+//     },
+//     sectionTitle: {
+//         fontSize: 18,
+//         fontWeight: 'bold',
+//         color: COLORS.darkGrey,
+//         marginBottom: 16,
+//     },
+//     summaryRow: {
+//         flexDirection: 'row',
+//         justifyContent: 'space-between',
+//         marginBottom: 12,
+//     },
+//     summaryCard: {
+//         flex: 1,
+//         padding: 16,
+//         borderRadius: 12,
+//         marginHorizontal: 4,
+//         shadowColor: '#000',
+//         shadowOffset: { width: 0, height: 1 },
+//         shadowOpacity: 0.05,
+//         shadowRadius: 2,
+//         elevation: 1,
+//     },
+//     cardIcon: {
+//         marginBottom: 8,
+//     },
+//     summaryLabel: {
+//         fontSize: 12,
+//         color: '#6B7280',
+//         marginBottom: 4,
+//         fontWeight: '600',
+//     },
+//     summaryValue: {
+//         fontSize: 20,
+//         fontWeight: 'bold',
+//         color: '#1F2937',
+//     },
+//     detailSection: {
+//         marginBottom: 20,
+//     },
+//     detailCard: {
+//         backgroundColor: COLORS.white,
+//         borderRadius: 12,
+//         padding: 16,
+//         marginBottom: 12,
+//         shadowColor: '#000',
+//         shadowOffset: { width: 0, height: 1 },
+//         shadowOpacity: 0.05,
+//         shadowRadius: 3,
+//         elevation: 2,
+//     },
+//     detailHeader: {
+//         flexDirection: 'row',
+//         justifyContent: 'space-between',
+//         alignItems: 'center',
+//         marginBottom: 12,
+//         paddingBottom: 12,
+//         borderBottomWidth: 1,
+//         borderBottomColor: '#F3F4F6',
+//     },
+//     detailDate: {
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//     },
+//     dateText: {
+//         marginLeft: 6,
+//         fontSize: 14,
+//         fontWeight: '600',
+//         color: COLORS.darkGrey,
+//     },
+//     sharedBadge: {
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//         backgroundColor: '#F3E8FF',
+//         paddingHorizontal: 8,
+//         paddingVertical: 4,
+//         borderRadius: 12,
+//     },
+//     sharedText: {
+//         fontSize: 11,
+//         color: COLORS.purple,
+//         marginLeft: 4,
+//         fontWeight: '600',
+//     },
+//     detailBody: {
+//         gap: 8,
+//     },
+//     detailRow: {
+//         flexDirection: 'row',
+//         justifyContent: 'space-between',
+//         alignItems: 'center',
+//     },
+//     detailLabel: {
+//         fontSize: 14,
+//         color: COLORS.grey,
+//     },
+//     detailValue: {
+//         fontSize: 14,
+//         fontWeight: '600',
+//         color: COLORS.darkGrey,
+//     },
+//     costValue: {
+//         color: COLORS.purple,
+//         fontSize: 16,
+//         fontWeight: 'bold',
+//     },
+//     emptyContainer: {
+//         paddingVertical: 40,
+//         alignItems: 'center',
+//     },
+//     emptyText: {
+//         marginTop: 16,
+//         fontSize: 16,
+//         color: COLORS.grey,
+//         textAlign: 'center',
+//     },
+// });

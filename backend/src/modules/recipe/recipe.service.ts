@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { Recipe } from '../../entities/recipe.entity';
 import { RecipeStep } from '../../entities/recipe-step.entity';
 import { Dish } from '../../entities/dish.entity';
@@ -42,11 +42,15 @@ export class RecipeService {
 
     // Admin có thể xem tất cả, user chỉ xem public recipes hoặc private recipes của chính họ
     if (user.role !== 'admin') {
-      queryBuilder.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+      queryBuilder.where(
+        new Brackets((qb) => {
+          qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
+              privateStatus: 'private', 
+              userId: user.id 
+            });
+        })
+      );
     }
 
     if (dishId) {
@@ -104,7 +108,9 @@ export class RecipeService {
   }
 
   /**
-   * Lấy công thức theo món ăn (public recipes visible to all, private recipes only to owner or admin)
+   * Lấy công thức theo món ăn
+   * - Admin: xem tất cả công thức (public và private)
+   * - User: xem tất cả công thức public và công thức private của chính họ
    */
   async findByDishId(dishId: number, user: User): Promise<Recipe[]> {
     // Kiểm tra món ăn có tồn tại không
@@ -121,13 +127,17 @@ export class RecipeService {
       .where('recipe.dish_id = :dishId', { dishId })
       .orderBy('recipe.created_at', 'DESC');
 
-    // Admin có thể xem tất cả, user chỉ xem public recipes hoặc private recipes của chính họ
+    // Admin có thể xem tất cả, user xem public recipes hoặc private recipes của chính họ
     if (user.role !== 'admin') {
-      queryBuilder.andWhere('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
+              privateStatus: 'private', 
+              userId: user.id 
+            });
+        })
+      );
     }
 
     return await queryBuilder.getMany();
@@ -167,11 +177,15 @@ export class RecipeService {
 
     // Admin có thể xem tất cả, user chỉ xem public recipes hoặc private recipes của chính họ
     if (user.role !== 'admin') {
-      queryBuilder.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+      queryBuilder.where(
+        new Brackets((qb) => {
+          qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
+              privateStatus: 'private', 
+              userId: user.id 
+            });
+        })
+      );
     }
 
     return await queryBuilder.getMany();

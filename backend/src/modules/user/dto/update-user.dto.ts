@@ -31,4 +31,8 @@ export class  UpdateUserDto {
   @IsEnum(['user', 'admin'])
   @IsOptional()
   role?: 'user' | 'admin';
+
+  @IsEnum(['public', 'private'])
+  @IsOptional()
+  profile_status?: 'public' | 'private';
 }

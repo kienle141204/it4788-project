@@ -1,352 +1,207 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
-import { PieChart, LineChart } from 'react-native-chart-kit';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { PieChart, BarChart } from 'react-native-chart-kit';
 import { COLORS } from '../../constants/themes';
-import { getMonthlyCost, getCheckedItemsCount, getTopIngredientsByQuantity, getTopIngredientsByCost, getFamilyStatistics, getUserStatistics } from '../../service/statistics';
-import { getMyFamily } from '../../service/family';
-import { getUserProfile } from '../../service/auth';
+import { getMyShoppingLists } from '../../service/statistics';
+import { Ionicons } from '@expo/vector-icons';
 
 const screenWidth = Dimensions.get('window').width;
 
-const CHART_CONFIG = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(55, 65, 81, ${opacity})`,
-    style: {
-        borderRadius: 16
-    },
-    propsForDots: {
-        r: "6",
-        strokeWidth: "2",
-        stroke: "#A855F7"
-    },
-    propsForBackgroundLines: {
-        strokeDasharray: "",
-        stroke: "#E5E7EB",
-        strokeWidth: 1
-    },
-    propsForLabels: {
-        fontFamily: 'System',
-        fontSize: 10,
-        fontWeight: '600',
-    }
-};
+interface ShoppingList {
+    id: number;
+    cost: number;
+    shopping_date: string;
+    is_shared: boolean;
+    items?: any[];
+}
 
 export default function SpendingCharts() {
-    const [monthlyCostData, setMonthlyCostData] = useState<any[]>([]);
-    const [checkedItemsCount, setCheckedItemsCount] = useState<number>(0);
-    const [topIngredientsByQuantity, setTopIngredientsByQuantity] = useState<any[]>([]);
-    const [topIngredientsByCost, setTopIngredientsByCost] = useState<any[]>([]);
-    const [familyStats, setFamilyStats] = useState<any>(null);
-    const [userStats, setUserStats] = useState<any>(null);
-    const [currentFamilyId, setCurrentFamilyId] = useState<number | null>(null);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [myLists, setMyLists] = useState<ShoppingList[]>([]);
     const [loading, setLoading] = useState(true);
+    const [totalCost, setTotalCost] = useState(0);
+    const [monthlyData, setMonthlyData] = useState<{ labels: string[]; data: number[] }>({ labels: [], data: [] });
 
     useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                console.log('Fetching user profile...');
-                // Get user profile to get userId
-                const userProfile = await getUserProfile();
-                console.log('User profile fetched:', userProfile);
-                setCurrentUserId(userProfile.id);
-
-                console.log('Fetching user families...');
-                // Get user's families
-                const families = await getMyFamily();
-                console.log('Families fetched:', families);
-                if (families && families.length > 0) {
-                    // Use the first family as the current one (in a real app, user might select which family to view)
-                    setCurrentFamilyId(families[0].id);
-                    console.log('Family ID set:', families[0].id);
-                } else {
-                    console.log('No families found, using default');
-                    setCurrentFamilyId(1);
-                }
-            } catch (error) {
-                console.error('Error fetching user data:', error);
-                // If there's an error, try to continue with a default family ID
-                // In a real app, you might show an error message and let the user choose what to do
-                setCurrentFamilyId(1);
-            }
-        };
-
-        fetchUserData();
-    }, []);
-
-    useEffect(() => {
-        const fetchAllData = async () => {
-            if (!currentFamilyId || !currentUserId) {
-                console.log('Missing familyId or userId, skipping fetch');
-                return;
-            }
-
-            console.log('Fetching statistics data with:', { currentFamilyId, currentUserId });
+        const fetchMyLists = async () => {
             try {
                 setLoading(true);
+                const lists = await getMyShoppingLists();
+                setMyLists(lists || []);
 
-                // Fetch all statistics data
-                const promises = [
-                    getMonthlyCost(new Date().getFullYear(), currentFamilyId)
-                        .then(result => {
-                            console.log('getMonthlyCost result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('getMonthlyCost error:', error);
-                            return [];
-                        }),
-                    getCheckedItemsCount(currentFamilyId)
-                        .then(result => {
-                            console.log('getCheckedItemsCount result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('getCheckedItemsCount error:', error);
-                            return 0;
-                        }),
-                    getTopIngredientsByQuantity(currentFamilyId)
-                        .then(result => {
-                            console.log('getTopIngredientsByQuantity result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('getTopIngredientsByQuantity error:', error);
-                            return [];
-                        }),
-                    getTopIngredientsByCost(currentFamilyId)
-                        .then(result => {
-                            console.log('getTopIngredientsByCost result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('getTopIngredientsByCost error:', error);
-                            return [];
-                        }),
-                    getFamilyStatistics(currentFamilyId)
-                        .then(result => {
-                            console.log('getFamilyStatistics result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('getFamilyStatistics error:', error);
-                            return null;
-                        }),
-                    getUserStatistics(currentUserId)  // Fetch user statistics as well
-                        .then(result => {
-                            console.log('getUserStatistics result:', result);
-                            return result;
-                        })
-                        .catch(error => {
-                            console.error('getUserStatistics error:', error);
-                            return null;
-                        })
-                ];
+                // Calculate total cost
+                const total = lists?.reduce((sum: number, list: ShoppingList) => {
+                    const cost = Number(list.cost) || 0;
+                    return sum + cost;
+                }, 0) || 0;
+                setTotalCost(Math.round(total));
 
-                const [monthlyCost, checkedCount, topQuantities, topCosts, familyStat, userStat] = await Promise.all(promises);
-
-                console.log('All data fetched:', { monthlyCost, checkedCount, topQuantities, topCosts, familyStat, userStat });
-
-                setMonthlyCostData(monthlyCost || []);
-                setCheckedItemsCount(checkedCount || 0);
-                setTopIngredientsByQuantity(topQuantities || []);
-                setTopIngredientsByCost(topCosts || []);
-                setFamilyStats(familyStat || null);
-                setUserStats(userStat || null);
+                // Calculate monthly data
+                calculateMonthlyData(lists || []);
             } catch (error) {
-                console.error('Error fetching statistics:', error);
-                // Set empty defaults
-                setMonthlyCostData([]);
-                setCheckedItemsCount(0);
-                setTopIngredientsByQuantity([]);
-                setTopIngredientsByCost([]);
-                setFamilyStats(null);
-                setUserStats(null);
+                console.error('Error fetching my shopping lists:', error);
+                setMyLists([]);
+                setTotalCost(0);
             } finally {
                 setLoading(false);
-                console.log('Finished fetching statistics, loading set to false');
             }
         };
 
-        fetchAllData();
-    }, [currentFamilyId, currentUserId]);
+        fetchMyLists();
+    }, []);
+
+    const calculateMonthlyData = (lists: ShoppingList[]) => {
+        const monthNames = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
+        const monthlyTotals = new Array(12).fill(0);
+
+        lists.forEach(list => {
+            if (list.shopping_date) {
+                const date = new Date(list.shopping_date);
+                const month = date.getMonth();
+                monthlyTotals[month] += Number(list.cost) || 0;
+            }
+        });
+
+        // Get last 6 months with data or current 6 months
+        const currentMonth = new Date().getMonth();
+        const labels: string[] = [];
+        const data: number[] = [];
+
+        for (let i = 5; i >= 0; i--) {
+            const monthIndex = (currentMonth - i + 12) % 12;
+            labels.push(monthNames[monthIndex]);
+            data.push(Math.round(monthlyTotals[monthIndex] / 1000)); // Convert to thousands
+        }
+
+        setMonthlyData({ labels, data });
+    };
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    };
+
+    // Prepare pie chart data - top 5 shopping lists by cost
+    const preparePieData = () => {
+        console.log('Preparing pie data, myLists:', myLists);
+        if (!myLists || myLists.length === 0) return [];
+
+        const colors = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#A855F7'];
+
+        const sortedLists = [...myLists]
+            .filter(list => Number(list.cost) > 0)
+            .sort((a, b) => Number(b.cost) - Number(a.cost))
+            .slice(0, 5);
+
+        console.log('Sorted lists for pie:', sortedLists);
+
+        const result = sortedLists.map((list, index) => ({
+            name: formatDate(list.shopping_date),
+            population: Number(list.cost) || 1,
+            color: colors[index % colors.length],
+            legendFontColor: '#1F2937',
+            legendFontSize: 12,
+        }));
+
+        console.log('Pie chart data:', result);
+        return result;
+    };
+
+    const pieData = preparePieData();
 
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.purple} />
+                <Text style={styles.loadingText}>Đang tải...</Text>
             </View>
         );
     }
 
-    // Prepare data for pie chart based on top ingredients by cost
-    const preparePieData = () => {
-        return topIngredientsByCost.slice(0, 4).map((item, index) => {
-            const colors = ['#EF4444', '#10B981', '#3B82F6', '#F59E0B'];
-            return {
-                name: item.ingredient_name || `Nguyên liệu ${index + 1}`,
-                population: item.total_cost || 0,
-                color: colors[index % colors.length],
-                legendFontColor: '#1F2937',
-                legendFontSize: 14,
-                legendFontFamily: 'System',
-            };
-        });
-    };
-
-    const pieData = preparePieData();
-
-    // Prepare data for line chart based on monthly cost
-    const prepareLineData = () => {
-        // Create labels for all months
-        const months = Array.from({ length: 12 }, (_, i) => {
-            const month = i + 1;
-            return `${month}/`;
-        });
-        
-        // Create data points for each month
-        const dataPoints = Array(12).fill(0);
-        monthlyCostData.forEach((item) => {
-            // Extract month from the month string (format: "YYYY-MM")
-            const monthStr = item.month || '';
-            if (monthStr.includes('-')) {
-                const month = parseInt(monthStr.split('-')[1]);
-                if (month >= 1 && month <= 12) {
-                    dataPoints[month - 1] = Math.round(item.total_cost / 1000); // Convert to thousands for display
-                }
-            }
-        });
-
-        return {
-            labels: months,
-            datasets: [
-                {
-                    data: dataPoints,
-                    color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
-                    strokeWidth: 3
-                }
-            ],
-        };
-    };
-
-    const lineData = prepareLineData();
-    const data = lineData.datasets[0].data;
-    const maxValue = Math.max(...data, 100); // Ensure minimum value for scaling
-    const chartHeight = 220;
-    const chartWidth = screenWidth - 60;
-
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Summary Cards */}
-            <View style={styles.summaryRow}>
-                <View style={[styles.summaryCard, { backgroundColor: '#F3E8FF' }]}>
-                    <Text style={styles.summaryLabel}>Tổng chi tiêu</Text>
-                    <Text style={styles.summaryValue}>{(familyStats?.total_cost / 1000).toFixed(0)}k đ</Text>
-                    <Text style={styles.summarySubtext}>Gia đình</Text>
+            {/* Summary Card */}
+            <View style={styles.summaryCard}>
+                <View style={styles.summaryHeader}>
+                    <Ionicons name="wallet" size={28} color="#3B82F6" />
+                    <Text style={styles.summaryLabel}>Tổng chi tiêu cá nhân</Text>
                 </View>
-                <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
-                    <Text style={styles.summaryLabel}>Chi tiêu cá nhân</Text>
-                    <Text style={styles.summaryValue}>{(userStats?.total_cost / 1000).toFixed(0)}k đ</Text>
-                    <Text style={styles.summarySubtext}>Cá nhân</Text>
-                </View>
+                <Text style={styles.summaryValue}>{formatCurrency(totalCost)}</Text>
+                <Text style={styles.summarySubtext}>{myLists.length} danh sách mua sắm</Text>
+            </View>
+
+            {/* Monthly Bar Chart */}
+            <View style={styles.chartContainer}>
+                <Text style={styles.chartTitle}>Chi tiêu theo tháng</Text>
+                <Text style={styles.chartSubtitle}>Đơn vị: nghìn đồng (k)</Text>
+
+                {monthlyData.data.some(v => v > 0) ? (
+                    <BarChart
+                        data={{
+                            labels: monthlyData.labels,
+                            datasets: [{ data: monthlyData.data.map(v => v || 0) }]
+                        }}
+                        width={screenWidth - 60}
+                        height={200}
+                        yAxisLabel=""
+                        yAxisSuffix="k"
+                        chartConfig={{
+                            backgroundColor: '#ffffff',
+                            backgroundGradientFrom: '#ffffff',
+                            backgroundGradientTo: '#ffffff',
+                            decimalPlaces: 0,
+                            color: (opacity = 1) => `rgba(22, 163, 74, ${opacity})`,
+                            labelColor: (opacity = 1) => `rgba(55, 65, 81, ${opacity})`,
+                            style: { borderRadius: 16 },
+                            barPercentage: 0.6,
+                        }}
+                        style={styles.chart}
+                        fromZero
+                        showValuesOnTopOfBars
+                    />
+                ) : (
+                    <View style={styles.emptyChart}>
+                        <Ionicons name="bar-chart-outline" size={48} color={COLORS.grey} />
+                        <Text style={styles.emptyText}>Chưa có dữ liệu</Text>
+                    </View>
+                )}
             </View>
 
             {/* Pie Chart */}
             <View style={styles.chartContainer}>
-                <View style={styles.chartHeader}>
-                    <Text style={styles.chartTitle}>Top nguyên liệu theo chi phí</Text>
-                    <Text style={styles.chartSubtitle}>Theo % giá trị</Text>
-                </View>
-                <View style={styles.chartWrapper}>
-                    {pieData.length > 0 ? (
-                        <PieChart
-                            data={pieData}
-                            width={screenWidth - 60}
-                            height={220}
-                            chartConfig={CHART_CONFIG}
-                            accessor={"population"}
-                            backgroundColor={"transparent"}
-                            paddingLeft={"15"}
-                            center={[0, 0]}
-                            absolute
-                            hasLegend={true}
-                        />
-                    ) : (
-                        <View style={styles.emptyChart}>
-                            <Text style={styles.emptyChartText}>Không có dữ liệu</Text>
-                        </View>
-                    )}
-                </View>
-            </View>
+                <Text style={styles.chartTitle}>Top 5 chi tiêu lớn nhất</Text>
+                <Text style={styles.chartSubtitle}>Theo ngày mua sắm</Text>
 
-            {/* Line Chart */}
-            <View style={styles.chartContainer}>
-                <View style={styles.chartHeader}>
-                    <Text style={styles.chartTitle}>Chi tiêu theo tháng</Text>
-                    <Text style={styles.chartSubtitle}>Đơn vị: nghìn đồng</Text>
-                </View>
-                <ScrollView
-                    horizontal={true}
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.chartScrollView}
-                    contentContainerStyle={styles.chartScrollContent}
-                >
-                    <LineChart
-                        data={lineData}
-                        width={Math.max(screenWidth * 1.5, chartWidth * 1.5)} // Make the chart wider for horizontal scrolling
-                        height={chartHeight}
-                        chartConfig={CHART_CONFIG}
-                        bezier
-                        style={styles.lineChart}
-                        withInnerLines={true}
-                        withOuterLines={true}
-                        withVerticalLabels={true}
-                        withHorizontalLabels={true}
-                        withDots={true}
-                        withShadow={false}
-                        fromZero={true}
-                        segments={4}
-                        formatYLabel={(value) => `${value}k`}
-                        decorator={() => {
-                            return lineData.datasets[0].data.map((value, index) => {
-                                if (value === undefined || value === null || value === 0) return null;
-
-                                // Calculate x position based on index and chart dimensions
-                                const xPosition = (Math.max(screenWidth * 1.5, chartWidth * 1.5) - 120) / (lineData.labels.length - 1) * index + 60;
-                                // Calculate y position based on value
-                                const yPosition = chartHeight - 40 - ((value / maxValue) * (chartHeight - 60));
-
-                                return (
-                                    <View
-                                        key={index}
-                                        style={{
-                                            position: 'absolute',
-                                            left: xPosition - 20,
-                                            top: yPosition - 30,
-                                        }}
-                                    >
-                                        <View style={styles.valueLabel}>
-                                            <Text style={styles.valueLabelText}>{value}k</Text>
-                                        </View>
-                                    </View>
-                                );
-                            });
+                {pieData.length > 0 ? (
+                    <PieChart
+                        data={pieData}
+                        width={screenWidth - 60}
+                        height={200}
+                        chartConfig={{
+                            backgroundColor: '#ffffff',
+                            backgroundGradientFrom: '#ffffff',
+                            backgroundGradientTo: '#ffffff',
+                            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                         }}
+                        accessor="population"
+                        backgroundColor="transparent"
+                        paddingLeft="15"
+                        center={[0, 0]}
+                        hasLegend={true}
+                        absolute
                     />
-                </ScrollView>
-                {/* Legend */}
-                <View style={styles.legendContainer}>
-                    <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: '#A855F7' }]} />
-                        <Text style={styles.legendText}>Chi tiêu hằng tháng</Text>
+                ) : (
+                    <View style={styles.emptyChart}>
+                        <Ionicons name="pie-chart-outline" size={48} color={COLORS.grey} />
+                        <Text style={styles.emptyText}>Chưa có dữ liệu</Text>
                     </View>
-                </View>
+                )}
             </View>
 
-            {/* Bottom Spacing */}
             <View style={{ height: 20 }} />
         </ScrollView>
     );
@@ -363,129 +218,75 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#F9FAFB',
-        padding: 20,
     },
-    summaryRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
+    loadingText: {
+        marginTop: 12,
+        color: COLORS.grey,
     },
     summaryCard: {
-        flex: 1,
-        padding: 16,
+        backgroundColor: '#DBEAFE',
         borderRadius: 16,
-        marginHorizontal: 4,
+        padding: 20,
+        marginBottom: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    summaryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
     },
     summaryLabel: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginBottom: 8,
+        fontSize: 14,
+        color: '#1F2937',
+        marginLeft: 8,
         fontWeight: '600',
     },
     summaryValue: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
         color: '#1F2937',
         marginBottom: 4,
     },
     summarySubtext: {
-        fontSize: 11,
-        color: '#9CA3AF',
+        fontSize: 12,
+        color: '#6B7280',
     },
     chartContainer: {
         backgroundColor: COLORS.white,
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 20,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
+        shadowOpacity: 0.05,
         shadowRadius: 8,
-        elevation: 3,
-    },
-    chartHeader: {
-        marginBottom: 20,
+        elevation: 2,
     },
     chartTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#1F2937',
         marginBottom: 4,
     },
     chartSubtitle: {
-        fontSize: 13,
+        fontSize: 12,
         color: '#6B7280',
-        fontWeight: '500',
+        marginBottom: 16,
     },
-    chartWrapper: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    chartScrollView: {
-        // Styles for the horizontal scroll view
-        flexDirection: 'row',
-    },
-    chartScrollContent: {
-        // Make the content wider to allow scrolling
-        paddingRight: 50,
-    },
-    lineChart: {
-        borderRadius: 16,
-        paddingRight: 0,
-    },
-    legendContainer: {
-        marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-    },
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    legendDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        marginRight: 8,
-    },
-    legendText: {
-        fontSize: 14,
-        color: '#374151',
-        fontWeight: '600',
-    },
-    valueLabel: {
-        backgroundColor: '#A855F7',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-        minWidth: 40,
-        alignItems: 'center',
-    },
-    valueLabelText: {
-        color: '#FFFFFF',
-        fontSize: 10,
-        fontWeight: 'bold',
+    chart: {
+        borderRadius: 12,
+        marginLeft: -10,
     },
     emptyChart: {
-        flex: 1,
-        justifyContent: 'center',
+        paddingVertical: 40,
         alignItems: 'center',
-        height: 200,
     },
-    emptyChartText: {
-        fontSize: 16,
-        color: '#6B7280',
-        textAlign: 'center',
+    emptyText: {
+        marginTop: 12,
+        color: COLORS.grey,
     },
 });
