@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { COLORS } from '@/constants/themes';
-import { getAccess } from '@/utils/api';
+import { getAccess, logoutUser } from '@/utils/api';
 import ActionMenu from '@/components/ActionMenu';
 
 type UserProfile = {
@@ -68,6 +68,33 @@ export default function ProfileScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchProfile(true);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Đăng xuất',
+      'Bạn có chắc chắn muốn đăng xuất?',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logoutUser();
+              router.replace('/(auth)' as any);
+            } catch (error) {
+              console.error('Lỗi khi đăng xuất:', error);
+              Alert.alert('Lỗi', 'Không thể đăng xuất, vui lòng thử lại.');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const formatDate = (value: string | undefined) => {
@@ -182,6 +209,12 @@ export default function ProfileScreen() {
                 'Tính năng khóa bảo vệ tài khoản sẽ được triển khai.',
               );
             },
+          },
+          {
+            label: 'Đăng xuất',
+            icon: 'log-out-outline',
+            destructive: true,
+            onPress: handleLogout,
           },
         ]}
       />
