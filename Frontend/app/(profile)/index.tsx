@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { COLORS } from '@/constants/themes';
-import { getAccess } from '@/utils/api';
+import { getAccess, patchAccess } from '@/utils/api';
 import ActionMenu from '@/components/ActionMenu';
 
 type UserProfile = {
@@ -17,6 +17,7 @@ type UserProfile = {
   address: string | null;
   phone: string | null;
   role: string;
+  profile_status?: 'public' | 'private';
   created_at: string;
   updated_at: string;
 };
@@ -68,6 +69,52 @@ export default function ProfilePage() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchProfile(true);
+  };
+
+  const handleToggleProfileStatus = async () => {
+    if (!profile) return;
+
+    const currentStatus = profile.profile_status || 'public';
+    const newStatus = currentStatus === 'public' ? 'private' : 'public';
+    const statusText = newStatus === 'private' ? 'riêng tư' : 'công khai';
+    const actionText = newStatus === 'private' ? 'khóa' : 'mở khóa';
+
+    Alert.alert(
+      'Xác nhận',
+      `Bạn có chắc chắn muốn ${actionText} bảo vệ trang cá nhân? Trang cá nhân của bạn sẽ chuyển sang trạng thái ${statusText}.`,
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Xác nhận',
+          onPress: async () => {
+            try {
+              setMenuVisible(false);
+              const payload = await patchAccess(`users/${profile.id}`, {
+                profile_status: newStatus,
+              });
+
+              if (payload?.success !== false) {
+                Alert.alert(
+                  'Thành công',
+                  `Đã ${actionText} bảo vệ trang cá nhân thành công. Trang cá nhân của bạn hiện đang ở trạng thái ${statusText}.`
+                );
+                // Refresh profile để cập nhật trạng thái mới
+                fetchProfile(true);
+              } else {
+                throw new Error(payload?.message || 'Không thể cập nhật trạng thái');
+              }
+            } catch (err: any) {
+              console.error('handleToggleProfileStatus error', err);
+              const errorMessage = err?.response?.data?.message || err?.message || 'Không thể cập nhật trạng thái. Vui lòng thử lại.';
+              Alert.alert('Lỗi', errorMessage);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatDate = (value: string | undefined) => {
@@ -176,14 +223,9 @@ export default function ProfilePage() {
             },
           },
           {
-            label: 'Khóa bảo vệ tài khoản',
-            icon: 'lock-closed-outline',
-            onPress: () => {
-              Alert.alert(
-                'Khóa bảo vệ',
-                'Tính năng khóa bảo vệ tài khoản sẽ được triển khai.',
-              );
-            },
+            label: profile?.profile_status === 'private' ? 'Mở khóa bảo vệ' : 'Khóa bảo vệ trang cá nhân',
+            icon: profile?.profile_status === 'private' ? 'lock-open-outline' : 'lock-closed-outline',
+            onPress: handleToggleProfileStatus,
           },
         ]}
       />

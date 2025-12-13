@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_DOMAIN = process.env.API || 'https://it4788-deploy-8.onrender.com/api/';
+const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 // const API_DOMAIN = process.env.API_DOMAIN || 'http://192.168.100.84:8090/api/';
 // const API_DOMAIN = 'http://localhost:8090/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;

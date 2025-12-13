@@ -355,6 +355,54 @@ export const mealStyles = StyleSheet.create({
     color: COLORS.purple,
     fontWeight: '600',
   },
+  // Date Carousel Styles
+  dateCarouselContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 16,
+    gap: 8,
+    backgroundColor: COLORS.white,
+  },
+  dateNavButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateCarousel: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  dateItem: {
+    minWidth: 70,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: COLORS.lightGrey,
+  },
+  dateItemActive: {
+    backgroundColor: COLORS.purple,
+  },
+  dateWeekday: {
+    fontSize: 12,
+    color: COLORS.darkGrey,
+    opacity: 0.7,
+  },
+  dateWeekdayActive: {
+    color: COLORS.white,
+    opacity: 1,
+  },
+  dateDay: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.darkGrey,
+    marginTop: 4,
+  },
+  dateDayActive: {
+    color: COLORS.white,
+  },
 });
 
 

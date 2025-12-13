@@ -158,7 +158,7 @@ export default function EditProfileScreen() {
       if (response && response.success && response.data) {
         const imageUrl = response.data.url || response.data.secure_url || response.data;
         setAvatarUrl(imageUrl);
-        Alert.alert('Thành công', 'Upload ảnh đại diện thành công.');
+        // Alert.alert('Thành công', 'Upload ảnh đại diện thành công.');
       } else {
         throw new Error(response?.message || 'Upload failed');
       }

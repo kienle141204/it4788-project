@@ -29,6 +29,11 @@ export default function FoodPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Favorite dishes state
+  const [favoriteDishes, setFavoriteDishes] = useState<Dish[]>([]);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
 
   const handleBack = () => {
     router.back();
@@ -116,9 +121,67 @@ export default function FoodPage() {
   };
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    fetchDishes(1, true);
+    if (activeTab === 'explore') {
+      setRefreshing(true);
+      fetchDishes(1, true);
+    } else {
+      setRefreshing(true);
+      fetchFavoriteDishes(true);
+    }
   };
+
+  const fetchFavoriteDishes = useCallback(async (silent = false) => {
+    if (!silent) {
+      setFavoriteLoading(true);
+    }
+    setFavoriteError(null);
+
+    try {
+      const payload = await getAccess('favorite-dishes');
+
+      if (payload?.success !== false && payload?.data) {
+        // Transform favorite dishes data: extract dish objects from favorite items
+        const dishesList: Dish[] = payload.data
+          .map((item: any) => {
+            if (item.dish) {
+              return {
+                id: String(item.dish.id || item.dish_id),
+                name: item.dish.name || '',
+                description: item.dish.description || '',
+                image_url: item.dish.image_url || null,
+                created_at: item.dish.created_at || item.created_at,
+              };
+            }
+            return null;
+          })
+          .filter((dish: Dish | null) => dish !== null) as Dish[];
+
+        setFavoriteDishes(dishesList);
+      } else {
+        throw new Error(payload?.message || 'Không thể tải danh sách món ăn yêu thích');
+      }
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.log('fetchFavoriteDishes error', err);
+      setFavoriteError('Không thể tải danh sách món ăn yêu thích. Vui lòng thử lại.');
+      setFavoriteDishes([]);
+    } finally {
+      if (!silent) {
+        setFavoriteLoading(false);
+      }
+      setRefreshing(false);
+    }
+  }, [handleSessionExpired]);
+
+  // Fetch favorite dishes when switching to "mine" tab
+  useEffect(() => {
+    if (activeTab === 'mine') {
+      fetchFavoriteDishes();
+    }
+  }, [activeTab, fetchFavoriteDishes]);
 
   return (
     <View style={foodStyles.container}>
@@ -191,10 +254,13 @@ export default function FoodPage() {
       </View>
 
       {/* Content */}
-      {loading && dishes.length === 0 ? (
+      {((activeTab === 'explore' && loading && dishes.length === 0) || 
+        (activeTab === 'mine' && favoriteLoading && favoriteDishes.length === 0)) ? (
         <View style={foodStyles.loaderContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
-          <Text style={foodStyles.loaderText}>Đang tải món ăn...</Text>
+          <Text style={foodStyles.loaderText}>
+            {activeTab === 'explore' ? 'Đang tải món ăn...' : 'Đang tải món ăn yêu thích...'}
+          </Text>
         </View>
       ) : (
         <ScrollView 
@@ -251,9 +317,34 @@ export default function FoodPage() {
           )}
 
           {activeTab === 'mine' && (
-            <View style={foodStyles.emptyState}>
-              <Text style={foodStyles.emptyStateText}>Chưa có món ăn nào</Text>
-            </View>
+            <>
+              {favoriteError && (
+                <View style={foodStyles.errorContainer}>
+                  <Ionicons name="alert-circle-outline" size={20} color={COLORS.purple} />
+                  <Text style={foodStyles.errorText}>{favoriteError}</Text>
+                </View>
+              )}
+
+              {!favoriteError && favoriteDishes.length === 0 && (
+                <View style={foodStyles.emptyState}>
+                  <Text style={foodStyles.emptyStateText}>Chưa có món ăn yêu thích nào</Text>
+                </View>
+              )}
+
+              {!favoriteError && favoriteDishes.length > 0 && (
+                <View style={foodStyles.foodList}>
+                  {favoriteDishes.map((item) => (
+                    <FoodCard 
+                      key={item.id} 
+                      id={String(item.id)}
+                      name={item.name} 
+                      image_url={item.image_url}
+                      onPress={handleFoodPress}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       )}
