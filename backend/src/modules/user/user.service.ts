@@ -57,8 +57,6 @@ export class UserService {
     if (user.profile_status === 'private') {
       throw new ForbiddenException('Tài khoản này đang ở trạng thái riêng tư');
     }
-
-    // Nếu profile_status là public, cho phép xem
     return user;
   }
 
