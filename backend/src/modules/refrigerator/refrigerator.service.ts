@@ -163,83 +163,106 @@ export class RefrigeratorService {
    * Gợi ý các món ăn dựa trên nguyên liệu hiện có trong tủ lạnh
    */
   async suggestDishes(refrigerator_id: number, user: JwtUser) {
-    // đảm bảo người dùng có quyền truy cập tủ lạnh
-    await this.findOne(refrigerator_id, user);
+    try {
+      // đảm bảo người dùng có quyền truy cập tủ lạnh
+      await this.findOne(refrigerator_id, user);
 
-    const fridgeIngredients = await this.fridgeIngredientRepo.find({
-      where: { refrigerator_id },
-      relations: ['ingredient'],
-    });
-
-    if (!fridgeIngredients.length) {
-      return [];
-    }
-
-    const fridgeIngredientNames = Array.from(
-      new Set(
-        fridgeIngredients
-          .map((item) => item.ingredient?.name?.trim().toLowerCase())
-          .filter((name): name is string => Boolean(name)),
-      ),
-    );
-
-    if (!fridgeIngredientNames.length) {
-      return [];
-    }
-
-    const matchingDishIngredients = await this.dishesIngredientsRepo
-      .createQueryBuilder('di')
-      .leftJoinAndSelect('di.dish', 'dish')
-      .where('LOWER(di.ingredient_name) IN (:...names)', { names: fridgeIngredientNames })
-      .getMany();
-
-    if (!matchingDishIngredients.length) {
-      return [];
-    }
-
-    const dishIds = Array.from(new Set(matchingDishIngredients.map((item) => item.dish_id)));
-
-    const [allDishIngredients, dishes] = await Promise.all([
-      this.dishesIngredientsRepo.find({ where: { dish_id: In(dishIds) } }),
-      this.dishRepo.find({ where: { id: In(dishIds) } }),
-    ]);
-
-    const dishMap = new Map(dishes.map((dish) => [dish.id, dish]));
-
-    const suggestions = dishIds
-      .map((dishId) => {
-        const dish = dishMap.get(dishId);
-        if (!dish) return null;
-
-        const dishIngredients = allDishIngredients.filter((item) => item.dish_id === dishId);
-        const matchedIngredients = matchingDishIngredients.filter((item) => item.dish_id === dishId);
-
-        const matchedNames = Array.from(new Set(matchedIngredients.map((item) => item.ingredient_name)));
-        const allNames = Array.from(new Set(dishIngredients.map((item) => item.ingredient_name)));
-
-        const missingNames = allNames.filter((name) => !matchedNames.includes(name));
-        const totalIngredients = allNames.length;
-        const matchCount = matchedNames.length;
-        const matchPercentage = totalIngredients ? Number((matchCount / totalIngredients).toFixed(2)) : 0;
-
-        return {
-          dishId: dish.id,
-          dishName: dish.name,
-          matchCount,
-          totalIngredients,
-          matchPercentage,
-          matchedIngredients: matchedNames,
-          missingIngredients: missingNames,
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .sort((a, b) => {
-        if (b.matchPercentage !== a.matchPercentage) {
-          return b.matchPercentage - a.matchPercentage;
-        }
-        return b.matchCount - a.matchCount;
+      const fridgeIngredients = await this.fridgeIngredientRepo.find({
+        where: { refrigerator_id },
+        relations: ['ingredient'],
       });
 
-    return suggestions;
+      if (!fridgeIngredients.length) {
+        return [];
+      }
+
+      const fridgeIngredientNames = Array.from(
+        new Set(
+          fridgeIngredients
+            .map((item) => item.ingredient?.name?.trim().toLowerCase())
+            .filter((name): name is string => Boolean(name)),
+        ),
+      );
+
+      if (!fridgeIngredientNames.length) {
+        return [];
+      }
+
+      const matchingDishIngredients = await this.dishesIngredientsRepo
+        .createQueryBuilder('di')
+        .leftJoinAndSelect('di.dish', 'dish')
+        .where('LOWER(di.ingredient_name) IN (:...names)', { names: fridgeIngredientNames })
+        .getMany();
+
+      if (!matchingDishIngredients.length) {
+        return [];
+      }
+
+      const dishIds = Array.from(new Set(matchingDishIngredients.map((item) => item.dish_id)));
+
+      if (!dishIds.length) {
+        return [];
+      }
+
+      const [allDishIngredients, dishes] = await Promise.all([
+        this.dishesIngredientsRepo.find({ where: { dish_id: In(dishIds) } }),
+        this.dishRepo.find({ where: { id: In(dishIds) } }),
+      ]);
+
+      const dishMap = new Map(dishes.map((dish) => [dish.id, dish]));
+
+      const suggestions = dishIds
+        .map((dishId) => {
+          const dish = dishMap.get(dishId);
+          if (!dish) return null;
+
+          const dishIngredients = allDishIngredients.filter((item) => item.dish_id === dishId);
+          const matchedIngredients = matchingDishIngredients.filter((item) => item.dish_id === dishId);
+
+          const matchedNames = Array.from(new Set(matchedIngredients.map((item) => item.ingredient_name).filter(Boolean)));
+          const allNames = Array.from(new Set(dishIngredients.map((item) => item.ingredient_name).filter(Boolean)));
+
+          const missingNames = allNames.filter((name) => !matchedNames.includes(name));
+          const totalIngredients = allNames.length;
+          const matchCount = matchedNames.length;
+          const matchPercentage = totalIngredients ? Number((matchCount / totalIngredients).toFixed(2)) : 0;
+
+          return {
+            dishId: dish.id,
+            dishName: dish.name,
+            matchCount,
+            totalIngredients,
+            matchPercentage,
+            matchedIngredients: matchedNames,
+            missingIngredients: missingNames,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        .sort((a, b) => {
+          if (b.matchPercentage !== a.matchPercentage) {
+            return b.matchPercentage - a.matchPercentage;
+          }
+          return b.matchCount - a.matchCount;
+        });
+
+      return suggestions;
+    } catch (error: any) {
+      // Log lỗi để debug
+      console.error('Error in suggestDishes:', {
+        refrigerator_id,
+        error: error.message,
+        code: error.code,
+        errno: error.errno,
+        stack: error.stack,
+      });
+
+      // Nếu là lỗi database connection
+      if (error.code === 'ETIMEDOUT' || error.errno === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT')) {
+        throw new Error('Không thể kết nối đến cơ sở dữ liệu. Vui lòng thử lại sau.');
+      }
+
+      // Nếu là lỗi khác, throw lại
+      throw error;
+    }
   }
 }

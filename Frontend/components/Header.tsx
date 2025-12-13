@@ -1,16 +1,19 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/themes';
 import { homeStyles } from '../styles/home.styles';
 
 interface HeaderProps {
-  userName: string;
+  userName?: string;
+  avatarUrl?: string | null;
   onNotificationPress: () => void;
   onMenuPress: () => void;
 }
 
-export default function Header({ userName, onNotificationPress, onMenuPress }: HeaderProps) {
+const defaultAvatar = require('../assets/images/avatar.png');
+
+export default function Header({ userName, avatarUrl, onNotificationPress, onMenuPress }: HeaderProps) {
   return (
     <View style={homeStyles.header}>
       {/* Top bar */}
@@ -18,11 +21,21 @@ export default function Header({ userName, onNotificationPress, onMenuPress }: H
         {/* User profile section */}
         <View style={homeStyles.userProfile}>
           <View style={homeStyles.profileImageContainer}>
-            <Ionicons name="person" size={24} color={COLORS.white} />
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={homeStyles.profileImage}
+              />
+            ) : (
+              <Image
+                source={defaultAvatar}
+                style={homeStyles.profileImage}
+              />
+            )}
           </View>
           <View style={homeStyles.userInfo}>
             <Text style={homeStyles.greeting}>Hello!</Text>
-            <Text style={homeStyles.userName}>{userName}</Text>
+            <Text style={homeStyles.userName}>{userName || 'Người dùng'}</Text>
           </View>
         </View>
         <View style={homeStyles.headerActions}>

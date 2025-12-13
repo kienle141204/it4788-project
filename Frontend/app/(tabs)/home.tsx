@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import { BackHandler, ToastAndroid } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Import components
 import Header from '@/components/Header';
@@ -10,12 +11,47 @@ import TaskSummaryCard from '@/components/TaskSummaryCard';
 import NotificationCard from '@/components/NotificationCard';
 import FeatureGrid from '@/components/FeatureGrid';
 import { COLORS } from '@/constants/themes';
+import { getAccess } from '@/utils/api';
+
+type UserProfile = {
+  id: number;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+  address: string | null;
+  phone: string | null;
+  role: string;
+  created_at: string;
+  updated_at: string;
+};
 
 export default function HomePage() {
   const router = useRouter();
   const backPressCount = useRef(0);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   console.log('🏠 Đang ở HOME');
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const data = await getAccess('auth/profile');
+      setProfile(data);
+    } catch (err: any) {
+      console.error('Error fetching profile:', err);
+      // Không hiển thị lỗi để không làm gián đoạn trải nghiệm người dùng
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  // Refresh profile khi màn hình được focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [fetchProfile])
+  );
 
   useEffect(() => {
     const backAction = () => {
@@ -42,7 +78,7 @@ export default function HomePage() {
     { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
     { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
     { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
-    { id: 'personal', name: 'Cá nhân', icon: 'person' as const, color: '#10B981', bgColor: '#D1FAE5', onPress: () => router.push('/(profile)') },
+    { id: 'fridge', name: 'Tủ lạnh', icon: 'snow' as const, color: COLORS.green, bgColor: COLORS.greenLight, onPress: () => router.push('/(fridge)') },
     { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
     { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
     { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
@@ -68,7 +104,8 @@ export default function HomePage() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <Header
-          userName="Livia Vaccaro"
+          userName={profile?.full_name || 'Người dùng'}
+          avatarUrl={profile?.avatar_url}
           onNotificationPress={handleNotificationPress}
           onMenuPress={handleMenuPress}
         />

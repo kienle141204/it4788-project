@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/themes';
 import ShoppingHistory from '../../components/Statistics/ShoppingHistory';
 import SpendingCharts from '../../components/Statistics/SpendingCharts';
+import { safeGoBack } from '@/utils/navigation';
 // import DetailedStats from '../../components/Statistics/DetailedStats';
 
 export default function StatisticsScreen() {
@@ -15,7 +16,7 @@ export default function StatisticsScreen() {
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={() => safeGoBack(router)} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Thống kê mua sắm</Text>

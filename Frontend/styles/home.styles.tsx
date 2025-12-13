@@ -57,7 +57,6 @@ export const homeStyles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 15,
   },
   profileImageContainer: {
     width: 50,
@@ -67,6 +66,7 @@ export const homeStyles = StyleSheet.create({
     marginRight: 15,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   userInfo: {
     flex: 1,

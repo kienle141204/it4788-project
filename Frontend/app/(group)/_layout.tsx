@@ -6,10 +6,17 @@ export default function GroupLayout() {
     <Stack screenOptions={{headerShown:false}} >
       <Stack.Screen
         name="index"
-        // options={{
-        //   headerShown: false,
-        //   title: 'Gia đình',
-        // }}
+        options={{
+          headerShown: false,
+          title: 'Gia đình',
+        }}
+      />
+      <Stack.Screen
+        name="create"
+        options={{
+          headerShown: false,
+          title: 'Tạo gia đình mới',
+        }}
       />
     </Stack>
   );

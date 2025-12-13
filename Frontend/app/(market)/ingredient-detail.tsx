@@ -87,7 +87,13 @@ export default function IngredientDetailScreen() {
           <Text style={styles.errorText}>{error || "Không tìm thấy nguyên liệu"}</Text>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/home' as any);
+              }
+            }}
           >
             <Text style={styles.backButtonText}>Quay lại</Text>
           </TouchableOpacity>
@@ -103,7 +109,13 @@ export default function IngredientDetailScreen() {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButtonHeader}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/home' as any);
+              }
+            }}
           >
             <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
           </TouchableOpacity>

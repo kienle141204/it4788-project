@@ -135,7 +135,11 @@ export default function CreateMenuPage() {
   }, [showDishModal, fetchDishes]);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleSelectFamily = (family: Family) => {
@@ -209,11 +213,18 @@ export default function CreateMenuPage() {
 
       await Promise.all(addDishPromises);
 
-      Alert.alert('Thành công', 'Tạo thực đơn thành công');
-      // Tự động quay lại sau 1 giây
-      setTimeout(() => {
-        router.back();
-      }, 1000);
+      Alert.alert('Thành công', 'Tạo thực đơn thành công', [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/home' as any);
+            }
+          },
+        },
+      ]);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
