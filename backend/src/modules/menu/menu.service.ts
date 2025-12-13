@@ -435,7 +435,7 @@ export class MenuService {
         throw new ForbiddenException('Bạn không có quyền xóa menu này');
       }
     }
-    // Nếu role là admin, không cần kiểm tra quyền
+    await this.menuDishRepository.delete({ menu_id: menuId });
 
     await this.menuRepository.delete(menuId);
   }
