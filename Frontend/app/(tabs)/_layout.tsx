@@ -74,7 +74,7 @@ export default function TabsLayout() {
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'document-text' : 'document-text-outline'}
+              name={focused ? 'compass' : 'compass-outline'}
               size={24}
               color={color}
             />

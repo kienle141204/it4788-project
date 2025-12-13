@@ -112,6 +112,9 @@ export const foodStyles = StyleSheet.create({
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    minHeight: 104,
+    maxHeight: 104,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -123,6 +126,7 @@ export const foodStyles = StyleSheet.create({
   },
   cardImageContainer: {
     marginRight: 12,
+    flexShrink: 0,
   },
   cardImage: {
     width: 80,
@@ -141,12 +145,14 @@ export const foodStyles = StyleSheet.create({
   cardContent: {
     flex: 1,
     justifyContent: 'center',
+    minWidth: 0, // Cho phép text wrap
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.darkGrey,
     marginBottom: 4,
+    flexShrink: 1,
   },
   emptyState: {
     flex: 1,

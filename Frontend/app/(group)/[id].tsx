@@ -34,6 +34,45 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 
+// InfoRow component for member profile
+const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
+  <View style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  }}>
+    <View style={{
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: '#EEF2FF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    }}>
+      <Ionicons name={icon as any} size={18} color={COLORS.purple} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={{
+        fontSize: 12,
+        color: COLORS.grey,
+        marginBottom: 2,
+      }}>
+        {label}
+      </Text>
+      <Text style={{
+        fontSize: 15,
+        color: COLORS.darkGrey,
+        fontWeight: '500',
+      }}>
+        {value}
+      </Text>
+    </View>
+  </View>
+);
+
 interface Member {
   id: number;
   user_id: number;
@@ -148,6 +187,11 @@ export default function GroupDetailPage() {
   const [showMemberMenu, setShowMemberMenu] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
+  
+  // Member profile states
+  const [showMemberProfileModal, setShowMemberProfileModal] = useState(false);
+  const [memberProfile, setMemberProfile] = useState<any>(null);
+  const [loadingMemberProfile, setLoadingMemberProfile] = useState(false);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -338,6 +382,29 @@ export default function GroupDetailPage() {
     setShowMemberMenu(true);
   };
 
+  const fetchMemberProfile = useCallback(async (userId: number) => {
+    setLoadingMemberProfile(true);
+    try {
+      const payload = await getAccess(`users/${userId}`);
+      if (payload?.success !== false && payload?.data) {
+        setMemberProfile(payload.data);
+        setShowMemberProfileModal(true);
+      } else {
+        throw new Error(payload?.message || 'Không thể tải thông tin thành viên');
+      }
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.error('fetchMemberProfile error', err);
+      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin thành viên';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setLoadingMemberProfile(false);
+    }
+  }, [handleSessionExpired]);
+
   const getMemberMenuOptions = () => {
     if (!selectedMember) return [];
     
@@ -349,10 +416,8 @@ export default function GroupDetailPage() {
       label: 'Xem thông tin',
       icon: 'person-outline' as const,
       onPress: () => {
-        Alert.alert(
-          'Thông tin thành viên',
-          `Tên: ${selectedMember.user?.full_name || 'N/A'}\nEmail: ${selectedMember.user?.email || 'N/A'}\nVai trò: ${isMemberManager ? 'Quản trị viên' : 'Thành viên'}`,
-        );
+        setShowMemberMenu(false);
+        fetchMemberProfile(selectedMember.user_id);
       },
     });
 
@@ -1101,6 +1166,195 @@ export default function GroupDetailPage() {
           }}
         />
       )}
+
+      {/* Member Profile Modal */}
+      <Modal
+        visible={showMemberProfileModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowMemberProfileModal(false);
+          setMemberProfile(null);
+        }}
+      >
+        <View style={groupStyles.modalOverlay}>
+          <View style={[groupStyles.modalContent, { maxHeight: '90%' }]}>
+            <View style={groupStyles.modalHeader}>
+              <Text style={groupStyles.modalTitle}>Thông tin thành viên</Text>
+              <TouchableOpacity
+                style={groupStyles.modalCloseButton}
+                onPress={() => {
+                  setShowMemberProfileModal(false);
+                  setMemberProfile(null);
+                }}
+              >
+                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ maxHeight: '80%' }}
+              showsVerticalScrollIndicator={false}
+            >
+              {loadingMemberProfile ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={COLORS.purple} />
+                  <Text style={{ marginTop: 12, color: COLORS.grey }}>Đang tải thông tin...</Text>
+                </View>
+              ) : memberProfile ? (
+                <>
+                  {/* Profile Card */}
+                  <View style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 20,
+                    padding: 24,
+                    alignItems: 'center',
+                    marginBottom: 20,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.05,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: 2,
+                  }}>
+                    {memberProfile.avatar_url ? (
+                      <Image
+                        source={{ uri: memberProfile.avatar_url }}
+                        style={{
+                          width: 96,
+                          height: 96,
+                          borderRadius: 48,
+                          marginBottom: 16,
+                        }}
+                      />
+                    ) : (
+                      <View style={{
+                        width: 96,
+                        height: 96,
+                        borderRadius: 48,
+                        backgroundColor: COLORS.purple,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginBottom: 16,
+                      }}>
+                        <Text style={{
+                          fontSize: 36,
+                          fontWeight: '600',
+                          color: COLORS.white,
+                        }}>
+                          {(memberProfile.fullname || memberProfile.full_name || 'U').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={{
+                      fontSize: 22,
+                      fontWeight: '700',
+                      color: COLORS.darkGrey,
+                    }}>
+                      {memberProfile.fullname || memberProfile.full_name || 'Không có tên'}
+                    </Text>
+                    <Text style={{
+                      fontSize: 14,
+                      color: COLORS.grey,
+                      marginTop: 4,
+                    }}>
+                      {memberProfile.email}
+                    </Text>
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: COLORS.purple,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      marginTop: 12,
+                      gap: 6,
+                    }}>
+                      <Ionicons name="shield-checkmark" size={16} color={COLORS.white} />
+                      <Text style={{
+                        color: COLORS.white,
+                        fontWeight: '600',
+                        textTransform: 'capitalize',
+                      }}>
+                        {memberProfile.role || 'user'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Contact Information */}
+                  <View style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 16,
+                    padding: 20,
+                    marginBottom: 16,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.04,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 2 },
+                    elevation: 1,
+                  }}>
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: COLORS.darkGrey,
+                      marginBottom: 12,
+                    }}>
+                      Thông tin liên hệ
+                    </Text>
+                    <InfoRow icon="mail-outline" label="Email" value={memberProfile.email || 'Chưa cập nhật'} />
+                    <InfoRow icon="call-outline" label="Số điện thoại" value={memberProfile.phone || 'Chưa cập nhật'} />
+                    <InfoRow icon="location-outline" label="Địa chỉ" value={memberProfile.address || 'Chưa cập nhật'} />
+                  </View>
+
+                  {/* Activity */}
+                  <View style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 16,
+                    padding: 20,
+                    marginBottom: 16,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.04,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 2 },
+                    elevation: 1,
+                  }}>
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: COLORS.darkGrey,
+                      marginBottom: 12,
+                    }}>
+                      Hoạt động
+                    </Text>
+                    <InfoRow 
+                      icon="calendar-outline" 
+                      label="Ngày tạo" 
+                      value={memberProfile.created_at ? new Date(memberProfile.created_at).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      }) : 'Chưa cập nhật'} 
+                    />
+                    <InfoRow 
+                      icon="time-outline" 
+                      label="Cập nhật gần nhất" 
+                      value={memberProfile.updated_at ? new Date(memberProfile.updated_at).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      }) : 'Chưa cập nhật'} 
+                    />
+                  </View>
+                </>
+              ) : (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <Ionicons name="alert-circle-outline" size={48} color={COLORS.grey} />
+                  <Text style={{ marginTop: 12, color: COLORS.grey }}>Không có thông tin</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Add Shopping List Modal */}
       <Modal

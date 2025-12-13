@@ -45,6 +45,7 @@ export default function CreateMenuPage() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [time, setTime] = useState<string>('breakfast'); // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   const [selectedDishes, setSelectedDishes] = useState<SelectedDish[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingFamilies, setLoadingFamilies] = useState(true);
@@ -185,6 +186,7 @@ export default function CreateMenuPage() {
       // Tạo menu
       const menuResponse = await postAccess(`menus?familyId=${selectedFamilyId}`, {
         description: description.trim() || undefined,
+        time: time,
       });
 
       if (!menuResponse?.success) {
@@ -207,12 +209,11 @@ export default function CreateMenuPage() {
 
       await Promise.all(addDishPromises);
 
-      Alert.alert('Thành công', 'Tạo thực đơn thành công', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
+      Alert.alert('Thành công', 'Tạo thực đơn thành công');
+      // Tự động quay lại sau 1 giây
+      setTimeout(() => {
+        router.back();
+      }, 1000);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -265,6 +266,42 @@ export default function CreateMenuPage() {
             </Text>
             <Ionicons name="chevron-down" size={20} color={COLORS.grey} />
           </TouchableOpacity>
+        </View>
+
+        {/* Chọn bữa ăn */}
+        <View style={mealStyles.menuCard}>
+          <Text style={mealStyles.sectionLabel}>Bữa ăn *</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {[
+              { value: 'breakfast', label: 'Bữa sáng' },
+              { value: 'lunch', label: 'Bữa trưa' },
+              { value: 'dinner', label: 'Bữa chiều' },
+              { value: 'snack', label: 'Bữa tối' },
+            ].map(option => (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => setTime(option.value)}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: time === option.value ? COLORS.purple : COLORS.grey,
+                  backgroundColor: time === option.value ? COLORS.purple : COLORS.white,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: time === option.value ? COLORS.white : COLORS.darkGrey,
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Mô tả */}
