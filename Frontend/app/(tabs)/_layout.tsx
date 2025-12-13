@@ -1,10 +1,12 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/themes';
+import { useRouter } from 'expo-router';
 
 export default function TabsLayout() {
+  const router = useRouter();
   return (
     <Tabs
       screenOptions={{
@@ -65,7 +67,7 @@ export default function TabsLayout() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            Alert.alert('Thêm mới', 'Tạo nội dung mới');
+            router.push('/(group)/create' as any);
           },
         }}
       />

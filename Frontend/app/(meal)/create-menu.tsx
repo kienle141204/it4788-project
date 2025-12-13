@@ -134,7 +134,11 @@ export default function CreateMenuPage() {
   }, [showDishModal, fetchDishes]);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleSelectFamily = (family: Family) => {
@@ -210,7 +214,13 @@ export default function CreateMenuPage() {
       Alert.alert('Thành công', 'Tạo thực đơn thành công', [
         {
           text: 'OK',
-          onPress: () => router.back(),
+          onPress: () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/home' as any);
+            }
+          },
         },
       ]);
     } catch (err: any) {

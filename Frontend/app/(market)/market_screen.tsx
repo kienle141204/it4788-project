@@ -175,7 +175,13 @@ export default function MarketScreen() {
         <View style={marketStyles.header}>
           <TouchableOpacity 
             style={marketStyles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/home' as any);
+              }
+            }}
           >
             <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
           </TouchableOpacity>
@@ -283,8 +289,8 @@ export default function MarketScreen() {
                       style={marketStyles.addBtn}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="cart-outline" size={16} color={COLORS.white} />
-                      <Text style={marketStyles.addText}>Thêm vào giỏ</Text>
+                      <Ionicons name="eye-outline" size={16} color={COLORS.white} />
+                      <Text style={marketStyles.addText}>Xem chi tiết</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>

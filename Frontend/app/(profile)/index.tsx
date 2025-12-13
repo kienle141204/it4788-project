@@ -143,7 +143,13 @@ export default function ProfilePage() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)/home' as any);
+          }
+        }}>
           <Ionicons name="arrow-back" size={22} color={COLORS.darkGrey} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trang cá nhân</Text>

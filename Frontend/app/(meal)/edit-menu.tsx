@@ -108,7 +108,11 @@ export default function EditMenuPage() {
       }
       console.error('fetchMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể tải thông tin thực đơn');
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/home' as any);
+      }
     } finally {
       setLoadingMenu(false);
     }
@@ -158,7 +162,11 @@ export default function EditMenuPage() {
   }, [showDishModal, fetchDishes]);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleAddDish = (dish: Dish) => {
@@ -261,7 +269,13 @@ export default function EditMenuPage() {
       Alert.alert('Thành công', 'Cập nhật thực đơn thành công', [
         {
           text: 'OK',
-          onPress: () => router.back(),
+          onPress: () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/home' as any);
+            }
+          },
         },
       ]);
     } catch (err: any) {

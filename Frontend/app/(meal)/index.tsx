@@ -161,7 +161,11 @@ export default function MealPage() {
   );
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleAddMenuPress = () => {

@@ -205,7 +205,11 @@ export default function EditProfileScreen() {
       });
 
       Alert.alert('Thành công', 'Cập nhật thông tin cá nhân thành công.');
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/home' as any);
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Lỗi', 'Không thể cập nhật thông tin. Vui lòng thử lại.');
@@ -221,7 +225,13 @@ export default function EditProfileScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/home' as any);
+            }
+          }}>
             <Ionicons name="arrow-back" size={22} color={COLORS.darkGrey} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Sửa thông tin cá nhân</Text>
@@ -322,7 +332,13 @@ export default function EditProfileScreen() {
           <View style={styles.footerButtons}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home' as any);
+                }
+              }}
               disabled={loading}
             >
               <Text style={[styles.buttonText, styles.cancelButtonText]}>Hủy</Text>

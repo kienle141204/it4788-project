@@ -339,7 +339,11 @@ export default function FoodDetailPage() {
   }, [reviewsPage, reviewsHasMore, reviewsLoadingMore, fetchReviews]);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleShareDish = async () => {

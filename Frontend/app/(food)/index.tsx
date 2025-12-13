@@ -31,7 +31,11 @@ export default function FoodPage() {
   const [error, setError] = useState<string | null>(null);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleNotificationPress = () => {
