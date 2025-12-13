@@ -40,7 +40,13 @@ export default function FoodCard({ id, name, image_url, onPress }: FoodCardProps
 
       {/* Text Content */}
       <View style={foodStyles.cardContent}>
-        <Text style={foodStyles.cardTitle}>{name}</Text>
+        <Text 
+          style={foodStyles.cardTitle}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {name}
+        </Text>
       </View>
     </TouchableOpacity>
   );

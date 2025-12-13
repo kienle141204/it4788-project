@@ -54,6 +54,7 @@ export default function EditMenuPage() {
   const [menuId] = useState<string | null>(id || null);
   const [family, setFamily] = useState<Family | null>(null);
   const [description, setDescription] = useState('');
+  const [time, setTime] = useState<string>('breakfast'); // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   const [selectedDishes, setSelectedDishes] = useState<SelectedDish[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
@@ -91,6 +92,7 @@ export default function EditMenuPage() {
       if (menu) {
         setFamily(menu.family || null);
         setDescription(menu.description || '');
+        setTime(menu.time || 'breakfast');
         
         // Chuyển đổi menuDishes thành SelectedDish
         const menuDishes: SelectedDish[] = (menu.menuDishes || []).map((md: MenuDish) => ({
@@ -248,6 +250,12 @@ export default function EditMenuPage() {
 
     setLoading(true);
     try {
+      // Cập nhật thông tin menu (description và time)
+      await patchAccess(`menus/${menuId}`, {
+        description: description.trim() || undefined,
+        time: time,
+      });
+
       // Lấy danh sách món ăn hiện có và món ăn mới
       const newDishes = selectedDishes.filter(sd => !sd.menuDishId);
 
@@ -335,6 +343,42 @@ export default function EditMenuPage() {
             <Text style={{ fontSize: 16, color: COLORS.darkGrey }}>
               {family?.name || 'Không xác định'}
             </Text>
+          </View>
+        </View>
+
+        {/* Chọn bữa ăn */}
+        <View style={mealStyles.menuCard}>
+          <Text style={mealStyles.sectionLabel}>Bữa ăn *</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {[
+              { value: 'breakfast', label: 'Bữa sáng' },
+              { value: 'lunch', label: 'Bữa trưa' },
+              { value: 'dinner', label: 'Bữa chiều' },
+              { value: 'snack', label: 'Bữa tối' },
+            ].map(option => (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => setTime(option.value)}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: time === option.value ? COLORS.purple : COLORS.grey,
+                  backgroundColor: time === option.value ? COLORS.purple : COLORS.white,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: time === option.value ? COLORS.white : COLORS.darkGrey,
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 

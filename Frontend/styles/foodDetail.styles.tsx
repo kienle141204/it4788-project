@@ -298,12 +298,12 @@ export const foodDetailStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.primary, // Màu xanh lá chủ đạo
   },
   stepBadgeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.darkGrey,
+    color: COLORS.white,
   },
   stepDescription: {
     fontSize: 15,
@@ -587,6 +587,22 @@ export const foodDetailStyles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 16,
     fontWeight: '600',
+  },
+  favoriteFab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.purple,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
 

@@ -45,10 +45,10 @@ export class RecipeService {
       queryBuilder.where(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-              privateStatus: 'private', 
-              userId: user.id 
-            });
+                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
+                    privateStatus: 'private', 
+                    userId: user.id 
+                  });
         })
       );
     }
@@ -132,10 +132,10 @@ export class RecipeService {
       queryBuilder.andWhere(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-              privateStatus: 'private', 
-              userId: user.id 
-            });
+                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
+                    privateStatus: 'private', 
+                    userId: user.id 
+                  });
         })
       );
     }
@@ -180,10 +180,10 @@ export class RecipeService {
       queryBuilder.where(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-              privateStatus: 'private', 
-              userId: user.id 
-            });
+                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
+                    privateStatus: 'private', 
+                    userId: user.id 
+                  });
         })
       );
     }

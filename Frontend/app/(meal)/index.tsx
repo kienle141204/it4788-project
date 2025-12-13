@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -41,6 +41,7 @@ interface Menu {
   family: Family | null;
   description: string | null;
   created_at: string;
+  time?: string; // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   menuDishes: MenuDish[];
 }
 
@@ -59,6 +60,16 @@ const formatDate = (value?: string) => {
   } catch {
     return value;
   }
+};
+
+const formatTime = (time?: string) => {
+  const timeMap: { [key: string]: string } = {
+    breakfast: 'Bữa sáng',
+    lunch: 'Bữa trưa',
+    dinner: 'Bữa chiều',
+    snack: 'Bữa tối',
+  };
+  return time ? timeMap[time] || time : 'Không xác định';
 };
 
 const formatPrice = (value?: string | number) => {
@@ -85,9 +96,8 @@ export default function MealPage() {
   const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const [showMenuOptionsModal, setShowMenuOptionsModal] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [dateOffset, setDateOffset] = useState<number>(0);
 
   const handleSessionExpired = useCallback(() => {
     if (sessionExpiredRef.current) {
@@ -221,24 +231,55 @@ export default function MealPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const payload = await deleteAccess(`menus/${selectedMenu.id}`);
+              setShowMenuOptionsModal(false);
+              
+              // Đảm bảo ID là số
+              const menuId = typeof selectedMenu.id === 'string' ? parseInt(selectedMenu.id, 10) : selectedMenu.id;
+              
+              if (isNaN(menuId)) {
+                throw new Error('ID thực đơn không hợp lệ');
+              }
+              
+              console.log('Deleting menu with ID:', menuId);
+              const payload = await deleteAccess(`menus/${menuId}`);
+              console.log('Delete response:', payload);
     
-              if (payload?.success !== false) {
-                Alert.alert('Thành công', 'Đã xóa thực đơn thành công');
-                setShowMenuOptionsModal(false);
+              // Kiểm tra response - backend trả về { success: true, message: '...' }
+              if (payload?.success === true) {
+                Alert.alert('Thành công', payload?.message || 'Đã xóa thực đơn thành công');
                 setSelectedMenu(null);
                 // Refresh danh sách
                 fetchMenus(1, true);
               } else {
-                throw new Error(payload?.message || 'Không thể xóa thực đơn');
+                throw new Error(payload?.message || payload?.error || 'Không thể xóa thực đơn');
               }
             } catch (err: any) {
               if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
                 handleSessionExpired();
                 return;
               }
-              console.error('handleDeleteMenu error', err);
-              Alert.alert('Lỗi', err?.message || 'Không thể xóa thực đơn. Vui lòng thử lại.');
+              console.error('handleDeleteMenu error:', err);
+              console.error('Error details:', {
+                message: err?.message,
+                response: err?.response?.data,
+                status: err?.response?.status,
+              });
+              
+              let errorMessage = 'Không thể xóa thực đơn. Vui lòng thử lại.';
+              
+              if (err?.response?.status === 500) {
+                errorMessage = 'Lỗi server. Vui lòng thử lại sau.';
+              } else if (err?.response?.status === 403) {
+                errorMessage = 'Bạn không có quyền xóa thực đơn này.';
+              } else if (err?.response?.status === 404) {
+                errorMessage = 'Không tìm thấy thực đơn.';
+              } else if (err?.response?.data?.message) {
+                errorMessage = err.response.data.message;
+              } else if (err?.message) {
+                errorMessage = err.message;
+              }
+              
+              Alert.alert('Lỗi', errorMessage);
             }
           },
         },
@@ -246,44 +287,109 @@ export default function MealPage() {
     );
   };
 
-  const handleOpenDatePicker = () => {
-    // Set tempDate về ngày đã chọn hoặc hôm nay
-    setTempDate(selectedDate || new Date());
-    setShowDatePicker(true);
-  };
-
-  const handleDateConfirm = (date: Date) => {
-    setSelectedDate(date);
-    setShowDatePicker(false);
-  };
-
-  const handleDateCancel = () => {
-    setShowDatePicker(false);
-  };
-
-  const adjustDate = (field: 'day' | 'month' | 'year', delta: number) => {
-    const newDate = new Date(tempDate);
-    if (field === 'day') {
-      newDate.setDate(newDate.getDate() + delta);
-    } else if (field === 'month') {
-      newDate.setMonth(newDate.getMonth() + delta);
-    } else if (field === 'year') {
-      newDate.setFullYear(newDate.getFullYear() + delta);
+  // Generate date range for carousel (5 dates: 2 before, current, 2 after based on offset)
+  const dateRange = useMemo(() => {
+    const dates = [];
+    const today = new Date();
+    for (let i = -2; i <= 2; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + dateOffset + i);
+      dates.push(date);
     }
-    setTempDate(newDate);
+    return dates;
+  }, [dateOffset]);
+
+  // Format date for carousel display
+  const formatDateForCarousel = (date: Date) => {
+    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const today = new Date();
+    const isToday = isSameDay(date, today);
+    
+    return {
+      day: date.getDate(),
+      weekday: days[date.getDay()],
+      isToday,
+    };
   };
 
-  const handleClearFilter = () => {
-    setSelectedDate(null);
+  // Check if two dates are the same day
+  const isSameDay = (date1: Date, date2: Date) => {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
   };
 
-  const formatFilterDate = (date: Date | null) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+  const handlePreviousDate = () => {
+    setDateOffset(prev => prev - 1);
+  };
+
+  const handleNextDate = () => {
+    setDateOffset(prev => prev + 1);
+  };
+
+  // Filter menus by selected date
+  const filteredMenus = useMemo(() => {
+    return menus.filter(menu => {
+      const menuDate = new Date(menu.created_at);
+      return isSameDay(menuDate, selectedDate);
     });
+  }, [menus, selectedDate]);
+
+  const renderDateCarousel = () => {
+    return (
+      <View style={mealStyles.dateCarouselContainer}>
+        <TouchableOpacity 
+          style={mealStyles.dateNavButton}
+          onPress={handlePreviousDate}
+        >
+          <Ionicons name="chevron-back" size={20} color={COLORS.darkGrey} />
+        </TouchableOpacity>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={mealStyles.dateCarousel}
+        >
+          {dateRange.map((date, index) => {
+            const { day, weekday, isToday } = formatDateForCarousel(date);
+            const isActive = isSameDay(date, selectedDate);
+            
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  mealStyles.dateItem,
+                  isActive && mealStyles.dateItemActive,
+                ]}
+                onPress={() => setSelectedDate(date)}
+              >
+                <Text style={[
+                  mealStyles.dateWeekday,
+                  isActive && mealStyles.dateWeekdayActive,
+                ]}>
+                  {isToday ? 'Hôm nay' : weekday}
+                </Text>
+                <Text style={[
+                  mealStyles.dateDay,
+                  isActive && mealStyles.dateDayActive,
+                ]}>
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <TouchableOpacity 
+          style={mealStyles.dateNavButton}
+          onPress={handleNextDate}
+        >
+          <Ionicons name="chevron-forward" size={20} color={COLORS.darkGrey} />
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const renderMenuCard = (menu: Menu) => {
@@ -300,11 +406,12 @@ export default function MealPage() {
             <View style={mealStyles.menuInfo}>
               {/* <Text style={mealStyles.sectionLabel}>Gia đình</Text> */}
               <Text style={mealStyles.menuTitle}>{menu.family?.name || 'Không xác định'}</Text>
-              {/* {!!menu.description && <Text style={mealStyles.menuMeta}>{menu.description}</Text>} */}
             </View>
             <View style={mealStyles.menuDate}>
-              <Ionicons name="calendar-outline" size={18} color={COLORS.grey} />
-              <Text style={mealStyles.menuDateText}>{formatDate(menu.created_at)}</Text>
+              <Ionicons name="time-outline" size={18} color={COLORS.grey} />
+              <Text style={mealStyles.menuDateText}>
+                {menu.time ? formatTime(menu.time) : 'Không xác định'}
+              </Text>
               <Ionicons
                 name={isExpanded ? 'chevron-up' : 'chevron-down'}
                 size={20}
@@ -389,30 +496,8 @@ export default function MealPage() {
         </TouchableOpacity>
       </View>
 
-      {/* Filter bar */}
-      <View style={mealStyles.filterBar}>
-        <TouchableOpacity
-          style={mealStyles.filterButton}
-          onPress={handleOpenDatePicker}
-          activeOpacity={0.7}
-        >
-          <Ionicons name='calendar-outline' size={20} color={COLORS.purple} />
-          <Text style={mealStyles.filterButtonText}>
-            {selectedDate ? formatFilterDate(selectedDate) : 'Lọc theo ngày'}
-          </Text>
-          {selectedDate && (
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                handleClearFilter();
-              }}
-              style={mealStyles.clearFilterButton}
-            >
-              <Ionicons name='close-circle' size={18} color={COLORS.grey} />
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Date Carousel */}
+      {renderDateCarousel()}
 
       {loading && menus.length === 0 ? (
         <View style={mealStyles.loaderContainer}>
@@ -439,14 +524,16 @@ export default function MealPage() {
             </View>
           )}
 
-          {!error && menus.length === 0 && (
+          {!error && filteredMenus.length === 0 && (
             <View style={mealStyles.emptyState}>
               <Ionicons name='restaurant-outline' size={32} color={COLORS.grey} />
-              <Text style={mealStyles.emptyStateText}>Chưa có thực đơn nào được chia sẻ.</Text>
+              <Text style={mealStyles.emptyStateText}>
+                Không có thực đơn nào cho ngày đã chọn.
+              </Text>
             </View>
           )}
 
-          {menus.map(renderMenuCard)}
+          {filteredMenus.map(renderMenuCard)}
 
           {hasNextPage && (
             <TouchableOpacity
@@ -464,166 +551,6 @@ export default function MealPage() {
         </ScrollView>
       )}
 
-      {/* Date Picker Modal */}
-      <Modal visible={showDatePicker} transparent animationType="slide">
-        <TouchableOpacity
-          style={mealStyles.datePickerModalOverlay}
-          activeOpacity={1}
-          onPress={handleDateCancel}
-        >
-          <View
-            style={mealStyles.datePickerModalContent}
-            onStartShouldSetResponder={() => true}
-          >
-            <View style={mealStyles.datePickerHeader}>
-              <Text style={mealStyles.datePickerTitle}>Chọn ngày</Text>
-              <TouchableOpacity
-                onPress={handleDateCancel}
-                style={mealStyles.datePickerCloseButton}
-              >
-                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Custom Date Picker */}
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
-                {/* Day */}
-                <View style={{ alignItems: 'center', minWidth: 80 }}>
-                  <Text style={{ fontSize: 14, color: COLORS.grey, marginBottom: 8 }}>Ngày</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity
-                      onPress={() => adjustDate('day', -1)}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: COLORS.lightGrey,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="remove" size={20} color={COLORS.darkGrey} />
-                    </TouchableOpacity>
-                    <Text style={{ fontSize: 24, fontWeight: '600', color: COLORS.darkGrey, minWidth: 40, textAlign: 'center' }}>
-                      {tempDate.getDate()}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => adjustDate('day', 1)}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: COLORS.lightGrey,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="add" size={20} color={COLORS.darkGrey} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Month */}
-                <View style={{ alignItems: 'center', minWidth: 80 }}>
-                  <Text style={{ fontSize: 14, color: COLORS.grey, marginBottom: 8 }}>Tháng</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity
-                      onPress={() => adjustDate('month', -1)}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: COLORS.lightGrey,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="remove" size={20} color={COLORS.darkGrey} />
-                    </TouchableOpacity>
-                    <Text style={{ fontSize: 24, fontWeight: '600', color: COLORS.darkGrey, minWidth: 40, textAlign: 'center' }}>
-                      {tempDate.getMonth() + 1}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => adjustDate('month', 1)}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: COLORS.lightGrey,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="add" size={20} color={COLORS.darkGrey} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Year */}
-                <View style={{ alignItems: 'center', minWidth: 100 }}>
-                  <Text style={{ fontSize: 14, color: COLORS.grey, marginBottom: 8 }}>Năm</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity
-                      onPress={() => adjustDate('year', -1)}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: COLORS.lightGrey,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="remove" size={20} color={COLORS.darkGrey} />
-                    </TouchableOpacity>
-                    <Text style={{ fontSize: 24, fontWeight: '600', color: COLORS.darkGrey, minWidth: 60, textAlign: 'center' }}>
-                      {tempDate.getFullYear()}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => adjustDate('year', 1)}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: COLORS.lightGrey,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="add" size={20} color={COLORS.darkGrey} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-              
-              <View style={{ marginTop: 20, padding: 16, backgroundColor: COLORS.lightGrey, borderRadius: 12 }}>
-                <Text style={{ fontSize: 16, color: COLORS.grey, textAlign: 'center', marginBottom: 4 }}>
-                  Ngày đã chọn
-                </Text>
-                <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey, textAlign: 'center' }}>
-                  {formatFilterDate(tempDate)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={mealStyles.datePickerActions}>
-              <TouchableOpacity
-                style={[mealStyles.datePickerActionButton, mealStyles.datePickerCancelButton]}
-                onPress={handleDateCancel}
-              >
-                <Text style={mealStyles.datePickerCancelText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[mealStyles.datePickerActionButton, mealStyles.datePickerConfirmButton]}
-                onPress={() => handleDateConfirm(tempDate)}
-              >
-                <Text style={mealStyles.datePickerConfirmText}>Xác nhận</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Modal options cho menu */}
       <Modal visible={showMenuOptionsModal} transparent animationType="fade">

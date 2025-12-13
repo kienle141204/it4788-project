@@ -17,15 +17,29 @@ interface Dish {
   created_at: string;
 }
 
+interface RecipeStepImage {
+  id: string | number;
+  recipe_steps_id: string | number;
+  url: string;
+  created_at: string;
+}
+
 interface RecipeStep {
   id: string | number;
+  recipe_id: string | number;
   step_number: number;
   description: string;
+  images?: RecipeStepImage[];
 }
 
 interface Recipe {
   id: string | number;
   dish_id: string | number;
+  owner_id?: string | number;
+  status?: string | null;
+  created_at?: string;
+  dish?: Dish;
+  owner?: User;
   steps: RecipeStep[];
 }
 
@@ -92,6 +106,8 @@ export default function FoodDetailPage() {
   const [nutrientsLoading, setNutrientsLoading] = useState(true);
   const [nutrientsError, setNutrientsError] = useState<string | null>(null);
   const [isNutrientsExpanded, setIsNutrientsExpanded] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const handleSessionExpired = useCallback(() => {
     if (sessionExpiredRef.current) {
@@ -219,16 +235,16 @@ export default function FoodDetailPage() {
 
       try {
         if (!dishId) return;
-        const payload = await getAccess(`recipes/by-dish/${dishId}`);
+        
+        // Gọi trực tiếp API recipes/{id} với id là dish_id
+        const payload = await getAccess(`recipes/${dishId}`);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải công thức');
         }
 
-        const firstRecipe = Array.isArray(payload.data) ? payload.data[0] : null;
-
-        if (firstRecipe) {
-          setRecipe(firstRecipe);
+        if (payload?.data) {
+          setRecipe(payload.data);
         } else {
           setRecipe(null);
           setRecipeError('Chưa có công thức cho món ăn này');
@@ -238,7 +254,7 @@ export default function FoodDetailPage() {
           handleSessionExpired();
           return;
         }
-        console.log(err);
+        console.log('fetchRecipe error', err);
         setRecipe(null);
         setRecipeError('Không thể tải công thức. Vui lòng thử lại.');
       } finally {
@@ -319,6 +335,39 @@ export default function FoodDetailPage() {
       }
     };
 
+    const checkFavoriteStatus = async () => {
+      try {
+        if (!dishId) return;
+        const payload = await getAccess(`favorite-dishes/check/${dishId}`);
+        
+        // Backend trả về: { success: true, message: '...', data: { isFavorite: boolean } }
+        if (payload?.success === true && payload?.data) {
+          const isFavoriteValue = payload.data.isFavorite;
+          if (typeof isFavoriteValue === 'boolean') {
+            setIsFavorite(isFavoriteValue);
+          } else {
+            // Fallback: nếu không có isFavorite, mặc định là false
+            setIsFavorite(false);
+          }
+        } else if (payload?.success === undefined && payload?.data?.isFavorite !== undefined) {
+          // Trường hợp response không có success field nhưng có data
+          setIsFavorite(payload.data.isFavorite);
+        } else {
+          // Nếu không có data, mặc định là false
+          setIsFavorite(false);
+        }
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        // Không có favorite hoặc lỗi khi kiểm tra là trường hợp bình thường
+        // Mặc định set là false và không hiển thị lỗi cho user
+        console.log('Error checking favorite status:', err);
+        setIsFavorite(false);
+      }
+    };
+
     if (dishId) {
       fetchDish();
       fetchRecipe();
@@ -327,6 +376,7 @@ export default function FoodDetailPage() {
       fetchReviewStats();
       fetchUserReview();
       fetchNutrients();
+      checkFavoriteStatus();
     }
   }, [dishId, handleSessionExpired, fetchReviews]);
 
@@ -343,6 +393,61 @@ export default function FoodDetailPage() {
       router.back();
     } else {
       router.replace('/(tabs)/home' as any);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!dishId || favoriteLoading) return;
+
+    setFavoriteLoading(true);
+    try {
+      if (isFavorite) {
+        // Xóa khỏi yêu thích - DELETE /api/favorite-dishes/dish/{dishId}
+        const payload = await deleteAccess(`favorite-dishes/dish/${dishId}`);
+        
+        // Backend trả về { success: true, message: '...' }
+        if (payload?.success === true || (payload?.success === undefined && !payload?.message)) {
+          setIsFavorite(false);
+          Alert.alert('Thành công', payload?.message || 'Đã xóa món ăn khỏi danh sách yêu thích');
+        } else {
+          throw new Error(payload?.message || 'Không thể xóa khỏi danh sách yêu thích');
+        }
+      } else {
+        // Thêm vào yêu thích - POST /api/favorite-dishes
+        const payload = await postAccess('favorite-dishes', {
+          dish_id: dishId,
+        });
+        
+        // Backend trả về { success: true, message: '...', data: {...} }
+        if (payload?.success === true || (payload?.success === undefined && !payload?.message)) {
+          setIsFavorite(true);
+          Alert.alert('Thành công', payload?.message || 'Đã thêm món ăn vào danh sách yêu thích');
+        } else {
+          throw new Error(payload?.message || 'Không thể thêm vào danh sách yêu thích');
+        }
+      }
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.error('handleToggleFavorite error', err);
+      
+      let errorMessage = 'Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.';
+      
+      if (err?.response?.status === 409) {
+        errorMessage = 'Món ăn đã có trong danh sách yêu thích';
+      } else if (err?.response?.status === 404) {
+        errorMessage = 'Không tìm thấy món ăn';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
@@ -846,6 +951,29 @@ export default function FoodDetailPage() {
                           <Text style={foodDetailStyles.stepDescription}>
                             {step.description || 'Chưa có mô tả cho bước này'}
                           </Text>
+                          {/* Hiển thị images nếu có */}
+                          {step.images && step.images.length > 0 && (
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              style={{ marginTop: 12 }}
+                              contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+                            >
+                              {step.images.map((image) => (
+                                <Image
+                                  key={image.id}
+                                  source={{ uri: image.url }}
+                                  style={{
+                                    width: 120,
+                                    height: 120,
+                                    borderRadius: 8,
+                                    backgroundColor: COLORS.lightGrey,
+                                  }}
+                                  resizeMode="cover"
+                                />
+                              ))}
+                            </ScrollView>
+                          )}
                         </View>
                       ))}
                     </View>
@@ -1182,6 +1310,26 @@ export default function FoodDetailPage() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Favorite FAB Button */}
+      {!loading && dish && (
+        <TouchableOpacity
+          style={foodDetailStyles.favoriteFab}
+          onPress={handleToggleFavorite}
+          disabled={favoriteLoading}
+          activeOpacity={0.8}
+        >
+          {favoriteLoading ? (
+            <ActivityIndicator size="small" color={COLORS.white} />
+          ) : (
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={28}
+              color={COLORS.white}
+            />
+          )}
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }

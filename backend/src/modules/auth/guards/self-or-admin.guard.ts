@@ -26,8 +26,22 @@ export const SelfOrAdminGuard = (idParam: string = 'id') => {
       }
 
       // Kiểm tra user có phải chính họ không
-      const resourceId = parseInt(request.params[idParam]);
-      if (resourceId !== user.id) {
+      const resourceIdParam = request.params[idParam];
+      if (!resourceIdParam) {
+        throw new ForbiddenException(`Missing ${idParam} parameter`);
+      }
+      
+      const resourceId = Number(resourceIdParam);
+      if (isNaN(resourceId)) {
+        throw new ForbiddenException(`Invalid ${idParam} parameter: must be a number`);
+      }
+      
+      // Convert cả hai về number để đảm bảo so sánh chính xác
+      // (user.id có thể là bigint từ database)
+      const userId = Number(user.id);
+      const targetId = Number(resourceId);
+      
+      if (userId !== targetId) {
         throw new ForbiddenException('You can only access your own resources');
       }
 
