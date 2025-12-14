@@ -6,10 +6,11 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiBody, ApiParam } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { RefrigeratorService } from './refrigerator.service';
 import { FridgeDishService } from './services/fridge-dish.service';
 import { FridgeIngredientService } from './services/fridge-ingredient.service';
@@ -19,6 +20,7 @@ import { CreateFridgeDishDto } from './dto/create-fridge-dish.dto';
 import { UpdateFridgeDishDto } from './dto/update-fridge-dish.dto';
 import { CreateFridgeIngredientDto } from './dto/create-fridge-ingredient.dto';
 import { UpdateFridgeIngredientDto } from './dto/update-fridge-ingredient.dto';
+import { PaginationDto } from './dto/pagination.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
 
@@ -77,71 +79,153 @@ export class RefrigeratorController {
 
   @Get()
   @ApiOperation({ 
-    summary: 'Lấy ra toàn bộ tủ lạnh',
-    description: 'API này trả về danh sách tất cả các tủ lạnh trong hệ thống. Yêu cầu quyền admin.'
+    summary: 'Lấy ra toàn bộ tủ lạnh (có phân trang)',
+    description: 'API này trả về danh sách tất cả các tủ lạnh trong hệ thống với phân trang. Yêu cầu quyền admin.'
   })
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng items mỗi trang (mặc định: 10, tối đa: 100)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Lấy danh sách tủ lạnh thành công',
-    example: [
-      {
-        id: 1,
-        name: 'Tủ lạnh nhà bếp',
-        family_id: 1,
-        owner_id: 1
+    example: {
+      success: true,
+      message: 'Lấy danh sách tủ lạnh trang 1 thành công',
+      data: [
+        {
+          id: 1,
+          name: 'Tủ lạnh nhà bếp',
+          family_id: 1,
+          owner_id: 1
+        }
+      ],
+      pagination: {
+        currentPage: 1,
+        totalPages: 5,
+        totalItems: 50,
+        itemsPerPage: 10,
+        hasNextPage: true,
+        hasPrevPage: false
       }
-    ]
+    }
   })
   @ApiResponse({ status: 403, description: 'Không có quyền admin' })
-  async findAll() {
-    return await this.refrigeratorService.findAll();
+  async findAll(@Query() paginationDto: PaginationDto) {
+    const result = await this.refrigeratorService.findAll(paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách tủ lạnh trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
   }
 
   @Get('my-frifge')
   @ApiOperation({ 
-    summary: 'Lấy tủ lạnh của tôi',
-    description: 'API này trả về danh sách tất cả các tủ lạnh mà người dùng hiện tại là chủ sở hữu.'
+    summary: 'Lấy tủ lạnh của tôi (có phân trang)',
+    description: 'API này trả về danh sách tất cả các tủ lạnh mà người dùng hiện tại là chủ sở hữu với phân trang.'
   })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng items mỗi trang (mặc định: 10, tối đa: 100)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Lấy danh sách tủ lạnh thành công',
-    example: [
-      {
-        id: 1,
-        name: 'Tủ lạnh nhà bếp',
-        family_id: 1,
-        owner_id: 1
+    example: {
+      success: true,
+      message: 'Lấy danh sách tủ lạnh trang 1 thành công',
+      data: [
+        {
+          id: 1,
+          name: 'Tủ lạnh nhà bếp',
+          family_id: 1,
+          owner_id: 1
+        }
+      ],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 1,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
       }
-    ]
+    }
   })
-  async myFridge(@User() user: JwtUser) {
-    return await this.refrigeratorService.myFridge(user);
+  @ApiResponse({ status: 404, description: 'Không tìm thấy tủ lạnh' })
+  async myFridge(@User() user: JwtUser, @Query() paginationDto: PaginationDto) {
+    const result = await this.refrigeratorService.myFridge(user, paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách tủ lạnh trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
   }
 
   @Get('my-family/:id')
   @ApiOperation({ 
-    summary: 'Lấy tủ lạnh của gia đình',
-    description: 'API này trả về danh sách tất cả các tủ lạnh của một gia đình cụ thể.'
+    summary: 'Lấy tủ lạnh của gia đình (có phân trang)',
+    description: 'API này trả về danh sách tất cả các tủ lạnh của một gia đình cụ thể với phân trang.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của gia đình' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng items mỗi trang (mặc định: 10, tối đa: 100)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Lấy danh sách tủ lạnh thành công',
-    example: [
-      {
-        id: 1,
-        name: 'Tủ lạnh nhà bếp',
-        family_id: 1,
-        owner_id: 1
+    example: {
+      success: true,
+      message: 'Lấy danh sách tủ lạnh trang 1 thành công',
+      data: [
+        {
+          id: 1,
+          name: 'Tủ lạnh nhà bếp',
+          family_id: 1,
+          owner_id: 1
+        }
+      ],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 1,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
       }
-    ]
+    }
   })
   @ApiResponse({ status: 403, description: 'Không phải thành viên của gia đình này' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình' })
-  async myFamilyFridge(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
-    return await this.refrigeratorService.myFamilyFridge(id, user);
+  async myFamilyFridge(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser, @Query() paginationDto: PaginationDto) {
+    const result = await this.refrigeratorService.myFamilyFridge(id, user, paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách tủ lạnh trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
   }
 
   @Get(':id')
@@ -261,31 +345,58 @@ export class RefrigeratorController {
 
   @Get(':id/dishes')
   @ApiOperation({ 
-    summary: 'Lấy danh sách món ăn trong tủ lạnh',
-    description: 'API này trả về danh sách tất cả các món ăn trong một tủ lạnh cụ thể.'
+    summary: 'Lấy danh sách món ăn trong tủ lạnh (có phân trang)',
+    description: 'API này trả về danh sách tất cả các món ăn trong một tủ lạnh cụ thể với phân trang.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của tủ lạnh' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng items mỗi trang (mặc định: 10, tối đa: 100)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Lấy danh sách món ăn thành công',
-    example: [
-      {
-        id: 1,
-        refrigerator_id: 1,
-        dish_id: 1,
-        quantity: 2,
-        expiry_date: '2024-01-10',
-        dish: {
+    example: {
+      success: true,
+      message: 'Lấy danh sách món ăn trang 1 thành công',
+      data: [
+        {
           id: 1,
-          name: 'Phở Bò'
+          refrigerator_id: 1,
+          dish_id: 1,
+          quantity: 2,
+          expiry_date: '2024-01-10',
+          dish: {
+            id: 1,
+            name: 'Phở Bò'
+          }
         }
+      ],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 1,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
       }
-    ]
+    }
   })
   @ApiResponse({ status: 403, description: 'Không có quyền xem tủ lạnh này' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tủ lạnh' })
-  async getDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
-    return await this.fridgeDishService.findByRefrigerator(refrigerator_id, user);
+  async getDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser, @Query() paginationDto: PaginationDto) {
+    const result = await this.fridgeDishService.findByRefrigerator(refrigerator_id, user, paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách món ăn trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
   }
 
   @Patch('dishes/:dishId')
@@ -398,38 +509,113 @@ export class RefrigeratorController {
 
   @Get(':id/ingredients')
   @ApiOperation({ 
-    summary: 'Lấy danh sách nguyên liệu trong tủ lạnh',
-    description: 'API này trả về danh sách tất cả các nguyên liệu trong một tủ lạnh cụ thể.'
+    summary: 'Lấy danh sách nguyên liệu trong tủ lạnh (có phân trang)',
+    description: 'API này trả về danh sách tất cả các nguyên liệu trong một tủ lạnh cụ thể với phân trang.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của tủ lạnh' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng items mỗi trang (mặc định: 10, tối đa: 100)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Lấy danh sách nguyên liệu thành công',
-    example: [
-      {
-        id: 1,
-        refrigerator_id: 1,
-        ingredient_id: 1,
-        quantity: 500,
-        unit: 'g',
-        expiry_date: '2024-01-10',
-        ingredient: {
+    example: {
+      success: true,
+      message: 'Lấy danh sách nguyên liệu trang 1 thành công',
+      data: [
+        {
           id: 1,
-          name: 'Thịt bò'
+          refrigerator_id: 1,
+          ingredient_id: 1,
+          quantity: 500,
+          unit: 'g',
+          expiry_date: '2024-01-10',
+          ingredient: {
+            id: 1,
+            name: 'Thịt bò'
+          }
         }
+      ],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 1,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
       }
-    ]
+    }
   })
   @ApiResponse({ status: 403, description: 'Không có quyền xem tủ lạnh này' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tủ lạnh' })
-  async getIngredients(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
-    return await this.fridgeIngredientService.findByRefrigerator(refrigerator_id, user);
+  async getIngredients(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser, @Query() paginationDto: PaginationDto) {
+    const result = await this.fridgeIngredientService.findByRefrigerator(refrigerator_id, user, paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách nguyên liệu trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
   }
 
   @Get(':id/suggestions')
-  @ApiOperation({ summary: 'Gợi ý món ăn phù hợp với nguyên liệu trong tủ lạnh' })
-  async suggestDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser) {
-    return await this.refrigeratorService.suggestDishes(refrigerator_id, user);
+  @ApiOperation({ 
+    summary: 'Gợi ý món ăn phù hợp với nguyên liệu trong tủ lạnh (có phân trang)',
+    description: 'API này trả về danh sách các món ăn được gợi ý dựa trên nguyên liệu hiện có trong tủ lạnh với phân trang.'
+  })
+  @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của tủ lạnh' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Số trang (mặc định: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng items mỗi trang (mặc định: 10, tối đa: 100)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Lấy danh sách gợi ý món ăn thành công',
+    example: {
+      success: true,
+      message: 'Lấy danh sách gợi ý món ăn trang 1 thành công',
+      data: [
+        {
+          dishId: 1,
+          dishName: 'Phở Bò',
+          matchCount: 3,
+          totalIngredients: 5,
+          matchPercentage: 0.6,
+          matchedIngredients: ['Thịt bò', 'Bánh phở', 'Hành lá'],
+          missingIngredients: ['Nước dùng', 'Rau thơm']
+        }
+      ],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 1,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
+      }
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền xem tủ lạnh này' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy tủ lạnh' })
+  async suggestDishes(@Param('id', ParseIntPipe) refrigerator_id: number, @User() user: JwtUser, @Query() paginationDto: PaginationDto) {
+    const result = await this.refrigeratorService.suggestDishes(refrigerator_id, user, paginationDto);
+    return {
+      success: true,
+      message: `Lấy danh sách gợi ý món ăn trang ${result.page} thành công`,
+      data: result.data,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    };
   }
 
   @Patch('ingredients/:ingredientId')

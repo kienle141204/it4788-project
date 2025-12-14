@@ -6,6 +6,7 @@ import { Refrigerator } from '../../../entities/refrigerator.entity';
 import { Ingredient } from '../../../entities/ingredient.entity';
 import { CreateFridgeIngredientDto } from '../dto/create-fridge-ingredient.dto';
 import { UpdateFridgeIngredientDto } from '../dto/update-fridge-ingredient.dto';
+import { PaginationDto } from '../dto/pagination.dto';
 import { JwtUser } from '../../../common/types/user.type';
 
 @Injectable()
@@ -91,26 +92,51 @@ export class FridgeIngredientService {
     return item;
   }
 
-  /** Lấy tất cả nguyên liệu trong tủ lạnh */
-  async findByRefrigerator(fridge_id: number, user: JwtUser): Promise<FridgeIngredient[]> {
-    const items = await this.fridgeIngredientRepo.find({
-      where: { refrigerator_id: fridge_id },
-      relations: ['refrigerator', 'ingredient', 'refrigerator.family', 'refrigerator.family.members'],
+  /** Lấy tất cả nguyên liệu trong tủ lạnh với phân trang */
+  async findByRefrigerator(fridge_id: number, user: JwtUser, paginationDto: PaginationDto): Promise<{
+    data: FridgeIngredient[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    // Kiểm tra quyền truy cập tủ lạnh
+    const fridge = await this.refrigeratorRepo.findOne({
+      where: { id: fridge_id },
+      relations: ['owner', 'family', 'family.members'],
     });
 
-    if (!items.length) throw new NotFoundException(`Không tìm thấy nguyên liệu trong tủ lạnh`);
+    if (!fridge) throw new NotFoundException(`Không tìm thấy tủ lạnh`);
 
-    const fridge = items[0].refrigerator;
     const isOwner = fridge.owner_id === user.id;
     const isAdmin = user.role === 'admin';
     const isFamilyOwner = fridge.family?.owner_id === user.id;
     const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền truy cập nguyên liệu này');
+      throw new UnauthorizedException('Bạn không có quyền truy cập tủ lạnh này');
     }
 
-    return items;
+    const { page = 1, limit = 10 } = paginationDto;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.fridgeIngredientRepo.findAndCount({
+      where: { refrigerator_id: fridge_id },
+      relations: ['refrigerator', 'ingredient', 'refrigerator.family', 'refrigerator.family.members'],
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   /** Cập nhật nguyên liệu */
