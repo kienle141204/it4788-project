@@ -39,7 +39,18 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      requestInterceptor: (req) => {
+        // Đảm bảo token được gửi đúng format
+        if (req.headers && req.headers.Authorization && !req.headers.Authorization.startsWith('Bearer ')) {
+          req.headers.Authorization = `Bearer ${req.headers.Authorization}`;
+        }
+        return req;
+      },
+    },
+  });
 
   await app.listen(process.env.PORT ?? 3000);
   
