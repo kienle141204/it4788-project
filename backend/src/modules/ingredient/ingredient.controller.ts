@@ -1,11 +1,13 @@
-  import {
+import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
   ParseIntPipe,
+  Delete,
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
@@ -19,8 +21,10 @@ import {
   SearchIngredientDto 
 } from './dto/search-ingredient.dto';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
+import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
+import { ResponseCode, buildSuccessResponse } from 'src/common/errors/error-codes';
 
 @ApiTags('Ingredients')
 @Controller('api/ingredients')
@@ -394,6 +398,76 @@ export class IngredientController {
       data: ingredients,
       total: ingredients.length,
     };
+  }
+
+  /**
+   * Cập nhật nguyên liệu
+   * PATCH /api/ingredients/:id
+   */
+  @Patch(':id')
+  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Cập nhật nguyên liệu',
+    description: 'API này cập nhật thông tin của một nguyên liệu theo ID.',
+  })
+  @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của nguyên liệu cần cập nhật' })
+  @ApiBody({
+    type: UpdateIngredientDto,
+    description: 'Thông tin nguyên liệu cần cập nhật',
+    examples: {
+      example1: {
+        summary: 'Cập nhật tên và giá',
+        value: {
+          name: 'Thịt bò Úc',
+          price: 150000,
+        },
+      },
+      example2: {
+        summary: 'Cập nhật danh mục và địa điểm',
+        value: {
+          category_id: 2,
+          place_id: 3,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật nguyên liệu thành công',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nguyên liệu' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body(ValidationPipe) updateIngredientDto: UpdateIngredientDto,
+  ) {
+    const ingredient = await this.ingredientService.update(id, updateIngredientDto);
+    return buildSuccessResponse(ResponseCode.C00306, ingredient);
+  }
+
+  /**
+   * Xóa nguyên liệu
+   * DELETE /api/ingredients/:id
+   */
+  @Delete(':id')
+  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Xóa nguyên liệu',
+    description: 'API này xóa một nguyên liệu theo ID.',
+  })
+  @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của nguyên liệu cần xóa' })
+  @ApiResponse({
+    status: 200,
+    description: 'Xóa nguyên liệu thành công',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nguyên liệu' })
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    await this.ingredientService.remove(id);
+    return buildSuccessResponse(ResponseCode.C00307);
   }
 
   /**

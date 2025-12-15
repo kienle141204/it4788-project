@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FridgeIngredient } from '../../../entities/fridge-ingredient.entity';
@@ -35,7 +36,7 @@ export class FridgeIngredientService {
       where: { id: refrigerator_id },
       relations: ['owner', 'family', 'family.members'],
     });
-    if (!fridge) throw new NotFoundException(`Không tìm thấy refrigerator ${refrigerator_id}`);
+    if (!fridge) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00230]);
 
     // Kiểm tra quyền: admin, owner, family owner, hoặc member trong family
     const isOwner = fridge.owner_id === user.id;
@@ -51,7 +52,7 @@ export class FridgeIngredientService {
 
     // Kiểm tra nguyên liệu tồn tại
     const ingredient = await this.ingredientRepo.findOne({ where: { id: ingredient_id } });
-    if (!ingredient) throw new NotFoundException(`Không tìm thấy nguyên liệu ${ingredient_id}`);
+    if (!ingredient) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00236]);
 
     // Tạo FridgeIngredient
     const fridgeIngredient = this.fridgeIngredientRepo.create({
@@ -77,7 +78,7 @@ export class FridgeIngredientService {
       where: { id },
       relations: ['refrigerator', 'ingredient', 'refrigerator.family', 'refrigerator.family.members'],
     });
-    if (!item) throw new NotFoundException(`FridgeIngredient ${id} not found`);
+    if (!item) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00238]);
 
     const fridge = item.refrigerator;
     const isOwner = fridge.owner_id === user.id;
@@ -86,7 +87,7 @@ export class FridgeIngredientService {
     const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền truy cập nguyên liệu này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00234]);
     }
 
     return item;

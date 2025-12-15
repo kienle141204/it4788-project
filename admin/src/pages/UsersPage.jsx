@@ -92,11 +92,21 @@ const UsersPage = () => {
 
   const columns = [
     { header: 'ID', key: 'id' },
+    {
+      header: 'Ảnh',
+      key: 'avatar_url',
+      render: (value, row) => value ? (
+        <img src={value} alt={row.full_name} className="w-10 h-10 rounded-full object-cover" />
+      ) : (
+        <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-medium">
+          {row.full_name?.charAt(0)?.toUpperCase() || row.email?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+      )
+    },
     { header: 'Họ tên', key: 'full_name' },
     { header: 'Email', key: 'email' },
     { header: 'Số điện thoại', key: 'phone' },
     { header: 'Nhóm', key: 'role' },
-    { header: 'Địa chỉ', key: 'address' },
   ];
 
   const handleEdit = (user) => {
@@ -275,26 +285,26 @@ const UsersPage = () => {
           <Input
             label="Họ tên"
             value={formData.full_name}
-            onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             required
           />
           <Input
             label="Email"
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
           />
           <Input
             label="Số điện thoại"
             value={formData.phone}
-            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             required
           />
           <Select
             label="Nhóm người dùng"
             value={formData.role}
-            onChange={(e) => setFormData({...formData, role: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             options={[
               { value: 'admin', label: 'Admin' },
               { value: 'user', label: 'Người dùng' }
@@ -304,7 +314,7 @@ const UsersPage = () => {
           <Input
             label="Địa chỉ"
             value={formData.address}
-            onChange={(e) => setFormData({...formData, address: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             required
           />
           <div className="flex gap-2 justify-end mt-6">

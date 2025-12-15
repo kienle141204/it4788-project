@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FridgeDish } from '../../../entities/fridge-dish.entity';
@@ -29,7 +30,7 @@ export class FridgeDishService {
       where: { id: refrigerator_id },
       relations: ['owner', 'family', 'family.members'], // cần load members
     });
-    if (!fridge) throw new NotFoundException(`Không tìm thấy refrigerator ${refrigerator_id}`);
+    if (!fridge) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00230]);
 
     // Kiểm tra quyền: admin, owner, family owner, hoặc member family
     const isOwner = fridge.owner_id === user.id;
@@ -38,12 +39,12 @@ export class FridgeDishService {
     const isFamilyMember = fridge.family?.members?.some(member => member.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền thêm món ăn vào tủ này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00235]);
     }
 
     // Kiểm tra dish tồn tại
     const dish = await this.dishRepo.findOne({ where: { id: dish_id } });
-    if (!dish) throw new NotFoundException(`Không tìm thấy dish ${dish_id}`);
+    if (!dish) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
 
     // Tạo FridgeDish
     const fridgeDish = this.fridgeDishRepo.create({
@@ -69,7 +70,7 @@ export class FridgeDishService {
       where: { id },
       relations: ['refrigerator', 'dish', 'refrigerator.family', 'refrigerator.family.members'],
     });
-    if (!item) throw new NotFoundException(`FridgeDish ${id} not found`);
+    if (!item) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00237]);
 
     const fridge = item.refrigerator;
     const isOwner = fridge.owner_id === user.id;
@@ -78,7 +79,7 @@ export class FridgeDishService {
     const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền truy cập món ăn này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00234]);
     }
 
     return item;

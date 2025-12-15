@@ -8,6 +8,7 @@ import { FamilyMember } from '../../entities/family-member.entity';
 import { FamilyService } from '../family/family.service';
 import { MemberService } from '../member/member.service';
 import type { JwtUser } from 'src/common/types/user.type';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class ShoppingStatisticsService {
@@ -37,7 +38,7 @@ export class ShoppingStatisticsService {
     });
 
     if (!family) {
-      throw new ForbiddenException('Family not found');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00190]);
     }
 
     // Nếu user là owner
@@ -55,9 +56,7 @@ export class ShoppingStatisticsService {
 
     if (isMember) return true;
 
-    throw new ForbiddenException(
-      'Bạn không có quyền truy cập thống kê của gia đình này',
-    );
+    throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00270]);
   }
 
   /** Tổng tiền theo từng tháng trong 1 năm */

@@ -7,6 +7,10 @@ import UsersPage from './pages/UsersPage';
 import FoodsPage from './pages/FoodsPage';
 import DishesPage from './pages/DishesPage';
 import RecipesPage from './pages/RecipesPage';
+import FamiliesPage from './pages/FamiliesPage';
+import ShoppingListsPage from './pages/ShoppingListsPage';
+import RefrigeratorsPage from './pages/RefrigeratorsPage';
+import StatisticsPage from './pages/StatisticsPage';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import { useAuth } from './contexts/AuthContext';
@@ -16,6 +20,10 @@ const UsersLayout = () => <LayoutComponent page="users" />;
 const FoodsLayout = () => <LayoutComponent page="foods" />;
 const DishesLayout = () => <LayoutComponent page="dishes" />;
 const RecipesLayout = () => <LayoutComponent page="recipes" />;
+const FamiliesLayout = () => <LayoutComponent page="families" />;
+const ShoppingListsLayout = () => <LayoutComponent page="shopping-lists" />;
+const RefrigeratorsLayout = () => <LayoutComponent page="refrigerators" />;
+const StatisticsLayout = () => <LayoutComponent page="statistics" />;
 
 // Main layout component with page prop
 const LayoutComponent = ({ page }) => {
@@ -27,6 +35,10 @@ const LayoutComponent = ({ page }) => {
     foods: { component: FoodsPage, title: 'Thực phẩm' },
     dishes: { component: DishesPage, title: 'Món ăn' },
     recipes: { component: RecipesPage, title: 'Công thức' },
+    families: { component: FamiliesPage, title: 'Gia đình' },
+    'shopping-lists': { component: ShoppingListsPage, title: 'Danh sách mua sắm' },
+    refrigerators: { component: RefrigeratorsPage, title: 'Tủ lạnh' },
+    statistics: { component: StatisticsPage, title: 'Thống kê' },
   };
 
   const CurrentPageComponent = pageConfig[page]?.component || UsersPage;
@@ -87,6 +99,38 @@ const App = () => {
             element={
               <PrivateRoute>
                 <RecipesLayout />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/families"
+            element={
+              <PrivateRoute>
+                <FamiliesLayout />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/shopping-lists"
+            element={
+              <PrivateRoute>
+                <ShoppingListsLayout />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/refrigerators"
+            element={
+              <PrivateRoute>
+                <RefrigeratorsLayout />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/statistics"
+            element={
+              <PrivateRoute>
+                <StatisticsLayout />
               </PrivateRoute>
             }
           />

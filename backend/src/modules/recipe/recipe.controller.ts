@@ -17,6 +17,7 @@ import { GetRecipesDto } from './dto/get-recipes.dto';
 import { CreateRecipeDto, UpdateRecipeDto } from './dto/create-recipe.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../../entities/user.entity';
+import { buildSuccessResponse, ResponseCode } from 'src/common/errors/error-codes';
 
 @ApiTags('Recipes')
 @Controller('api/recipes')
@@ -39,10 +40,7 @@ export class RecipeController {
       message += ` của user ID ${getRecipesDto.ownerId}`;
     }
 
-    return {
-      success: true,
-      message,
-      data: result.data,
+    return buildSuccessResponse(ResponseCode.C00112, result.data, {
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
@@ -51,7 +49,7 @@ export class RecipeController {
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,
       },
-    };
+    });
   }
 
   /**
@@ -64,11 +62,7 @@ export class RecipeController {
   async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
     const user: User = req.user;
     const recipe = await this.recipeService.findOneWithDetails(id, user);
-    return {
-      success: true,
-      message: 'Lấy thông tin công thức thành công',
-      data: recipe,
-    };
+    return buildSuccessResponse(ResponseCode.C00113, recipe);
   }
 
   /**
@@ -95,11 +89,7 @@ export class RecipeController {
   async findByDishId(@Param('dishId', ParseIntPipe) dishId: number, @Request() req) {
     const user: User = req.user;
     const recipes = await this.recipeService.findByDishId(dishId, user);
-    return {
-      success: true,
-      message: `Lấy ${recipes.length} công thức cho món ăn ID ${dishId}`,
-      data: recipes,
-    };
+    return buildSuccessResponse(ResponseCode.C00120, recipes);
   }
 
   /**
@@ -125,11 +115,7 @@ export class RecipeController {
   })
   async findByOwnerId(@Param('ownerId', ParseIntPipe) ownerId: number) {
     const recipes = await this.recipeService.findByOwnerId(ownerId);
-    return {
-      success: true,
-      message: `Lấy ${recipes.length} công thức của user ID ${ownerId}`,
-      data: recipes,
-    };
+    return buildSuccessResponse(ResponseCode.C00121, recipes);
   }
 
   /**
@@ -156,11 +142,7 @@ export class RecipeController {
   async getPopularRecipes(@Query('limit') limit?: number, @Request() req?: any) {
     const user: User = req.user;
     const recipes = await this.recipeService.getPopularRecipes(limit || 10, user);
-    return {
-      success: true,
-      message: `Lấy ${recipes.length} công thức phổ biến`,
-      data: recipes,
-    };
+    return buildSuccessResponse(ResponseCode.C00122, recipes);
   }
 
   /**
@@ -177,11 +159,7 @@ export class RecipeController {
     const userId = req.user.id;
     const recipe = await this.recipeService.createRecipe(createRecipeDto, userId);
     
-    return {
-      success: true,
-      message: 'Tạo công thức thành công',
-      data: recipe,
-    };
+    return buildSuccessResponse(ResponseCode.C00111, recipe);
   }
 
   /**
@@ -235,11 +213,7 @@ export class RecipeController {
     const userId = req.user.id;
     const recipe = await this.recipeService.updateRecipe(id, updateRecipeDto, userId);
     
-    return {
-      success: true,
-      message: 'Cập nhật công thức thành công',
-      data: recipe,
-    };
+    return buildSuccessResponse(ResponseCode.C00114, recipe);
   }
 
   /**
@@ -271,9 +245,6 @@ export class RecipeController {
     const userId = req.user.id;
     await this.recipeService.deleteRecipe(id, userId);
     
-    return {
-      success: true,
-      message: 'Xóa công thức thành công',
-    };
+    return buildSuccessResponse(ResponseCode.C00115, { recipeId: id });
   }
 }
