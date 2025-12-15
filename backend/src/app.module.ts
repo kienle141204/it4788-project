@@ -22,6 +22,8 @@ import { ConsumptionHistoryModule } from './modules/consumption-history/consumpt
 import { RemindersModule } from './reminders/reminders.module';
 import { MarketModule } from './modules/market/market.module';
 import { FavoriteDishModule } from './modules/favorite-dish/favorite-dish.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WebSocketModule } from './common/websocket';
 @Module({
   imports: [
     // Cấu hình biến môi trường (toàn cục)
@@ -85,6 +87,8 @@ import { FavoriteDishModule } from './modules/favorite-dish/favorite-dish.module
     RemindersModule,
     MarketModule,
     FavoriteDishModule,
+    WebSocketModule, // Shared WebSocket module - import trước các module sử dụng nó
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

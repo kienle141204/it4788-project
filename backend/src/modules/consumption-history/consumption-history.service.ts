@@ -9,6 +9,7 @@ import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
 import { CreateConsumptionHistoryDto } from './dto/create-consumption-history.dto';
 import { UpdateConsumptionHistoryDto } from './dto/update-consumption-history.dto';
 import type { JwtUser } from 'src/common/types/user.type';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class ConsumptionHistoryService {
@@ -32,7 +33,7 @@ export class ConsumptionHistoryService {
   private checkPermission(user: JwtUser, targetUserId?: number) {
     if (user.role === 'admin') return;
     if (targetUserId && user.id !== targetUserId) {
-      throw new ForbiddenException('You do not have permission to access this data');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00171]);
     }
   }
 
@@ -52,7 +53,7 @@ export class ConsumptionHistoryService {
 
   async findOne(id: number, user: JwtUser) {
     const record = await this.consumptionRepo.findOne({ where: { id } });
-    if (!record) throw new NotFoundException('Consumption record not found');
+    if (!record) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00170]);
     this.checkPermission(user, record.user_id);
     return record;
   }
@@ -113,13 +114,13 @@ export class ConsumptionHistoryService {
     });
 
     if (members.length === 0) {
-      throw new NotFoundException("Bạn chưa thuộc gia đình nào");
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00172]);
     }
 
     const belongs = members.some(m => m.family_id === family_id);
 
     if (!belongs) {
-      throw new UnauthorizedException("Bạn không thuộc gia đình này");
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00173]);
     }
 
     // 3. Lấy dữ liệu của năm
@@ -159,13 +160,13 @@ export class ConsumptionHistoryService {
     });
 
     if (members.length === 0) {
-      throw new NotFoundException("Bạn chưa thuộc gia đình nào");
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00172]);
     }
 
     const belongs = members.some(m => m.family_id === family_id);
 
     if (!belongs) {
-      throw new UnauthorizedException("Bạn không thuộc gia đình này");
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00173]);
     }
 
     // 2. Điều kiện query
@@ -199,7 +200,7 @@ export class ConsumptionHistoryService {
 
   async statisticsByFamily(familyId: number, user: JwtUser) {
     if (user.role !== 'admin') {
-      throw new ForbiddenException('You do not have permission to access family statistics');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00174]);
     }
     const records = await this.consumptionRepo.find({ where: { family_id: familyId } });
     const total_consumed = records.reduce((sum, r) => sum + r.stock, 0);

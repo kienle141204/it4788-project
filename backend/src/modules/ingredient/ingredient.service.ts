@@ -5,6 +5,7 @@ import { Ingredient } from '../../entities/ingredient.entity';
 import { IngredientCategory } from '../../entities/ingredient-category.entity';
 import { Place } from '../../entities/place.entity';
 import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import {
   PaginationDto,
   SearchByNameDto,
@@ -56,7 +57,7 @@ export class IngredientService {
     });
 
     if (!ingredient) {
-      throw new NotFoundException('Không tìm thấy nguyên liệu');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
     }
 
     return ingredient;
@@ -87,7 +88,7 @@ export class IngredientService {
         where: { id: createIngredientDto.category_id },
       });
       if (!category) {
-        throw new BadRequestException('Danh mục không tồn tại');
+        throw new BadRequestException(ResponseMessageVi[ResponseCode.C00301]);
       }
     }
 
@@ -97,7 +98,7 @@ export class IngredientService {
         where: { place_id: createIngredientDto.place_id },
       });
       if (!place) {
-        throw new BadRequestException('Địa chỉ không tồn tại');
+        throw new BadRequestException(ResponseMessageVi[ResponseCode.C00302]);
       }
     }
 

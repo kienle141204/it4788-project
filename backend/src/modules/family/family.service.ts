@@ -12,6 +12,7 @@ import { MemberService } from '../member/member.service';
 import { AddMemberDto } from '../member/dto/add-member.dto';
 import type { JwtUser } from 'src/common/types/user.type';
 import * as QRCode from 'qrcode';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class FamilyService {
@@ -30,13 +31,13 @@ export class FamilyService {
       where: { id },
       relations: ['members', 'members.user'],
     });
-    if (!family) throw new NotFoundException(`Không tìm thấy gia đình ${id}`);
+    if (!family) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00190]);
     return family;
   }
 
   private ensureOwnerOrAdmin(family: Family, userId: number, role: string) {
     if (family.owner_id !== userId && role !== 'admin') {
-      throw new ForbiddenException('Bạn không phải chủ hay admin');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00191]);
     }
   }
 
@@ -117,7 +118,7 @@ export class FamilyService {
     const isMember = members.some(m => m.user_id === userId);
 
     if (!isMember) {
-      throw new ForbiddenException('Bạn không phải thành viên của gia đình này');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00192]);
     }
 
     // Lấy danh sách members với thông tin user
@@ -229,7 +230,7 @@ export class FamilyService {
     });
 
     if (!family) {
-      throw new NotFoundException('Mã mời không hợp lệ');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00193]);
     }
 
     // Kiểm tra user đã là thành viên chưa
@@ -237,7 +238,7 @@ export class FamilyService {
     const isAlreadyMember = existingMember.some(m => m.user_id === user.id);
 
     if (isAlreadyMember) {
-      throw new BadRequestException('Bạn đã là thành viên của gia đình này');
+      throw new BadRequestException(ResponseMessageVi[ResponseCode.C00194]);
     }
 
     // Thêm user vào family với role 'member' bằng cách gọi trực tiếp memberService
@@ -271,7 +272,7 @@ export class FamilyService {
     const userMember = member.find(m => m.user_id === userId);
 
     if (!userMember) {
-      throw new NotFoundException('Bạn không phải thành viên của gia đình này');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00192]);
     }
 
     // Nếu là owner, kiểm tra số lượng member
@@ -280,13 +281,13 @@ export class FamilyService {
       // Hoặc có thể xóa luôn family (tùy business logic)
       if (member.length === 1) {
         throw new BadRequestException(
-          'Bạn là chủ nhóm duy nhất. Vui lòng xóa nhóm hoặc chuyển quyền chủ nhóm trước khi rời.'
+          ResponseMessageVi[ResponseCode.C00195]
         );
       }
 
       // Nếu còn nhiều người, yêu cầu chuyển quyền owner trước
       throw new BadRequestException(
-        'Bạn là chủ nhóm. Vui lòng chuyển quyền chủ nhóm cho người khác trước khi rời.'
+        ResponseMessageVi[ResponseCode.C00196]
       );
     }
 
