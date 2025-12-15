@@ -20,7 +20,7 @@ export class RecipeService {
     private dishRepository: Repository<Dish>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   /**
    * Lấy tất cả công thức với phân trang và filter (public recipes visible to all, private recipes only to owner or admin)
@@ -46,10 +46,10 @@ export class RecipeService {
       queryBuilder.where(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
+              privateStatus: 'private',
+              userId: user.id
+            });
         })
       );
     }
@@ -133,10 +133,10 @@ export class RecipeService {
       queryBuilder.andWhere(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
+              privateStatus: 'private',
+              userId: user.id
+            });
         })
       );
     }
@@ -181,10 +181,10 @@ export class RecipeService {
       queryBuilder.where(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
+              privateStatus: 'private',
+              userId: user.id
+            });
         })
       );
     }
@@ -223,7 +223,7 @@ export class RecipeService {
     const savedRecipe = await this.recipeRepository.save(recipe);
 
     // Tạo các bước nấu ăn
-    const recipeSteps = steps.map(step => 
+    const recipeSteps = steps.map(step =>
       this.recipeStepRepository.create({
         recipe_id: savedRecipe.id,
         step_number: step.step_number,
@@ -265,7 +265,7 @@ export class RecipeService {
     await this.recipeStepRepository.delete({ recipe_id: recipeId });
 
     // Tạo các bước mới
-    const recipeSteps = updateRecipeDto.steps.map(step => 
+    const recipeSteps = updateRecipeDto.steps.map(step =>
       this.recipeStepRepository.create({
         recipe_id: recipeId,
         step_number: step.step_number,

@@ -1,6 +1,6 @@
 // Dishes API Service - Using centralized auth fetch utility
 
-import { get, post, put, del } from './authFetch';
+import { get, post, del } from './authFetch';
 
 // Get dishes with optional pagination and filtering
 export const fetchDishes = async (params = {}) => {
@@ -22,41 +22,24 @@ export const createDish = async (dishData) => {
   console.log('API call: createDish', dishData);
 
   try {
-    // Note: Backend documentation doesn't show a direct dish creation endpoint
-    // This functionality may not be available in the backend
-    throw new Error('Dish creation endpoint not available in backend');
+    const response = await post('/dishes/create-dish', dishData);
+    return response.data || response;
   } catch (error) {
     console.error('Error creating dish:', error);
     throw error;
   }
 };
 
-// Update an existing dish
+// Update an existing dish - NOT SUPPORTED BY BACKEND
 export const updateDish = async (id, dishData) => {
   console.log('API call: updateDish', id, dishData);
-
-  try {
-    // Note: Backend documentation doesn't show a direct dish update endpoint
-    // This functionality may not be available in the backend
-    throw new Error('Dish update endpoint not available in backend');
-  } catch (error) {
-    console.error('Error updating dish:', error);
-    throw error;
-  }
+  throw new Error('Chức năng sửa món ăn chưa được hỗ trợ bởi backend');
 };
 
-// Delete a dish
+// Delete a dish - NOT SUPPORTED BY BACKEND  
 export const deleteDish = async (id) => {
   console.log('API call: deleteDish', id);
-
-  try {
-    // Note: Backend documentation doesn't show a direct dish delete endpoint
-    // This functionality may not be available in the backend
-    throw new Error('Dish delete endpoint not available in backend');
-  } catch (error) {
-    console.error('Error deleting dish:', error);
-    throw error;
-  }
+  throw new Error('Chức năng xóa món ăn chưa được hỗ trợ bởi backend');
 };
 
 // Search dishes

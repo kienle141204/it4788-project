@@ -76,8 +76,8 @@ const DishesPage = () => {
 
   const columns = [
     { header: 'ID', key: 'id' },
-    { 
-      header: 'Hình ảnh', 
+    {
+      header: 'Hình ảnh',
       key: 'image_url',
       render: (value) => value ? (
         <img src={value} alt="Dish" className="w-12 h-12 object-cover rounded" />
@@ -86,9 +86,9 @@ const DishesPage = () => {
       )
     },
     { header: 'Tên món ăn', key: 'name' },
-    { 
-      header: 'Mô tả', 
-      key: 'description', 
+    {
+      header: 'Mô tả',
+      key: 'description',
       render: (value) => <div className="max-w-xs truncate">{value || 'N/A'}</div>
     },
   ];
@@ -146,19 +146,19 @@ const DishesPage = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingDish(null);
-    setFormData({ 
-      name: '', 
-      description: '', 
-      image_url: '' 
+    setFormData({
+      name: '',
+      description: '',
+      image_url: ''
     });
   };
 
   const handleOpenModal = () => {
     setEditingDish(null);
-    setFormData({ 
-      name: '', 
-      description: '', 
-      image_url: '' 
+    setFormData({
+      name: '',
+      description: '',
+      image_url: ''
     });
     setIsModalOpen(true);
   };
@@ -252,8 +252,6 @@ const DishesPage = () => {
       <Table
         columns={columns}
         data={currentDishes}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
       />
 
       {totalPages > 1 && (
@@ -274,20 +272,20 @@ const DishesPage = () => {
           <Input
             label="Tên món ăn"
             value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
           />
           <TextArea
             label="Mô tả"
             value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Nhập mô tả cho món ăn..."
             rows={4}
           />
           <Input
             label="URL Hình ảnh"
             value={formData.image_url}
-            onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             placeholder="https://example.com/image.jpg"
           />
           <div className="flex gap-2 justify-end mt-6">

@@ -35,8 +35,10 @@ export const updateRecipe = async (id, recipeData) => {
   console.log('API call: updateRecipe', id, recipeData);
 
   try {
-    // Real API call:
-    return await put(`/recipes/${id}`, recipeData);
+    // Real API call - PUT /recipes/:id
+    const response = await put(`/recipes/${id}`, recipeData);
+    // Return the recipe data from the response
+    return response.data || response;
   } catch (error) {
     console.error('Error updating recipe:', error);
     throw error;
@@ -48,8 +50,9 @@ export const deleteRecipe = async (id) => {
   console.log('API call: deleteRecipe', id);
 
   try {
-    // Real API call:
-    return await del(`/recipes/${id}`);
+    // Real API call - DELETE /recipes/:id
+    const response = await del(`/recipes/${id}`);
+    return response;
   } catch (error) {
     console.error('Error deleting recipe:', error);
     throw error;
