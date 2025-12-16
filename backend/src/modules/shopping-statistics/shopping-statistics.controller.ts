@@ -24,7 +24,32 @@ export class ShoppingStatisticsController {
   @Get('monthly-cost')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Lấy ra toàn bộ chi phí theo từng tháng' })
-  @ApiResponse({ status: 200, description: 'Total cost retrieved successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Total cost retrieved successfully.',
+    schema: {
+      example: [
+        {
+          month: "2024-01",
+          total_cost: 1500000,
+          shopping_lists: [
+            {
+              id: 1,
+              cost: 500000,
+              shopping_date: "2024-01-15T00:00:00.000Z",
+              items: [
+                {
+                  id: 1,
+                  name: "Thịt bò",
+                  ingredient: { id: 1, name: "Thịt bò", image_url: "..." }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getTotalCostByMonth(
     @Query('year', ParseIntPipe) year: number,
@@ -38,7 +63,23 @@ export class ShoppingStatisticsController {
   @Get('checked-items')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Lấy ra số lượng item đã được check' })
-  @ApiResponse({ status: 200, description: 'Checked items count retrieved successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Checked items count retrieved successfully.',
+    schema: {
+      example: {
+        total: 5,
+        items: [
+          {
+            id: 1,
+            name: "Rau cải",
+            is_checked: true,
+            ingredient: { id: 2, name: "Rau cải" }
+          }
+        ]
+      }
+    }
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getCheckedItems(
     @Query('familyId', ParseIntPipe) familyId: number,
@@ -79,7 +120,24 @@ export class ShoppingStatisticsController {
   @Get('user/:userId')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Lấy ra thống kê mua sắm theo user' })
-  @ApiResponse({ status: 200, description: 'User statistics retrieved successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'User statistics retrieved successfully.',
+    schema: {
+      example: {
+        total_cost: 2000000,
+        purchased_items: [
+          {
+            id: 10,
+            name: "Sữa tươi",
+            price: 30000,
+            is_checked: true,
+            ingredient: { id: 5, name: "Sữa tươi" }
+          }
+        ]
+      }
+    }
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getUserStatistics(
     @Param('userId', ParseIntPipe) userId: number,
@@ -92,7 +150,24 @@ export class ShoppingStatisticsController {
   @Get('family/:familyId')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Lấy ra thống kê mua sắm theo family' })
-  @ApiResponse({ status: 200, description: 'Family statistics retrieved successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Family statistics retrieved successfully.',
+    schema: {
+      example: {
+        total_cost: 5000000,
+        purchased_items: [
+          {
+            id: 15,
+            name: "Gạo",
+            price: 200000,
+            is_checked: true,
+            ingredient: { id: 8, name: "Gạo" }
+          }
+        ]
+      }
+    }
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getFamilyStatistics(
     @Param('familyId', ParseIntPipe) familyId: number,
