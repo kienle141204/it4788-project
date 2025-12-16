@@ -278,7 +278,22 @@ const FamiliesPage = () => {
                         ) : (
                             <div className="space-y-3">
                                 {familyMembers.map((member, index) => {
-                                    const isLeader = member.role === 'owner' || member.role === 'manager' || member.user_id === selectedFamily?.owner_id;
+                                    // Xác định vai trò: owner > manager > member
+                                    const isOwner = member.user_id === selectedFamily?.owner_id || member.role === 'owner';
+                                    const isManager = !isOwner && member.role === 'manager';
+
+                                    // Xác định label và màu sắc cho badge
+                                    let roleLabel = 'Thành viên';
+                                    let badgeClass = 'bg-gray-100 text-gray-800';
+
+                                    if (isOwner) {
+                                        roleLabel = 'Chủ nhóm';
+                                        badgeClass = 'bg-amber-100 text-amber-800';
+                                    } else if (isManager) {
+                                        roleLabel = 'Quản lý';
+                                        badgeClass = 'bg-blue-100 text-blue-800';
+                                    }
+
                                     return (
                                         <div key={member.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                             <div className="flex items-center gap-3">
@@ -289,7 +304,8 @@ const FamiliesPage = () => {
                                                         className="w-10 h-10 rounded-full object-cover"
                                                     />
                                                 ) : (
-                                                    <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${isOwner ? 'bg-amber-500' : isManager ? 'bg-blue-500' : 'bg-emerald-500'
+                                                        }`}>
                                                         {member.user?.full_name?.charAt(0) || member.full_name?.charAt(0) || '?'}
                                                     </div>
                                                 )}
@@ -298,9 +314,8 @@ const FamiliesPage = () => {
                                                     <p className="text-sm text-gray-500">{member.user?.email || member.email || ''}</p>
                                                 </div>
                                             </div>
-                                            <span className={`px-2 py-1 rounded text-xs font-medium ${isLeader ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                {isLeader ? 'Nhóm trưởng' : 'Thành viên'}
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${badgeClass}`}>
+                                                {roleLabel}
                                             </span>
                                         </div>
                                     );
