@@ -44,16 +44,24 @@ const RecipesPage = () => {
         limit: itemsPerPage
       });
 
-      // Handle paginated response - API returns {data: [...], pagination: {...}}
+      // Handle paginated response - API returns {data: [...], details: {pagination: {...}}}
       let recipesData = [];
       let responseTotalPages = 1;
       let responseTotalItems = 0;
 
-      if (response && response.data && response.pagination) {
+      // Pagination có thể nằm ở response.pagination hoặc response.details.pagination
+      const pagination = response?.pagination || response?.details?.pagination;
+
+      if (response && response.data && pagination) {
         // Response is properly paginated
         recipesData = response.data;
-        responseTotalPages = response.pagination.totalPages;
-        responseTotalItems = response.pagination.totalItems;
+        responseTotalPages = pagination.totalPages;
+        responseTotalItems = pagination.totalItems;
+      } else if (response && response.data && Array.isArray(response.data)) {
+        // Response has data but no pagination
+        recipesData = response.data;
+        responseTotalPages = 1;
+        responseTotalItems = response.data.length;
       } else if (Array.isArray(response)) {
         // Fallback if response is directly an array
         recipesData = response;
@@ -210,13 +218,24 @@ const RecipesPage = () => {
     try {
       if (editingRecipe) {
         // Update existing recipe
-        // Backend UpdateRecipeDto only accepts: status (public/private), steps (step_number, description)
+        // Backend UpdateRecipeDto accepts: status (public/private), steps (id, step_number, description)
+        // Khi có id, backend sẽ giữ lại step và images của step đó
         const updateData = {
           status: formData.status || 'public',
-          steps: formData.steps.map((step, index) => ({
-            step_number: parseInt(step.step_number) || (index + 1),
-            description: step.description || ''
-          }))
+          steps: formData.steps.map((step, index) => {
+            const stepData = {
+              step_number: parseInt(step.step_number) || (index + 1),
+              description: step.description || ''
+            };
+            // Chỉ gửi id nếu có và là số hợp lệ
+            if (step.id) {
+              const stepId = parseInt(step.id);
+              if (!isNaN(stepId)) {
+                stepData.id = stepId;
+              }
+            }
+            return stepData;
+          })
         };
 
         const updatedRecipe = await updateRecipe(editingRecipe.id, updateData);
@@ -282,10 +301,11 @@ const RecipesPage = () => {
         responseTotalPages = 1;
         responseTotalItems = response.length;
       } else if (response && response.data) {
-        // Response is paginated {data: [...], pagination: {...}}
+        // Response is paginated {data: [...], details: {pagination: {...}}}
         recipesData = response.data;
-        responseTotalPages = response.pagination?.totalPages || 1;
-        responseTotalItems = response.pagination?.totalItems || recipesData.length;
+        const pagination = response.pagination || response.details?.pagination;
+        responseTotalPages = pagination?.totalPages || 1;
+        responseTotalItems = pagination?.totalItems || recipesData.length;
       }
 
       // Sort recipes by ID from smallest to largest

@@ -23,19 +23,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       // Lấy message từ exception
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        message = (exceptionResponse as any).message || exception.message || 'An error occurred';
+        const exMsg = (exceptionResponse as any).message;
+        // NestJS validation errors trả về message là array
+        if (Array.isArray(exMsg)) {
+          message = exMsg.join(', ');
+        } else if (typeof exMsg === 'string') {
+          message = exMsg;
+        } else {
+          message = exception.message || 'An error occurred';
+        }
       } else {
         message = exception.message || 'An error occurred';
       }
 
       // Tìm ResponseCode tương ứng với message
       resultCode = this.findResponseCodeByMessage(message);
-      
+
       if (resultCode) {
         resultMessage = {
           en: ResponseMessageEn[resultCode as ResponseCode],
@@ -79,15 +87,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
   /**
    * Tìm ResponseCode dựa vào message (tiếng Việt)
    */
-  private findResponseCodeByMessage(message: string): string | null {
+  private findResponseCodeByMessage(message: string | any): string | null {
+    // Đảm bảo message là string
+    if (typeof message !== 'string') {
+      if (Array.isArray(message)) {
+        message = message.join(', ');
+      } else {
+        message = String(message || '');
+      }
+    }
     // Chuẩn hóa message: loại bỏ dấu chấm và khoảng trắng thừa
     const normalizedMessage = message.trim().replace(/\.$/, '');
-    
+
     // Duyệt qua tất cả ResponseCode để tìm message khớp
     for (const [code, viMessage] of Object.entries(ResponseMessageVi)) {
       // Chuẩn hóa viMessage
       const normalizedViMessage = viMessage.trim().replace(/\.$/, '');
-      
+
       // So sánh chính xác hoặc message chứa viMessage
       if (
         normalizedMessage === normalizedViMessage ||

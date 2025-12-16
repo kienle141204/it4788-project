@@ -124,7 +124,7 @@ export default function FoodDetailPage() {
 
   const fetchReviews = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!dishId) return;
-    
+
     if (!append) {
       setReviewsLoading(true);
       setReviewsError(null);
@@ -136,7 +136,7 @@ export default function FoodDetailPage() {
       // Ensure page and limit are valid numbers
       const validPage = Math.max(1, Math.floor(page) || 1);
       const validLimit = Math.max(1, Math.floor(REVIEWS_PER_PAGE) || 3);
-      
+
       const payload = await getAccess(`dishes/${dishId}/reviews`, {
         page: validPage,
         limit: validLimit,
@@ -152,7 +152,7 @@ export default function FoodDetailPage() {
         } else {
           setReviews(payload.data);
         }
-        
+
         // Check if there are more reviews
         setReviewsHasMore(payload.data.length === validLimit);
       } else {
@@ -166,7 +166,7 @@ export default function FoodDetailPage() {
         handleSessionExpired();
         return;
       }
-      
+
       // If pagination fails with 500, try without pagination as fallback
       if (err?.response?.status === 500 && !append) {
         console.warn('Pagination failed, trying without pagination...');
@@ -184,7 +184,7 @@ export default function FoodDetailPage() {
           console.error('Fallback also failed:', fallbackErr);
         }
       }
-      
+
       console.log(err);
       if (!append) {
         setReviews([]);
@@ -201,7 +201,7 @@ export default function FoodDetailPage() {
     const fetchDish = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         if (!dishId) return;
         const payload = await getAccess(`dishes/get-info-dish-by-id/${dishId}`);
@@ -235,16 +235,23 @@ export default function FoodDetailPage() {
 
       try {
         if (!dishId) return;
-        
-        // Gọi trực tiếp API recipes/{id} với id là dish_id
-        const payload = await getAccess(`recipes/${dishId}`);
+
+        // Gọi API recipes/by-dish/{dishId} để lấy công thức theo món ăn
+        const payload = await getAccess(`recipes/by-dish/${dishId}`);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải công thức');
         }
 
-        if (payload?.data) {
-          setRecipe(payload.data);
+        // API trả về mảng công thức, lấy công thức đầu tiên
+        const recipes = payload?.data;
+        if (recipes && Array.isArray(recipes) && recipes.length > 0) {
+          // Sắp xếp steps theo step_number trước khi set
+          const firstRecipe = recipes[0];
+          if (firstRecipe.steps && Array.isArray(firstRecipe.steps)) {
+            firstRecipe.steps.sort((a: RecipeStep, b: RecipeStep) => a.step_number - b.step_number);
+          }
+          setRecipe(firstRecipe);
         } else {
           setRecipe(null);
           setRecipeError('Chưa có công thức cho món ăn này');
@@ -339,7 +346,7 @@ export default function FoodDetailPage() {
       try {
         if (!dishId) return;
         const payload = await getAccess(`favorite-dishes/check/${dishId}`);
-        
+
         // Backend trả về: { success: true, message: '...', data: { isFavorite: boolean } }
         if (payload?.success === true && payload?.data) {
           const isFavoriteValue = payload.data.isFavorite;
@@ -400,7 +407,7 @@ export default function FoodDetailPage() {
       if (isFavorite) {
         // Xóa khỏi yêu thích - DELETE /api/favorite-dishes/dish/{dishId}
         const payload = await deleteAccess(`favorite-dishes/dish/${dishId}`);
-        
+
         // Backend trả về { success: true, message: '...' }
         if (payload?.success === true || (payload?.success === undefined && !payload?.message)) {
           setIsFavorite(false);
@@ -413,7 +420,7 @@ export default function FoodDetailPage() {
         const payload = await postAccess('favorite-dishes', {
           dish_id: dishId,
         });
-        
+
         // Backend trả về { success: true, message: '...', data: {...} }
         if (payload?.success === true || (payload?.success === undefined && !payload?.message)) {
           setIsFavorite(true);
@@ -428,9 +435,9 @@ export default function FoodDetailPage() {
         return;
       }
       console.error('handleToggleFavorite error', err);
-      
+
       let errorMessage = 'Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.';
-      
+
       if (err?.response?.status === 409) {
         errorMessage = 'Món ăn đã có trong danh sách yêu thích';
       } else if (err?.response?.status === 404) {
@@ -440,7 +447,7 @@ export default function FoodDetailPage() {
       } else if (err?.message) {
         errorMessage = err.message;
       }
-      
+
       Alert.alert('Lỗi', errorMessage);
     } finally {
       setFavoriteLoading(false);
@@ -476,9 +483,9 @@ export default function FoodDetailPage() {
   const parseDescription = (description: string) => {
     const lines = description.split('\n');
     const sections: { type: 'text' | 'list'; content: string[] }[] = [];
-    
+
     let currentSection: string[] = [];
-    
+
     lines.forEach(line => {
       if (line.trim().startsWith('-')) {
         // List item
@@ -496,14 +503,14 @@ export default function FoodDetailPage() {
         currentSection.push(line.trim());
       }
     });
-    
+
     if (currentSection.length > 0) {
       sections.push({
         type: currentSection[0].startsWith('-') ? 'list' : 'text',
         content: currentSection
       });
     }
-    
+
     return sections;
   };
 
@@ -530,7 +537,7 @@ export default function FoodDetailPage() {
         Alert.alert('Thành công', 'Cập nhật đánh giá thành công');
         setShowReviewForm(false);
         setIsEditingReview(false);
-        
+
         // Refresh user review and all reviews
         const userReviewPayload = await getAccess(`dishes/${dishId}/reviews/my-review`);
         if (userReviewPayload?.success && userReviewPayload.data) {
@@ -582,7 +589,7 @@ export default function FoodDetailPage() {
                 setIsEditingReview(false);
                 setNewRating(5);
                 setNewComment('');
-                
+
                 // Reset pagination and refresh reviews
                 setReviewsPage(1);
                 await fetchReviews(1, false);
@@ -632,7 +639,7 @@ export default function FoodDetailPage() {
         setNewComment('');
         setNewRating(5);
         setShowReviewForm(false);
-        
+
         // Reset pagination and refresh reviews
         setReviewsPage(1);
         await fetchReviews(1, false);
@@ -650,7 +657,7 @@ export default function FoodDetailPage() {
         return;
       }
       console.log(err);
-      
+
       // Xử lý lỗi 409 - User đã đánh giá rồi
       const errorMessage = err?.response?.data?.message || err?.message || '';
       if (err?.response?.status === 409 || errorMessage.includes('đã đánh giá')) {
@@ -773,7 +780,7 @@ export default function FoodDetailPage() {
   return (
     <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       <View style={foodDetailStyles.headerWrapper}>
         <View style={foodDetailStyles.header}>
           <TouchableOpacity onPress={handleBack} style={foodDetailStyles.headerButton}>
@@ -788,7 +795,7 @@ export default function FoodDetailPage() {
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={foodDetailStyles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={foodDetailStyles.scrollContent}
@@ -798,8 +805,8 @@ export default function FoodDetailPage() {
           <View style={foodDetailStyles.imageBackdrop} />
           <View style={foodDetailStyles.imageCard}>
             {dish.image_url ? (
-              <Image 
-                source={{ uri: dish.image_url }} 
+              <Image
+                source={{ uri: dish.image_url }}
                 style={foodDetailStyles.dishImage}
               />
             ) : (
@@ -1277,7 +1284,7 @@ export default function FoodDetailPage() {
                           </View>
                         ))}
                       </View>
-                      
+
                       {reviewsHasMore && (
                         <TouchableOpacity
                           style={foodDetailStyles.loadMoreButton}

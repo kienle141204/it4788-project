@@ -29,7 +29,7 @@ export default function FoodPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Favorite dishes state
   const [favoriteDishes, setFavoriteDishes] = useState<Dish[]>([]);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
@@ -77,7 +77,8 @@ export default function FoodPage() {
       }
 
       const newItems: Dish[] = payload.data || [];
-      const pagination = payload.pagination || {};
+      // Pagination có thể nằm ở payload.pagination hoặc payload.details.pagination
+      const pagination = payload.pagination || payload.details?.pagination || {};
 
       setDishes(prev => (reset ? newItems : [...prev, ...newItems]));
       setHasNextPage(Boolean(pagination.hasNextPage));
@@ -186,17 +187,17 @@ export default function FoodPage() {
   return (
     <View style={foodStyles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       {/* Header */}
       <View style={foodStyles.header}>
         <TouchableOpacity onPress={handleBack} style={foodStyles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
         </TouchableOpacity>
-        
+
         <Text style={foodStyles.headerTitle}>Món ăn</Text>
-        
-        <TouchableOpacity 
-          onPress={handleNotificationPress} 
+
+        <TouchableOpacity
+          onPress={handleNotificationPress}
           style={foodStyles.notificationButton}
         >
           <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
@@ -221,7 +222,7 @@ export default function FoodPage() {
             Khám phá
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
             foodStyles.tab,
@@ -254,7 +255,7 @@ export default function FoodPage() {
       </View>
 
       {/* Content */}
-      {((activeTab === 'explore' && loading && dishes.length === 0) || 
+      {((activeTab === 'explore' && loading && dishes.length === 0) ||
         (activeTab === 'mine' && favoriteLoading && favoriteDishes.length === 0)) ? (
         <View style={foodStyles.loaderContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
@@ -263,8 +264,8 @@ export default function FoodPage() {
           </Text>
         </View>
       ) : (
-        <ScrollView 
-          style={foodStyles.scrollView} 
+        <ScrollView
+          style={foodStyles.scrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={foodStyles.scrollContent}
           refreshControl={
@@ -272,7 +273,7 @@ export default function FoodPage() {
           }
         >
           {activeTab === 'explore' && (
-            <>      
+            <>
               {error && (
                 <View style={foodStyles.errorContainer}>
                   <Ionicons name="alert-circle-outline" size={20} color={COLORS.purple} />
@@ -290,10 +291,10 @@ export default function FoodPage() {
 
               <View style={foodStyles.foodList}>
                 {dishes.map((item) => (
-                  <FoodCard 
-                    key={item.id} 
+                  <FoodCard
+                    key={item.id}
                     id={String(item.id)}
-                    name={item.name} 
+                    name={item.name}
                     image_url={item.image_url}
                     onPress={handleFoodPress}
                   />
@@ -301,7 +302,7 @@ export default function FoodPage() {
               </View>
 
               {hasNextPage && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={foodStyles.loadMoreButton}
                   onPress={handleLoadMore}
                   disabled={loadingMore}
@@ -334,10 +335,10 @@ export default function FoodPage() {
               {!favoriteError && favoriteDishes.length > 0 && (
                 <View style={foodStyles.foodList}>
                   {favoriteDishes.map((item) => (
-                    <FoodCard 
-                      key={item.id} 
+                    <FoodCard
+                      key={item.id}
                       id={String(item.id)}
-                      name={item.name} 
+                      name={item.name}
                       image_url={item.image_url}
                       onPress={handleFoodPress}
                     />
