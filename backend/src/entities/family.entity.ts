@@ -12,6 +12,7 @@ import { FamilyMember } from './family-member.entity';
 import { Menu } from './menu.entity';
 import { ShoppingList } from './shopping-list.entity';
 import { FamilyNote } from './family-note.entity';
+import { Chat } from './chat.entity';
 
 @Entity('families')
 export class Family {
@@ -45,5 +46,8 @@ export class Family {
 
   @OneToMany(() => FamilyNote, (familyNote) => familyNote.family)
   notes: FamilyNote[];
+
+  @OneToMany(() => Chat, (chat) => chat.family)
+  chats: Chat[];
 }
 
