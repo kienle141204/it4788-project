@@ -54,6 +54,7 @@ export default function EditMenuPage() {
   const [menuId] = useState<string | null>(id || null);
   const [family, setFamily] = useState<Family | null>(null);
   const [description, setDescription] = useState('');
+  const [time, setTime] = useState<string>('breakfast'); // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   const [selectedDishes, setSelectedDishes] = useState<SelectedDish[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
@@ -109,7 +110,11 @@ export default function EditMenuPage() {
       }
       console.error('fetchMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể tải thông tin thực đơn');
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/home' as any);
+      }
     } finally {
       setLoadingMenu(false);
     }
@@ -159,7 +164,11 @@ export default function EditMenuPage() {
   }, [showDishModal, fetchDishes]);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleAddDish = (dish: Dish) => {
@@ -265,11 +274,18 @@ export default function EditMenuPage() {
         await Promise.all(addDishPromises);
       }
 
-      Alert.alert('Thành công', 'Cập nhật thực đơn thành công');
-      // Tự động quay lại sau 1 giây
-      setTimeout(() => {
-        router.back();
-      }, 1000);
+      Alert.alert('Thành công', 'Cập nhật thực đơn thành công', [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/home' as any);
+            }
+          },
+        },
+      ]);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();

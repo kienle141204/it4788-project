@@ -98,7 +98,13 @@ export default function NearestMarketScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/(tabs)/home' as any);
+                  }
+                }}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>5 Chợ Gần Nhất</Text>
