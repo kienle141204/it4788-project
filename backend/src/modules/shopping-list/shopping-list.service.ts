@@ -8,6 +8,7 @@ import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
 import { FamilyService } from '../family/family.service';
 import { MemberService } from '../member/member.service';
 import { JwtUser } from 'src/common/types/user.type';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class ShoppingListService {
@@ -37,7 +38,7 @@ export class ShoppingListService {
     // Nếu chỉ định owner khác user
     if (data.owner_id !== user.id) {
       if (!data.family_id) {
-        throw new UnauthorizedException('Bạn không thể tạo cho người này');
+        throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00261]);
       }
 
       const family = await this.familyService.getFamilyById(data.family_id);
@@ -49,7 +50,7 @@ export class ShoppingListService {
       
       // Chỉ manager mới có quyền giao task
       if (!isManager) {
-        throw new UnauthorizedException('Bạn không có quyền giao nhiệm vụ cho người khác');
+        throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00262]);
       }
     }
 

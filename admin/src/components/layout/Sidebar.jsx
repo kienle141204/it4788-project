@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Package, Utensils, BookOpen, Menu, X } from 'lucide-react';
+import { Users, Package, Utensils, BookOpen, Menu, X, Home, ShoppingCart, Box, BarChart3 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Sidebar = ({
@@ -9,16 +9,20 @@ const Sidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Get current page from the URL
-  const currentPage = location.pathname.slice(1) || 'users'; 
+  const currentPage = location.pathname.slice(1) || 'users';
 
   const menuItems = [
     { id: 'users', label: 'Người dùng', icon: Users, path: '/users' },
+    { id: 'families', label: 'Gia đình', icon: Home, path: '/families' },
     { id: 'foods', label: 'Thực phẩm', icon: Package, path: '/foods' },
-    { id: 'dishes', label: 'Món ăn', icon: Utensils, path: '/dishes' },
     { id: 'recipes', label: 'Công thức', icon: BookOpen, path: '/recipes' },
+    { id: 'shopping-lists', label: 'Danh sách mua sắm', icon: ShoppingCart, path: '/shopping-lists' },
+    { id: 'refrigerators', label: 'Tủ lạnh', icon: Box, path: '/refrigerators' },
+    { id: 'statistics', label: 'Thống kê', icon: BarChart3, path: '/statistics' },
   ];
+
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -41,9 +45,8 @@ const Sidebar = ({
           <button
             key={item.id}
             onClick={() => handleNavigation(item.path)}
-            className={`w-full flex items-center gap-3 p-3 rounded-lg mb-2 transition-colors ${
-              currentPage === item.id ? 'bg-emerald-600' : 'hover:bg-emerald-700'
-            }`}
+            className={`w-full flex items-center gap-3 p-3 rounded-lg mb-2 transition-colors ${currentPage === item.id ? 'bg-emerald-600' : 'hover:bg-emerald-700'
+              }`}
           >
             <item.icon size={20} />
             {isOpen && <span>{item.label}</span>}

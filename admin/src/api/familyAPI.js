@@ -86,31 +86,35 @@ export const searchFamilies = async (searchTerm, page = 1, limit = 10) => {
   }
 };
 
-// Get family members - check if endpoint exists in backend
-export const getFamilyMembers = async (familyId, params = {}) => {
-  console.log('API call: getFamilyMembers', familyId, params);
+// Get family members - using correct endpoint
+export const getFamilyMembers = async (familyId) => {
+  console.log('API call: getFamilyMembers', familyId);
 
   try {
-    // Note: This endpoint may not exist in backend
-    throw new Error('getFamilyMembers endpoint may not be implemented in backend');
+    const response = await get(`/families/${familyId}/members`);
+    return response;
   } catch (error) {
     console.error('Error getting family members:', error);
     throw error;
   }
 };
 
-// Add member to family - check if endpoint exists in backend
-export const addFamilyMember = async (familyId, memberId) => {
-  console.log('API call: addFamilyMember', familyId, memberId);
+// Add member to family using correct endpoint
+export const addFamilyMember = async (familyId, memberId, role = 'member') => {
+  console.log('API call: addFamilyMember', familyId, memberId, role);
 
   try {
-    // Note: This endpoint may not exist in backend
-    throw new Error('addFamilyMember endpoint may not be implemented in backend');
+    return await post('/families/add-member', {
+      family_id: familyId,
+      member_id: memberId,
+      role: role
+    });
   } catch (error) {
     console.error('Error adding family member:', error);
     throw error;
   }
 };
+
 
 // Remove member from family - check if endpoint exists in backend
 export const removeFamilyMember = async (familyId, memberId) => {

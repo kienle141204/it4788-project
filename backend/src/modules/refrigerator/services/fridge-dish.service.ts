@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FridgeDish } from '../../../entities/fridge-dish.entity';
@@ -6,6 +7,7 @@ import { Refrigerator } from '../../../entities/refrigerator.entity';
 import { Dish } from '../../../entities/dish.entity';
 import { CreateFridgeDishDto } from '../dto/create-fridge-dish.dto';
 import { UpdateFridgeDishDto } from '../dto/update-fridge-dish.dto';
+import { PaginationDto } from '../dto/pagination.dto';
 import { JwtUser } from '../../../common/types/user.type';
 
 @Injectable()
@@ -28,7 +30,7 @@ export class FridgeDishService {
       where: { id: refrigerator_id },
       relations: ['owner', 'family', 'family.members'], // cần load members
     });
-    if (!fridge) throw new NotFoundException(`Không tìm thấy refrigerator ${refrigerator_id}`);
+    if (!fridge) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00230]);
 
     // Kiểm tra quyền: admin, owner, family owner, hoặc member family
     const isOwner = fridge.owner_id === user.id;
@@ -37,12 +39,12 @@ export class FridgeDishService {
     const isFamilyMember = fridge.family?.members?.some(member => member.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền thêm món ăn vào tủ này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00235]);
     }
 
     // Kiểm tra dish tồn tại
     const dish = await this.dishRepo.findOne({ where: { id: dish_id } });
-    if (!dish) throw new NotFoundException(`Không tìm thấy dish ${dish_id}`);
+    if (!dish) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
 
     // Tạo FridgeDish
     const fridgeDish = this.fridgeDishRepo.create({
@@ -68,7 +70,7 @@ export class FridgeDishService {
       where: { id },
       relations: ['refrigerator', 'dish', 'refrigerator.family', 'refrigerator.family.members'],
     });
-    if (!item) throw new NotFoundException(`FridgeDish ${id} not found`);
+    if (!item) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00237]);
 
     const fridge = item.refrigerator;
     const isOwner = fridge.owner_id === user.id;
@@ -77,33 +79,57 @@ export class FridgeDishService {
     const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền truy cập món ăn này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00234]);
     }
 
     return item;
   }
 
-  /** Lấy tất cả món ăn trong tủ lạnh */
-  async findByRefrigerator(fridge_id: number, user: JwtUser): Promise<FridgeDish[]> {
-    const items = await this.fridgeDishRepo.find({
-      where: { refrigerator_id: fridge_id },
-      relations: ['refrigerator', 'dish', 'refrigerator.family', 'refrigerator.family.members'],
+  /** Lấy tất cả món ăn trong tủ lạnh với phân trang */
+  async findByRefrigerator(fridge_id: number, user: JwtUser, paginationDto: PaginationDto): Promise<{
+    data: FridgeDish[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    // Kiểm tra quyền truy cập tủ lạnh
+    const fridge = await this.refrigeratorRepo.findOne({
+      where: { id: fridge_id },
+      relations: ['owner', 'family', 'family.members'],
     });
 
-    if (!items.length) throw new NotFoundException(`Không tìm thấy món ăn trong tủ lạnh`);
+    if (!fridge) throw new NotFoundException(`Không tìm thấy tủ lạnh`);
 
-    // Kiểm tra quyền dựa trên fridge đầu tiên (có thể cải tiến nếu nhiều fridge khác nhau)
-    const fridge = items[0].refrigerator;
     const isOwner = fridge.owner_id === user.id;
     const isAdmin = user.role === 'admin';
     const isFamilyOwner = fridge.family?.owner_id === user.id;
     const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền truy cập món ăn này');
+      throw new UnauthorizedException('Bạn không có quyền truy cập tủ lạnh này');
     }
 
-    return items;
+    const { page = 1, limit = 10 } = paginationDto;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.fridgeDishRepo.findAndCount({
+      where: { refrigerator_id: fridge_id },
+      relations: ['refrigerator', 'dish', 'refrigerator.family', 'refrigerator.family.members'],
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   /** Cập nhật món ăn */

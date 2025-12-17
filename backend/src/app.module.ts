@@ -22,11 +22,14 @@ import { ConsumptionHistoryModule } from './modules/consumption-history/consumpt
 import { RemindersModule } from './reminders/reminders.module';
 import { MarketModule } from './modules/market/market.module';
 import { FavoriteDishModule } from './modules/favorite-dish/favorite-dish.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WebSocketModule } from './common/websocket';
+import { ChatModule } from './modules/chat/chat.module';
 @Module({
   imports: [
     // Cấu hình biến môi trường (toàn cục)
     ConfigModule.forRoot({ isGlobal: true }),
-    
+
     // Cấu hình Schedule cho Cron jobs
     ScheduleModule.forRoot(),
 
@@ -85,6 +88,8 @@ import { FavoriteDishModule } from './modules/favorite-dish/favorite-dish.module
     RemindersModule,
     MarketModule,
     FavoriteDishModule,
+    WebSocketModule, // Shared WebSocket module - import trước các module sử dụng nó
+    NotificationsModule, ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Nutrient } from '../../entities/nutrient.entity';
 import { Dish } from '../../entities/dish.entity';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class NutrientService {
@@ -32,7 +33,7 @@ export class NutrientService {
     });
 
     if (!nutrient) {
-      throw new NotFoundException(`Không tìm thấy dinh dưỡng với ID ${id}`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00280]);
     }
 
     return nutrient;
@@ -48,7 +49,7 @@ export class NutrientService {
     });
 
     if (!dish) {
-      throw new NotFoundException(`Không tìm thấy món ăn với ID ${dishId}`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
     }
 
     return dish.nutrients || [];
@@ -67,7 +68,7 @@ export class NutrientService {
     });
 
     if (!dish) {
-      throw new NotFoundException(`Không tìm thấy món ăn với ID ${dishId}`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
     }
 
     return {

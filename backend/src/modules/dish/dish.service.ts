@@ -8,6 +8,7 @@ import { CreateDishDto } from './dto/create-dish.dto';
 import { PaginationDto, SearchDishDto } from './dto/pagination.dto';
 import { TopRatedDishesDto, TopDishesDto } from './dto/top-dishes.dto';
 import { User } from '../../entities/user.entity';
+import { ResponseCode, ResponseMessageVi } from 'src/common';
 
 @Injectable()
 export class DishService {
@@ -36,7 +37,7 @@ export class DishService {
     const dish = await this.dishRepository.findOne({ where: { id } });
     
     if (!dish) {
-      throw new NotFoundException('Không tìm thấy món ăn');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
     }
     
     return dish;

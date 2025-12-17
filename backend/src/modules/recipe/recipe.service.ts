@@ -7,6 +7,7 @@ import { Dish } from '../../entities/dish.entity';
 import { User } from '../../entities/user.entity';
 import { GetRecipesDto } from './dto/get-recipes.dto';
 import { CreateRecipeDto, UpdateRecipeDto } from './dto/create-recipe.dto';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class RecipeService {
@@ -19,7 +20,7 @@ export class RecipeService {
     private dishRepository: Repository<Dish>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   /**
    * Lấy tất cả công thức với phân trang và filter (public recipes visible to all, private recipes only to owner or admin)
@@ -45,10 +46,10 @@ export class RecipeService {
       queryBuilder.where(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
+              privateStatus: 'private',
+              userId: user.id
+            });
         })
       );
     }
@@ -87,12 +88,12 @@ export class RecipeService {
     });
 
     if (!recipe) {
-      throw new NotFoundException('Không tìm thấy công thức');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00110]);
     }
 
     // Kiểm tra quyền truy cập: admin có thể xem tất cả, user chỉ xem public recipes hoặc private recipes của chính họ
     if (user.role !== 'admin' && recipe.status === 'private' && recipe.owner_id !== user.id) {
-      throw new ForbiddenException('Bạn không có quyền xem công thức này');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00117]);
     }
 
     // Lấy các bước chi tiết với hình ảnh
@@ -116,7 +117,7 @@ export class RecipeService {
     // Kiểm tra món ăn có tồn tại không
     const dish = await this.dishRepository.findOne({ where: { id: dishId } });
     if (!dish) {
-      throw new NotFoundException('Không tìm thấy món ăn');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
     }
 
     const queryBuilder = this.recipeRepository
@@ -132,10 +133,10 @@ export class RecipeService {
       queryBuilder.andWhere(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
+              privateStatus: 'private',
+              userId: user.id
+            });
         })
       );
     }
@@ -150,7 +151,7 @@ export class RecipeService {
     // Kiểm tra user có tồn tại không
     const user = await this.userRepository.findOne({ where: { id: ownerId } });
     if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00052]);
     }
 
     return await this.recipeRepository.find({
@@ -180,10 +181,10 @@ export class RecipeService {
       queryBuilder.where(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
-                  .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', { 
-                    privateStatus: 'private', 
-                    userId: user.id 
-                  });
+            .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
+              privateStatus: 'private',
+              userId: user.id
+            });
         })
       );
     }
@@ -200,7 +201,7 @@ export class RecipeService {
     // Kiểm tra món ăn có tồn tại không
     const dish = await this.dishRepository.findOne({ where: { id: dish_id } });
     if (!dish) {
-      throw new NotFoundException('Không tìm thấy món ăn');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
     }
 
     // Kiểm tra user đã tạo công thức cho món ăn này chưa
@@ -209,7 +210,7 @@ export class RecipeService {
     });
 
     if (existingRecipe) {
-      throw new ConflictException('Bạn đã tạo công thức cho món ăn này rồi');
+      throw new ConflictException(ResponseMessageVi[ResponseCode.C00116]);
     }
 
     // Tạo công thức mới
@@ -222,7 +223,7 @@ export class RecipeService {
     const savedRecipe = await this.recipeRepository.save(recipe);
 
     // Tạo các bước nấu ăn
-    const recipeSteps = steps.map(step => 
+    const recipeSteps = steps.map(step =>
       this.recipeStepRepository.create({
         recipe_id: savedRecipe.id,
         step_number: step.step_number,
@@ -247,12 +248,12 @@ export class RecipeService {
     });
 
     if (!recipe) {
-      throw new NotFoundException('Không tìm thấy công thức');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00110]);
     }
 
     // Kiểm tra quyền sở hữu
     if (recipe.owner_id !== userId) {
-      throw new ForbiddenException('Bạn không có quyền chỉnh sửa công thức này');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00117]);
     }
 
     // Cập nhật status nếu có
@@ -264,7 +265,7 @@ export class RecipeService {
     await this.recipeStepRepository.delete({ recipe_id: recipeId });
 
     // Tạo các bước mới
-    const recipeSteps = updateRecipeDto.steps.map(step => 
+    const recipeSteps = updateRecipeDto.steps.map(step =>
       this.recipeStepRepository.create({
         recipe_id: recipeId,
         step_number: step.step_number,
@@ -288,12 +289,12 @@ export class RecipeService {
     });
 
     if (!recipe) {
-      throw new NotFoundException('Không tìm thấy công thức');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00110]);
     }
 
     // Kiểm tra quyền sở hữu
     if (recipe.owner_id !== userId) {
-      throw new ForbiddenException('Bạn không có quyền xóa công thức này');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00118]);
     }
 
     // Xóa công thức (các bước sẽ tự động xóa do cascade)

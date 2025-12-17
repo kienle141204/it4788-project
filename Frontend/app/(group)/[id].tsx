@@ -33,6 +33,7 @@ import { getAccess } from '../../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
+import GroupStatistics from '../../components/GroupStatistics';
 
 // InfoRow component for member profile
 const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
@@ -152,7 +153,8 @@ export default function GroupDetailPage() {
   const { id } = useLocalSearchParams();
   const familyId = parseInt(id as string);
 
-  const [activeTab, setActiveTab] = useState<'shopping' | 'members'>('shopping');
+  const [activeTab, setActiveTab] = useState<'shopping' | 'statistics'>('shopping');
+  const [showMembersView, setShowMembersView] = useState(false);
   const [family, setFamily] = useState<Family | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -171,11 +173,11 @@ export default function GroupDetailPage() {
   const [newItemIngredientId, setNewItemIngredientId] = useState<number | null>(null);
   const [newItemStock, setNewItemStock] = useState<string>('500');
   const [newItemPrice, setNewItemPrice] = useState<string>('');
-  
+
   // Create list states
   const [showAssignMemberDropdown, setShowAssignMemberDropdown] = useState<boolean>(false);
   const [assignedOwner, setAssignedOwner] = useState<Member | null>(null);
-  
+
   // Ingredient search states
   const [ingredientSearchTerm, setIngredientSearchTerm] = useState<string>('');
   const [searchedIngredients, setSearchedIngredients] = useState<any[]>([]);
@@ -187,7 +189,7 @@ export default function GroupDetailPage() {
   const [showMemberMenu, setShowMemberMenu] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
-  
+
   // Member profile states
   const [showMemberProfileModal, setShowMemberProfileModal] = useState(false);
   const [memberProfile, setMemberProfile] = useState<any>(null);
@@ -295,16 +297,16 @@ export default function GroupDetailPage() {
       console.log('[Manager Check] Missing data:', { currentUserId, membersCount: members.length });
       return null;
     }
-    
+
     // Convert both to numbers for comparison to avoid type mismatch
     const foundMember = members.find(member => Number(member.user_id) === Number(currentUserId)) || null;
-    
+
     console.log('[Manager Check] Current member found:', {
       currentUserId,
       foundMember: foundMember ? { id: foundMember.id, user_id: foundMember.user_id, role: foundMember.role } : null,
       allMembers: members.map(m => ({ id: m.id, user_id: m.user_id, role: m.role }))
     });
-    
+
     return foundMember;
   }, [currentUserId, members]);
 
@@ -331,8 +333,15 @@ export default function GroupDetailPage() {
 
   const getFamilyMenuOptions = () => {
     if (!family) return [];
-    
+
     return [
+      {
+        label: 'Thành viên nhóm',
+        icon: 'people-outline' as const,
+        onPress: () => {
+          setShowMembersView(true);
+        },
+      },
       {
         label: 'Mã mời',
         icon: 'qr-code-outline' as const,
@@ -411,7 +420,7 @@ export default function GroupDetailPage() {
 
   const getMemberMenuOptions = () => {
     if (!selectedMember) return [];
-    
+
     const isCurrentUser = selectedMember.user_id === currentUserId;
     const isMemberManager = selectedMember.role === 'manager';
     const options = [];
@@ -518,7 +527,7 @@ export default function GroupDetailPage() {
     const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     const today = new Date();
     const isToday = isSameDay(date, today);
-    
+
     return {
       day: date.getDate(),
       weekday: days[date.getDay()],
@@ -551,12 +560,12 @@ export default function GroupDetailPage() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       // Ensure owner_id is number or undefined (not null or string)
       const ownerId = assignedOwner ? Number(assignedOwner.user_id) : undefined;
-      
+
       console.log('Creating shopping list with:', { familyId, dateStr, ownerId });
-      
+
       await createShoppingList(familyId, dateStr, ownerId);
       await fetchFamilyData(true);
       setShowAddListModal(false);
@@ -597,7 +606,7 @@ export default function GroupDetailPage() {
   // Search ingredients
   const handleSearchIngredients = async (searchText: string) => {
     setIngredientSearchTerm(searchText);
-    
+
     if (searchText.trim().length < 2) {
       setSearchedIngredients([]);
       return;
@@ -609,7 +618,7 @@ export default function GroupDetailPage() {
         name: searchText,
         limit: 20,
       });
-      
+
       if (response && response.data) {
         setSearchedIngredients(response.data);
       } else {
@@ -630,7 +639,7 @@ export default function GroupDetailPage() {
     setNewItemIngredientId(Number(ingredient.id));
     setIngredientSearchTerm('');
     setSearchedIngredients([]);
-    
+
     // Calculate price based on current stock
     if (ingredient.price) {
       const stock = parseInt(newItemStock) || 500;
@@ -663,18 +672,18 @@ export default function GroupDetailPage() {
       const ingredientId = Number(newItemIngredientId);
       const stock = parseInt(newItemStock);
       const price = newItemPrice ? parseFloat(newItemPrice) : undefined;
-      
+
       // Validate numbers
       if (isNaN(listId) || isNaN(ingredientId) || isNaN(stock)) {
         Alert.alert('Lỗi', 'Dữ liệu không hợp lệ');
         return;
       }
-      
+
       console.log('Adding item with:', { listId, ingredientId, stock, price });
-      
+
       await addItemToList(listId, ingredientId, stock, price);
       await fetchFamilyData(true);
-      
+
       // Reset form
       setShowAddItemModal(false);
       setSelectedListId(null);
@@ -684,7 +693,7 @@ export default function GroupDetailPage() {
       setNewItemPrice('');
       setIngredientSearchTerm('');
       setSearchedIngredients([]);
-      
+
       Alert.alert('Thành công', 'Đã thêm mặt hàng vào danh sách');
     } catch (error) {
       console.error('Error adding item:', error);
@@ -733,9 +742,9 @@ export default function GroupDetailPage() {
     if (!searchTerm.trim()) {
       return members;
     }
-    
+
     const lowerSearchTerm = searchTerm.toLowerCase();
-    return members.filter(member => 
+    return members.filter(member =>
       member.user.full_name?.toLowerCase().includes(lowerSearchTerm) ||
       member.user.email?.toLowerCase().includes(lowerSearchTerm)
     );
@@ -764,8 +773,8 @@ export default function GroupDetailPage() {
           >
             <View style={groupStyles.memberAvatar}>
               {member.user.avatar_url ? (
-                <Image 
-                  source={{ uri: member.user.avatar_url }} 
+                <Image
+                  source={{ uri: member.user.avatar_url }}
                   style={groupStyles.memberAvatarImage}
                 />
               ) : (
@@ -812,7 +821,7 @@ export default function GroupDetailPage() {
   const renderDateCarousel = () => {
     return (
       <View style={groupStyles.dateCarouselContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={groupStyles.dateNavButton}
           onPress={handlePreviousDate}
         >
@@ -827,7 +836,7 @@ export default function GroupDetailPage() {
           {dateRange.map((date, index) => {
             const { day, weekday, isToday } = formatDate(date);
             const isActive = isSameDay(date, selectedDate);
-            
+
             return (
               <TouchableOpacity
                 key={index}
@@ -854,7 +863,7 @@ export default function GroupDetailPage() {
           })}
         </ScrollView>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={groupStyles.dateNavButton}
           onPress={handleNextDate}
         >
@@ -918,7 +927,7 @@ export default function GroupDetailPage() {
     return (
       <>
         {renderDateCarousel()}
-        
+
         <View style={groupStyles.shoppingListsContainer}>
           {filteredShoppingLists.length === 0 ? (
             <View style={groupStyles.emptyState}>
@@ -1038,15 +1047,15 @@ export default function GroupDetailPage() {
         <TouchableOpacity
           style={[
             groupStyles.tab,
-            activeTab === 'members' && groupStyles.tabActive
+            activeTab === 'statistics' && groupStyles.tabActive
           ]}
-          onPress={() => setActiveTab('members')}
+          onPress={() => setActiveTab('statistics')}
         >
           <Text style={[
             groupStyles.tabText,
-            activeTab === 'members' && groupStyles.tabTextActive
+            activeTab === 'statistics' && groupStyles.tabTextActive
           ]}>
-            Thành viên nhóm
+            Thống kê
           </Text>
         </TouchableOpacity>
       </View>
@@ -1084,35 +1093,8 @@ export default function GroupDetailPage() {
             </View>
           ) : (
             <>
-              {activeTab === 'members' && (
-                <>
-                  {/* Member count */}
-                  <View style={groupStyles.memberCountContainer}>
-                    <Text style={groupStyles.memberCountText}>
-                      {members.length} thành viên
-                    </Text>
-                  </View>
-
-                  {/* Search bar */}
-                  <View style={groupStyles.searchContainer}>
-                    <Ionicons name='search' size={20} color={COLORS.grey} style={groupStyles.searchIcon} />
-                    <TextInput
-                      style={groupStyles.searchInput}
-                      placeholder='Tìm thành viên theo tên'
-                      placeholderTextColor={COLORS.grey}
-                      value={searchTerm}
-                      onChangeText={setSearchTerm}
-                    />
-                    {searchTerm.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchTerm('')}>
-                        <Ionicons name='close-circle' size={20} color={COLORS.grey} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </>
-              )}
-              
-              {activeTab === 'members' ? renderMembersList() : renderShoppingList()}
+              {activeTab === 'shopping' && renderShoppingList()}
+              {activeTab === 'statistics' && <GroupStatistics familyId={familyId} />}
             </>
           )}
         </ScrollView>
@@ -1329,23 +1311,23 @@ export default function GroupDetailPage() {
                     }}>
                       Hoạt động
                     </Text>
-                    <InfoRow 
-                      icon="calendar-outline" 
-                      label="Ngày tạo" 
+                    <InfoRow
+                      icon="calendar-outline"
+                      label="Ngày tạo"
                       value={memberProfile.created_at ? new Date(memberProfile.created_at).toLocaleDateString('vi-VN', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
-                      }) : 'Chưa cập nhật'} 
+                      }) : 'Chưa cập nhật'}
                     />
-                    <InfoRow 
-                      icon="time-outline" 
-                      label="Cập nhật gần nhất" 
+                    <InfoRow
+                      icon="time-outline"
+                      label="Cập nhật gần nhất"
                       value={memberProfile.updated_at ? new Date(memberProfile.updated_at).toLocaleDateString('vi-VN', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
-                      }) : 'Chưa cập nhật'} 
+                      }) : 'Chưa cập nhật'}
                     />
                   </View>
                 </>
@@ -1355,6 +1337,59 @@ export default function GroupDetailPage() {
                   <Text style={{ marginTop: 12, color: COLORS.grey }}>Không có thông tin</Text>
                 </View>
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Members List Modal */}
+      <Modal
+        visible={showMembersView}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMembersView(false)}
+      >
+        <View style={groupStyles.modalOverlay}>
+          <View style={[groupStyles.modalContent, { maxHeight: '85%', width: '95%' }]}>
+            <View style={groupStyles.modalHeader}>
+              <Text style={groupStyles.modalTitle}>Thành viên nhóm</Text>
+              <TouchableOpacity
+                style={groupStyles.modalCloseButton}
+                onPress={() => setShowMembersView(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Member count */}
+            <View style={groupStyles.memberCountContainer}>
+              <Text style={groupStyles.memberCountText}>
+                {members.length} thành viên
+              </Text>
+            </View>
+
+            {/* Search bar */}
+            <View style={groupStyles.searchContainer}>
+              <Ionicons name='search' size={20} color={COLORS.grey} style={groupStyles.searchIcon} />
+              <TextInput
+                style={groupStyles.searchInput}
+                placeholder='Tìm thành viên theo tên'
+                placeholderTextColor={COLORS.grey}
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
+              {searchTerm.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchTerm('')}>
+                  <Ionicons name='close-circle' size={20} color={COLORS.grey} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {renderMembersList()}
             </ScrollView>
           </View>
         </View>
@@ -1371,7 +1406,7 @@ export default function GroupDetailPage() {
           setShowAssignMemberDropdown(false);
         }}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={groupStyles.modalOverlay}
           activeOpacity={1}
           onPress={() => {
@@ -1380,7 +1415,7 @@ export default function GroupDetailPage() {
             setShowAssignMemberDropdown(false);
           }}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={groupStyles.modalContent}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
@@ -1420,7 +1455,7 @@ export default function GroupDetailPage() {
                   <Text style={groupStyles.assignMemberLabel}>
                     Giao nhiệm vụ cho (tùy chọn)
                   </Text>
-                  
+
                   {!assignedOwner ? (
                     <TouchableOpacity
                       style={groupStyles.memberSelectButton}
@@ -1429,17 +1464,17 @@ export default function GroupDetailPage() {
                       <Text style={groupStyles.memberSelectPlaceholder}>
                         Chọn thành viên
                       </Text>
-                      <Ionicons 
-                        name={showAssignMemberDropdown ? "chevron-up" : "chevron-down"} 
-                        size={20} 
-                        color={COLORS.grey} 
+                      <Ionicons
+                        name={showAssignMemberDropdown ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color={COLORS.grey}
                       />
                     </TouchableOpacity>
                   ) : (
                     <View style={groupStyles.selectedMemberCard}>
                       <View style={groupStyles.selectedMemberAvatar}>
                         {assignedOwner.user.avatar_url ? (
-                          <Image 
+                          <Image
                             source={{ uri: assignedOwner.user.avatar_url }}
                             style={{ width: 32, height: 32, borderRadius: 16 }}
                           />
@@ -1476,7 +1511,7 @@ export default function GroupDetailPage() {
                         >
                           <View style={groupStyles.memberDropdownAvatar}>
                             {member.user.avatar_url ? (
-                              <Image 
+                              <Image
                                 source={{ uri: member.user.avatar_url }}
                                 style={{ width: 36, height: 36, borderRadius: 18 }}
                               />
@@ -1551,7 +1586,7 @@ export default function GroupDetailPage() {
           setSearchedIngredients([]);
         }}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={groupStyles.modalOverlay}
           activeOpacity={1}
           onPress={() => {
@@ -1565,7 +1600,7 @@ export default function GroupDetailPage() {
             setSearchedIngredients([]);
           }}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={groupStyles.modalContent}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
@@ -1599,7 +1634,7 @@ export default function GroupDetailPage() {
                   value={ingredientSearchTerm}
                   onChangeText={handleSearchIngredients}
                 />
-                
+
                 {loadingIngredients && (
                   <ActivityIndicator size="small" color={COLORS.purple} style={{ marginTop: 8 }} />
                 )}

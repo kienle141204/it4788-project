@@ -134,15 +134,33 @@ const RecipesPage = () => {
     },
   ];
 
-  const handleEdit = (recipe) => {
-    setEditingRecipe(recipe);
-    // Map the recipe data to match form field names
-    setFormData({
-      dish_id: recipe.dish_id || recipe.dish?.id || '',
-      status: recipe.status || '',
-      steps: recipe.steps || []
-    });
-    setIsEditModalOpen(true);
+  const handleEdit = async (recipe) => {
+    try {
+      setDetailLoading(true);
+      setIsEditModalOpen(true);
+
+      // Fetch full recipe details including steps
+      const fullRecipe = await getRecipeById(recipe.id);
+
+      setEditingRecipe(fullRecipe);
+      // Map the recipe data to match form field names
+      setFormData({
+        dish_id: fullRecipe.dish_id || fullRecipe.dish?.id || '',
+        status: fullRecipe.status || '',
+        steps: fullRecipe.steps || []
+      });
+    } catch (error) {
+      console.error('Error loading recipe for edit:', error);
+      // Fallback to basic data if fetch fails
+      setEditingRecipe(recipe);
+      setFormData({
+        dish_id: recipe.dish_id || recipe.dish?.id || '',
+        status: recipe.status || '',
+        steps: recipe.steps || []
+      });
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const handleDelete = async (recipe) => {
@@ -190,27 +208,50 @@ const RecipesPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Prepare data with correct field names
-      const recipeData = {
-        dish_id: parseInt(formData.dish_id),
-        status: formData.status,
-        steps: formData.steps
-      };
-
       if (editingRecipe) {
         // Update existing recipe
-        const updatedRecipe = await updateRecipe(editingRecipe.id, recipeData);
-        // Update recipe in local state
-        setRecipes(recipes.map(r => r.id === editingRecipe.id ? updatedRecipe : r));
+        // Backend UpdateRecipeDto only accepts: status (public/private), steps (step_number, description)
+        const updateData = {
+          status: formData.status || 'public',
+          steps: formData.steps.map((step, index) => ({
+            step_number: parseInt(step.step_number) || (index + 1),
+            description: step.description || ''
+          }))
+        };
+
+        const updatedRecipe = await updateRecipe(editingRecipe.id, updateData);
+        // Reload recipes to get fresh data
+        loadRecipes();
       } else {
-        // Create new recipe
-        const newRecipe = await createRecipe(recipeData);
-        // Add new recipe to local state
-        setRecipes([...recipes, newRecipe]);
+        // Create new recipe - includes dish_id
+        // Validate required fields
+        if (!formData.dish_id) {
+          alert('Vui lòng nhập ID món ăn');
+          return;
+        }
+
+        if (formData.steps.length === 0) {
+          alert('Vui lòng thêm ít nhất 1 bước thực hiện');
+          return;
+        }
+
+        const createData = {
+          dish_id: parseInt(formData.dish_id),
+          status: formData.status || 'public',
+          steps: formData.steps.map((step, index) => ({
+            step_number: parseInt(step.step_number) || (index + 1),
+            description: step.description || ''
+          }))
+        };
+
+        const newRecipe = await createRecipe(createData);
+        // Reload to get fresh data from server
+        loadRecipes();
       }
       closeEditModal();
     } catch (error) {
       console.error('Error saving recipe:', error);
+      alert('Có lỗi khi lưu công thức: ' + error.message);
     }
   };
 
@@ -225,12 +266,12 @@ const RecipesPage = () => {
     try {
       setLoading(true);
       // For recipe search, we'll use the recipes API with query parameters
-      const response = await fetchRecipes({ 
+      const response = await fetchRecipes({
         page: 1, // Reset to page 1 for search
         limit: itemsPerPage,
         q: searchValue
       });
-      
+
       let recipesData = [];
       let responseTotalPages = 1;
       let responseTotalItems = 0;
@@ -341,43 +382,132 @@ const RecipesPage = () => {
       <Modal
         isOpen={isEditModalOpen}
         onClose={closeEditModal}
-        title={editingRecipe ? 'Sửa công thức' : 'Thêm công thức mới'}
-        size="lg"
+        title={editingRecipe ? `Sửa công thức: ${editingRecipe.dish?.name || ''}` : 'Thêm công thức mới'}
+        size="xl"
       >
-        <form onSubmit={handleSubmit}>
-          <Input
-            label="ID Món ăn"
-            type="number"
-            value={formData.dish_id}
-            onChange={(e) => setFormData({...formData, dish_id: e.target.value})}
-            required
-          />
-          <Input
-            label="Trạng thái"
-            value={formData.status}
-            onChange={(e) => setFormData({...formData, status: e.target.value})}
-            placeholder="public, private, etc."
-          />
-          <TextArea
-            label="Các bước thực hiện (JSON)"
-            value={JSON.stringify(formData.steps, null, 2)}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                setFormData({...formData, steps: Array.isArray(parsed) ? parsed : []});
-              } catch (error) {
-                // If JSON is invalid, keep the current steps
-                console.error('Invalid JSON:', error);
-              }
-            }}
-            placeholder=' [{"step_number": 1, "description": "Chuẩn bị nguyên liệu"}]'
-            rows={6}
-          />
-          <div className="flex gap-2 justify-end mt-6">
-            <Button variant="secondary" onClick={closeEditModal}>Hủy</Button>
-            <Button type="submit">Lưu</Button>
+        {detailLoading ? (
+          <div className="flex justify-center items-center h-48">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            {/* Recipe Info Header */}
+            {editingRecipe && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-4">
+                  {editingRecipe.dish?.image_url && (
+                    <img
+                      src={editingRecipe.dish.image_url}
+                      alt={editingRecipe.dish?.name}
+                      className="w-20 h-20 object-cover rounded-lg"
+                    />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-lg">{editingRecipe.dish?.name || 'N/A'}</h3>
+                    <p className="text-sm text-gray-500">{editingRecipe.dish?.description || 'Không có mô tả'}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Người sở hữu: {editingRecipe.owner?.full_name || editingRecipe.owner?.email || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <Input
+                label="ID Món ăn"
+                type="number"
+                value={formData.dish_id}
+                onChange={(e) => setFormData({ ...formData, dish_id: e.target.value })}
+                required
+                disabled={!!editingRecipe}
+              />
+              <Input
+                label="Trạng thái"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                placeholder="public, private, draft..."
+              />
+            </div>
+
+            {/* Steps Section */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Các bước thực hiện ({formData.steps.length} bước)
+                </label>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const newStep = {
+                      step_number: formData.steps.length + 1,
+                      description: ''
+                    };
+                    setFormData({ ...formData, steps: [...formData.steps, newStep] });
+                  }}
+                >
+                  + Thêm bước
+                </Button>
+              </div>
+
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {formData.steps.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                    Chưa có bước nào. Nhấn "Thêm bước" để bắt đầu.
+                  </div>
+                ) : (
+                  formData.steps.map((step, index) => (
+                    <div key={index} className="flex gap-3 items-start p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center font-medium text-sm">
+                        {step.step_number || index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <TextArea
+                          value={step.description || ''}
+                          onChange={(e) => {
+                            const newSteps = [...formData.steps];
+                            newSteps[index] = {
+                              ...newSteps[index],
+                              description: e.target.value
+                            };
+                            setFormData({ ...formData, steps: newSteps });
+                          }}
+                          placeholder={`Mô tả bước ${index + 1}...`}
+                          rows={2}
+                          className="w-full"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:bg-red-50"
+                        onClick={() => {
+                          const newSteps = formData.steps.filter((_, i) => i !== index);
+                          // Reorder step numbers
+                          const reorderedSteps = newSteps.map((s, i) => ({
+                            ...s,
+                            step_number: i + 1
+                          }));
+                          setFormData({ ...formData, steps: reorderedSteps });
+                        }}
+                      >
+                        Xóa
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4 border-t">
+              <Button variant="secondary" onClick={closeEditModal}>Hủy</Button>
+              <Button type="submit">Lưu công thức</Button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Detail Modal */}

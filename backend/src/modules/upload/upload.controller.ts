@@ -7,6 +7,7 @@ import {
   BadRequestException,
   Req,
 } from '@nestjs/common';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -89,7 +90,7 @@ export class UploadController {
   ) {
     const folder = req.body?.folder;
     if (!file) {
-      throw new BadRequestException('Vui lòng chọn file để upload');
+      throw new BadRequestException(ResponseMessageVi[ResponseCode.C00330]);
     }
 
     try {

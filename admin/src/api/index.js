@@ -101,4 +101,39 @@ export {
   getDishReviewStats
 } from './dishReviewAPI';
 
+// Shopping List API
+export {
+  fetchShoppingLists,
+  getShoppingListById,
+  createShoppingList,
+  updateShoppingList,
+  deleteShoppingList,
+  shareShoppingList
+} from './shoppingListAPI';
+
+// Refrigerator API
+export {
+  fetchRefrigerators,
+  getRefrigeratorById,
+  createRefrigerator,
+  updateRefrigerator,
+  deleteRefrigerator,
+  getRefrigeratorDishes,
+  getRefrigeratorIngredients,
+  addDishToRefrigerator,
+  addIngredientToRefrigerator,
+  removeDishFromRefrigerator,
+  removeIngredientFromRefrigerator
+} from './refrigeratorAPI';
+
+// Statistics API
+export {
+  getMonthlyCost,
+  getCheckedItems,
+  getTopIngredients,
+  getTopIngredientsByCost,
+  getUserStatistics,
+  getFamilyStatistics
+} from './statisticsAPI';
+
 export { useApi, apiService } from './hooks';

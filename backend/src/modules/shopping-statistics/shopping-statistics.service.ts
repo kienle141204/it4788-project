@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { ShoppingList } from '../../entities/shopping-list.entity';
 import { ShoppingItem } from '../../entities/shopping-item.entity';
 import { Family } from '../../entities/family.entity';
@@ -8,6 +8,7 @@ import { FamilyMember } from '../../entities/family-member.entity';
 import { FamilyService } from '../family/family.service';
 import { MemberService } from '../member/member.service';
 import type { JwtUser } from 'src/common/types/user.type';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 
 @Injectable()
 export class ShoppingStatisticsService {
@@ -37,7 +38,7 @@ export class ShoppingStatisticsService {
     });
 
     if (!family) {
-      throw new ForbiddenException('Family not found');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00190]);
     }
 
     // Nếu user là owner
@@ -55,34 +56,65 @@ export class ShoppingStatisticsService {
 
     if (isMember) return true;
 
-    throw new ForbiddenException(
-      'Bạn không có quyền truy cập thống kê của gia đình này',
-    );
+    throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00270]);
   }
 
   /** Tổng tiền theo từng tháng trong 1 năm */
   async totalCostByMonth(year: number, familyId: number, user: JwtUser) {
     await this.checkFamilyPermission(familyId, user);
-    return await this.shoppingListRepo
-      .createQueryBuilder('list')
-      .select("DATE_FORMAT(list.shopping_date, '%Y-%m')", 'month')
-      .addSelect('SUM(list.cost)', 'total_cost')
-      .where('list.family_id = :familyId', { familyId })
-      .andWhere('YEAR(list.shopping_date) = :year', { year })
-      .groupBy("DATE_FORMAT(list.shopping_date, '%Y-%m')")
-      .orderBy("DATE_FORMAT(list.shopping_date, '%Y-%m')", 'ASC')
-      .getRawMany();
+
+    const startOfYear = new Date(`${year}-01-01T00:00:00.000Z`);
+    const endOfYear = new Date(`${year}-12-31T23:59:59.999Z`);
+
+    const lists = await this.shoppingListRepo.find({
+      where: {
+        family_id: familyId,
+        shopping_date: Between(startOfYear, endOfYear),
+      },
+      relations: ['items', 'items.ingredient'],
+      order: { shopping_date: 'ASC' }
+    });
+
+    // Group by month
+    const result = new Map<string, any>();
+
+    lists.forEach(list => {
+      const month = list.shopping_date.toISOString().slice(0, 7); // YYYY-MM
+
+      if (!result.has(month)) {
+        result.set(month, {
+          month,
+          total_cost: 0,
+          shopping_lists: []
+        });
+      }
+
+      const group = result.get(month);
+      group.total_cost += Number(list.cost || 0);
+      group.shopping_lists.push(list);
+    });
+
+    // Sort by month
+    return Array.from(result.values())
+      .sort((a, b) => a.month.localeCompare(b.month));
   }
 
   /** Số lượng item đã check của gia đình */
   async countCheckedItems(familyId: number, user: JwtUser) {
     await this.checkFamilyPermission(familyId, user);
-    return await this.shoppingItemRepo
-      .createQueryBuilder('item')
-      .innerJoin(ShoppingList, 'list', 'list.id = item.list_id')
-      .where('list.family_id = :familyId', { familyId })
-      .andWhere('item.is_checked = true')
-      .getCount();
+
+    const [items, count] = await this.shoppingItemRepo.findAndCount({
+      where: {
+        shoppingList: { family_id: familyId },
+        is_checked: true,
+      },
+      relations: ['ingredient', 'shoppingList']
+    });
+
+    return {
+      total: count,
+      items: items
+    };
   }
 
   /** Top nguyên liệu mua nhiều nhất (theo stock) */
@@ -157,58 +189,47 @@ export class ShoppingStatisticsService {
     if (user.role !== 'admin' && user.id !== userId) {
       throw new ForbiddenException('Bạn không có quyền truy cập thống kê này');
     }
-    const totalCost = await this.shoppingListRepo
-      .createQueryBuilder('list')
-      .select('SUM(list.cost)', 'total_cost')
-      .where('list.owner_id = :userId', { userId })
-      .getRawOne();
+    const lists = await this.shoppingListRepo.find({
+      where: { owner_id: userId },
+      select: ['cost']
+    });
+    const total_cost = lists.reduce((sum, list) => sum + Number(list.cost || 0), 0);
 
-    const totalItems = await this.shoppingItemRepo
-      .createQueryBuilder('item')
-      .innerJoin(ShoppingList, 'list', 'list.id = item.list_id')
-      .where('list.owner_id = :userId', { userId })
-      .getCount();
-
-    const checkedItems = await this.shoppingItemRepo
-      .createQueryBuilder('item')
-      .innerJoin(ShoppingList, 'list', 'list.id = item.list_id')
-      .where('list.owner_id = :userId', { userId })
-      .andWhere('item.is_checked = true')
-      .getCount();
+    const items = await this.shoppingItemRepo.find({
+      where: {
+        shoppingList: { owner_id: userId },
+        is_checked: true
+      },
+      relations: ['ingredient', 'shoppingList']
+    });
 
     return {
-      total_cost: Number(totalCost.total_cost || 0),
-      total_items: totalItems,
-      checked_items: checkedItems,
+      total_cost,
+      purchased_items: items,
     };
   }
 
   /** Thống kê mua sắm theo Family */
   async statisticsByFamily(familyId: number, user: JwtUser) {
     await this.checkFamilyPermission(familyId, user);
-    const totalCost = await this.shoppingListRepo
-      .createQueryBuilder('list')
-      .select('SUM(list.cost)', 'total_cost')
-      .where('list.family_id = :familyId', { familyId })
-      .getRawOne();
 
-    const totalItems = await this.shoppingItemRepo
-      .createQueryBuilder('item')
-      .innerJoin(ShoppingList, 'list', 'list.id = item.list_id')
-      .where('list.family_id = :familyId', { familyId })
-      .getCount();
+    const lists = await this.shoppingListRepo.find({
+      where: { family_id: familyId },
+      select: ['cost']
+    });
+    const total_cost = lists.reduce((sum, list) => sum + Number(list.cost || 0), 0);
 
-    const checkedItems = await this.shoppingItemRepo
-      .createQueryBuilder('item')
-      .innerJoin(ShoppingList, 'list', 'list.id = item.list_id')
-      .where('list.family_id = :familyId', { familyId })
-      .andWhere('item.is_checked = true')
-      .getCount();
+    const items = await this.shoppingItemRepo.find({
+      where: {
+        shoppingList: { family_id: familyId },
+        is_checked: true
+      },
+      relations: ['ingredient', 'shoppingList']
+    });
 
     return {
-      total_cost: Number(totalCost.total_cost || 0),
-      total_items: totalItems,
-      checked_items: checkedItems,
+      total_cost,
+      purchased_items: items,
     };
   }
 }
