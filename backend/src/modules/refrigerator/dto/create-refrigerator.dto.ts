@@ -1,11 +1,12 @@
-import { IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsNumber, IsOptional, ValidateIf } from 'class-validator';
 
 export class CreateRefrigeratorDto {
-    @IsNotEmpty()
+    @ValidateIf((o) => o.owner_id !== undefined && o.owner_id !== null)
     @IsNumber()
-    owner_id: number;
+    owner_id?: number;
 
-    @IsOptional() // Nếu family_id là null thì tự tạo tủ lạnh cho bản thân
+    @ValidateIf((o) => o.family_id !== undefined && o.family_id !== null)
     @IsNumber()
+    @IsOptional() // Nếu family_id là null thì tự tạo tủ lạnh cho bản thân
     family_id?: number;
 }
