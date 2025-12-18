@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Brackets } from 'typeorm';
+import { Repository, Brackets, In } from 'typeorm';
 import { Recipe } from '../../entities/recipe.entity';
 import { RecipeStep } from '../../entities/recipe-step.entity';
+import { Image } from '../../entities/image.entity';
 import { Dish } from '../../entities/dish.entity';
 import { User } from '../../entities/user.entity';
 import { GetRecipesDto } from './dto/get-recipes.dto';
@@ -16,6 +17,8 @@ export class RecipeService {
     private recipeRepository: Repository<Recipe>,
     @InjectRepository(RecipeStep)
     private recipeStepRepository: Repository<RecipeStep>,
+    @InjectRepository(Image)
+    private imageRepository: Repository<Image>,
     @InjectRepository(Dish)
     private dishRepository: Repository<Dish>,
     @InjectRepository(User)
@@ -125,8 +128,10 @@ export class RecipeService {
       .leftJoinAndSelect('recipe.dish', 'dish')
       .leftJoinAndSelect('recipe.owner', 'owner')
       .leftJoinAndSelect('recipe.steps', 'steps')
+      .leftJoinAndSelect('steps.images', 'images')
       .where('recipe.dish_id = :dishId', { dishId })
-      .orderBy('recipe.created_at', 'DESC');
+      .orderBy('recipe.created_at', 'DESC')
+      .addOrderBy('steps.step_number', 'ASC');
 
     // Admin có thể xem tất cả, user xem public recipes hoặc private recipes của chính họ
     if (user.role !== 'admin') {
@@ -240,7 +245,7 @@ export class RecipeService {
   /**
    * Cập nhật công thức
    */
-  async updateRecipe(recipeId: number, updateRecipeDto: UpdateRecipeDto, userId: number): Promise<Recipe> {
+  async updateRecipe(recipeId: number, updateRecipeDto: UpdateRecipeDto, userId: number, userRole?: string): Promise<Recipe> {
     // Tìm công thức
     const recipe = await this.recipeRepository.findOne({
       where: { id: recipeId },
@@ -251,8 +256,8 @@ export class RecipeService {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00110]);
     }
 
-    // Kiểm tra quyền sở hữu
-    if (recipe.owner_id !== userId) {
+    // Kiểm tra quyền sở hữu (admin có thể sửa bất kỳ công thức nào)
+    if (userRole !== 'admin' && recipe.owner_id !== userId) {
       throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00117]);
     }
 
@@ -261,19 +266,68 @@ export class RecipeService {
       await this.recipeRepository.update(recipeId, { status: updateRecipeDto.status });
     }
 
-    // Xóa các bước cũ
-    await this.recipeStepRepository.delete({ recipe_id: recipeId });
+    // Lấy danh sách step IDs hiện tại
+    const existingSteps = await this.recipeStepRepository.find({
+      where: { recipe_id: recipeId },
+    });
+    // Chuyển đổi ID sang number để so sánh chính xác
+    const existingStepIds = existingSteps.map(step => Number(step.id));
+
+    // Phân loại steps từ request
+    const stepsToUpdate = updateRecipeDto.steps.filter(step => step.id !== undefined && step.id !== null);
+    const stepsToCreate = updateRecipeDto.steps.filter(step => step.id === undefined || step.id === null);
+
+    // Chuyển đổi ID từ request sang number và chỉ giữ những ID thực sự tồn tại trong database
+    const stepIdsToKeep = stepsToUpdate
+      .map(step => Number(step.id))
+      .filter(id => existingStepIds.includes(id));
+
+    // Tìm steps cần xóa (không có trong danh sách update)
+    const stepIdsToDelete = existingStepIds.filter(id => !stepIdsToKeep.includes(id));
+
+    console.log('Existing steps:', existingStepIds);
+    console.log('Steps to keep:', stepIdsToKeep);
+    console.log('Steps to delete:', stepIdsToDelete);
+    console.log('Steps to create:', stepsToCreate.length);
+
+    // Xóa images của các steps sẽ bị xóa
+    if (stepIdsToDelete.length > 0) {
+      await this.imageRepository.delete({ recipe_steps_id: In(stepIdsToDelete) });
+      // Xóa các steps cũ không còn dùng
+      await this.recipeStepRepository.delete({ id: In(stepIdsToDelete) });
+    }
+
+    // Cập nhật các steps hiện có (giữ nguyên images)
+    for (const step of stepsToUpdate) {
+      const stepId = Number(step.id);
+      // Chỉ update nếu step ID tồn tại trong database
+      if (existingStepIds.includes(stepId)) {
+        await this.recipeStepRepository.update(stepId, {
+          step_number: step.step_number,
+          description: step.description || '',
+        });
+      } else {
+        // Nếu ID không tồn tại, tạo mới step
+        const newStep = this.recipeStepRepository.create({
+          recipe_id: recipeId,
+          step_number: step.step_number,
+          description: step.description || '',
+        });
+        await this.recipeStepRepository.save(newStep);
+      }
+    }
 
     // Tạo các bước mới
-    const recipeSteps = updateRecipeDto.steps.map(step =>
-      this.recipeStepRepository.create({
-        recipe_id: recipeId,
-        step_number: step.step_number,
-        description: step.description,
-      })
-    );
-
-    await this.recipeStepRepository.save(recipeSteps);
+    if (stepsToCreate.length > 0) {
+      const newSteps = stepsToCreate.map(step =>
+        this.recipeStepRepository.create({
+          recipe_id: recipeId,
+          step_number: step.step_number,
+          description: step.description || '',
+        })
+      );
+      await this.recipeStepRepository.save(newSteps);
+    }
 
     // Trả về công thức đã cập nhật
     return await this.findOneWithDetails(recipeId, { id: userId, role: 'user' } as User);
@@ -282,7 +336,7 @@ export class RecipeService {
   /**
    * Xóa công thức
    */
-  async deleteRecipe(recipeId: number, userId: number): Promise<void> {
+  async deleteRecipe(recipeId: number, userId: number, userRole?: string): Promise<void> {
     // Tìm công thức
     const recipe = await this.recipeRepository.findOne({
       where: { id: recipeId },
@@ -292,8 +346,8 @@ export class RecipeService {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00110]);
     }
 
-    // Kiểm tra quyền sở hữu
-    if (recipe.owner_id !== userId) {
+    // Kiểm tra quyền sở hữu (admin có thể xóa bất kỳ công thức nào)
+    if (userRole !== 'admin' && recipe.owner_id !== userId) {
       throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00118]);
     }
 

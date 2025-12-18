@@ -68,6 +68,10 @@ export const getMyFamily = async (): Promise<Family[]> => {
 export const getFamilyById = async (id: number): Promise<Family> => {
   try {
     const res = await getAccess(`families/${id}`);
+    // API may return { data: {...} } or direct object
+    if (res?.data) {
+      return res.data;
+    }
     return res;
   } catch (error) {
     console.error(`Error getting family ${id}:`, error);
@@ -207,6 +211,10 @@ export const getAllFamilies = async () => {
 export const getFamilyMembers = async (familyId: number) => {
   try {
     const res = await getAccess(`families/${familyId}/members`);
+    // API may return { data: [...] } or direct array
+    if (res?.data) {
+      return res.data;
+    }
     return res;
   } catch (error) {
     console.error(`Error getting members for family ${familyId}:`, error);

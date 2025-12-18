@@ -1,9 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
+// const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 // const API_DOMAIN = process.env.API_DOMAIN || 'http://10.0.2.2:8090/api/';
-// const API_DOMAIN = 'http://localhost:8090/api/';
+const API_DOMAIN = 'http://localhost:8090/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {
@@ -402,16 +402,16 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
     if (axios.isAxiosError(error)) {
       // Don't log 404 errors for expected empty states - these are handled by components
       const errorMessage = error.response?.data?.message || '';
-      const is404Expected = error.response?.status === 404 && 
-        (errorMessage.includes('chưa có tủ lạnh') || 
-         errorMessage.includes('Bạn chưa có tủ lạnh') ||
-         errorMessage.includes('Không tìm thấy món ăn trong tủ lạnh') ||
-         errorMessage.includes('Không tìm thấy nguyên liệu trong tủ lạnh'));
-      
+      const is404Expected = error.response?.status === 404 &&
+        (errorMessage.includes('chưa có tủ lạnh') ||
+          errorMessage.includes('Bạn chưa có tủ lạnh') ||
+          errorMessage.includes('Không tìm thấy món ăn trong tủ lạnh') ||
+          errorMessage.includes('Không tìm thấy nguyên liệu trong tủ lạnh'));
+
       if (!is404Expected) {
         console.error('getAccess error:', error?.response?.data || error?.message || error);
       }
-      
+
       if (error.response?.status === 401 && retryCount === 0) {
         console.log('🔄 Token expired, attempting to refresh...');
         await refreshAccessToken();
@@ -423,7 +423,7 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
         console.error('Request URL:', API_DOMAIN + path);
       }
       if (!is404Expected) {
-      console.log('API Error:', error.response?.data || error.message);
+        console.log('API Error:', error.response?.data || error.message);
       }
       throw error;
     } else {

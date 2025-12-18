@@ -16,12 +16,32 @@ import {
     getFamilyStatistics,
     getMonthlyCost,
     getTopIngredientsByQuantity,
+    getCheckedItemsCount,
+    getFamilyShoppingLists,
 } from '../service/statistics';
 
 const screenWidth = Dimensions.get('window').width;
 
 interface GroupStatisticsProps {
     familyId: number;
+}
+
+interface PurchasedItem {
+    id: number;
+    ingredient_id: number;
+    stock: number;
+    price: string;
+    is_checked: boolean;
+    ingredient?: {
+        id: number;
+        name: string;
+        image_url?: string;
+    };
+}
+
+interface FamilyStatsResponse {
+    total_cost: number;
+    purchased_items: PurchasedItem[];
 }
 
 interface FamilyStats {
@@ -60,9 +80,45 @@ export default function GroupStatistics({ familyId }: GroupStatisticsProps) {
             }
             setError(null);
 
-            // Fetch family statistics
-            const stats = await getFamilyStatistics(familyId);
-            setFamilyStats(stats);
+            // Fetch family statistics (total_cost và purchased_items - đã mua)
+            const statsResponse: FamilyStatsResponse = await getFamilyStatistics(familyId);
+
+            // Fetch family shopping lists để tính tổng items và items đã check
+            let totalItems = 0;
+            let checkedItems = 0;
+
+            try {
+                const familyLists = await getFamilyShoppingLists(familyId);
+                // Duyệt qua tất cả shopping lists và tính tổng items
+                if (Array.isArray(familyLists)) {
+                    familyLists.forEach((list: any) => {
+                        if (Array.isArray(list.items)) {
+                            totalItems += list.items.length;
+                            checkedItems += list.items.filter((item: any) => item.is_checked).length;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not fetch family shopping lists:', e);
+                // Fallback: sử dụng getCheckedItemsCount
+                try {
+                    const checkedData = await getCheckedItemsCount(familyId);
+                    checkedItems = checkedData?.total || 0;
+                    totalItems = checkedItems; // Không có thông tin total, dùng checked làm fallback
+                } catch (e2) {
+                    console.warn('Could not fetch checked items:', e2);
+                    // Fallback cuối cùng: dùng purchased_items từ statsResponse
+                    checkedItems = statsResponse?.purchased_items?.length || 0;
+                    totalItems = checkedItems;
+                }
+            }
+
+            // Tính toán và set familyStats
+            setFamilyStats({
+                total_cost: statsResponse?.total_cost || 0,
+                total_items: totalItems,
+                checked_items: checkedItems,
+            });
 
             // Fetch monthly cost for current year
             const currentYear = new Date().getFullYear();
