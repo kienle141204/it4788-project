@@ -1,0 +1,47 @@
+===========================================
+      HƯỚNG DẪN CẤU HÌNH CRON JOB
+===========================================
+
+1. ĐỊNH DẠNG CRON EXPRESSION
+   @Cron('giây phút giờ ngày tháng thứ')
+   
+   Mỗi trường có thể là:
+   - Số cụ thể: 0, 8, 30...
+   - Dấu *: mọi giá trị
+   - */n: mỗi n đơn vị (ví dụ: */5 = mỗi 5 đơn vị)
+   - n-m: khoảng từ n đến m
+
+2. VÍ DỤ CỤ THỂ
+   ┌──────────────────────────────────────────────────────┐
+   │ '0 0 8 * * *'     -> Mỗi ngày lúc 8:00 sáng         │
+   │ '0 0 20 * * *'    -> Mỗi ngày lúc 20:00 tối         │
+   │ '0 30 8 * * *'    -> Mỗi ngày lúc 8:30 sáng         │
+   │ '0 0 */2 * * *'   -> Mỗi 2 giờ                      │
+   │ '0 0 */6 * * *'   -> Mỗi 6 giờ                      │
+   │ '0 */30 * * * *'  -> Mỗi 30 phút                    │
+   │ '0 */15 * * * *'  -> Mỗi 15 phút                    │
+   │ '*/10 * * * * *'  -> Mỗi 10 giây (dùng để test)     │
+   │ '*/30 * * * * *'  -> Mỗi 30 giây (dùng để test)     │
+   │ '0 0 8 * * 1'     -> Mỗi thứ Hai lúc 8:00           │
+   │ '0 0 8 1 * *'     -> Ngày 1 hàng tháng lúc 8:00     │
+   └──────────────────────────────────────────────────────┘
+
+3. GIẢI THÍCH TỪNG VỊ TRÍ
+   Vị trí 1 - Giây:    0-59
+   Vị trí 2 - Phút:    0-59
+   Vị trí 3 - Giờ:     0-23
+   Vị trí 4 - Ngày:    1-31
+   Vị trí 5 - Tháng:   1-12 (hoặc JAN-DEC)
+   Vị trí 6 - Thứ:     0-6 (0=Chủ Nhật, 1=Thứ Hai...)
+
+4. CÁCH SỬA TRONG CODE
+   Mở file: reminders.service.ts
+   Tìm dòng: @Cron('0 0 8 * * *')
+   Thay đổi giá trị trong ngoặc theo mong muốn
+
+5. LƯU Ý
+   - Sau khi sửa, cần restart server để thay đổi có hiệu lực
+   - Dùng expression ngắn (như */10 giây) để test
+   - Nhớ đổi lại expression dài hơn khi deploy production
+
+===========================================

@@ -31,32 +31,33 @@ export class RemindersService {
         private readonly memberRepo: Repository<FamilyMember>,
     ) { }
 
-    /** Cron job chạy mỗi ngày lúc 8:00 sáng */
+    /* Cron job chạy mỗi ngày lúc 8:00 sáng */
     @Cron('0 0 8 * * *')
     async checkExpiringItems() {
         this.logger.debug('🔍 CronJob: Bắt đầu kiểm tra món ăn & nguyên liệu hết hạn...');
 
         const now = new Date();
         const dishSchedule = new Date(now);
-        dishSchedule.setDate(now.getDate() - 1); // món ăn lưu > 1 ngày
+        dishSchedule.setDate(now.getDate() + 1); // món ăn hết hạn trong 1 ngày tới
 
         const ingredientSchedule = new Date(now);
-        ingredientSchedule.setDate(now.getDate() - 3); // nguyên liệu lưu > 3 ngày
+        ingredientSchedule.setDate(now.getDate() + 3); // nguyên liệu hết hạn trong 3 ngày tới
 
         /** 1. LẤY MÓN ĂN SẮP HẾT (FridgeDish) **/
         const expiringDishes = await this.dishRepo.find({
-            where: { created_at: LessThanOrEqual(dishSchedule) },
+            where: { expiration_date: LessThanOrEqual(dishSchedule) },
             relations: ['dish', 'refrigerator'],
         });
 
         for (const item of expiringDishes) {
+            if (!item.expiration_date) continue;
 
-            const daysStored = Math.ceil(
-                (now.getTime() - item.created_at.getTime()) / (1000 * 60 * 60 * 24),
+            const daysUntilExpiry = Math.ceil(
+                (item.expiration_date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
             );
 
             const message =
-                `⚠️ Món ăn "${item.dish?.name}" đã lưu trong tủ ${daysStored} ngày (tạo lúc: ${item.created_at.toISOString().slice(0, 10)}).`;
+                `⚠️ Món ăn "${item.dish?.name}" sẽ hết hạn trong ${daysUntilExpiry} ngày (hết hạn: ${item.expiration_date.toISOString().slice(0, 10)}).`;
 
             this.logger.warn(message);
 
@@ -81,18 +82,19 @@ export class RemindersService {
 
         /** 2. NGUYÊN LIỆU SẮP HẾT (FridgeIngredient) **/
         const expiringIngredients = await this.ingredientRepo.find({
-            where: { created_at: LessThanOrEqual(ingredientSchedule) },
+            where: { expiration_date: LessThanOrEqual(ingredientSchedule) },
             relations: ['ingredient', 'refrigerator'],
         });
 
         for (const item of expiringIngredients) {
+            if (!item.expiration_date) continue;
 
-            const daysStored = Math.ceil(
-                (now.getTime() - item.created_at.getTime()) / (1000 * 60 * 60 * 24),
+            const daysUntilExpiry = Math.ceil(
+                (item.expiration_date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
             );
 
             const message =
-                `⚠️ Nguyên liệu "${item.ingredient?.name}" đã lưu ${daysStored} ngày (tạo lúc: ${item.created_at.toISOString().slice(0, 10)}).`;
+                `⚠️ Nguyên liệu "${item.ingredient?.name}" sẽ hết hạn trong ${daysUntilExpiry} ngày (hết hạn: ${item.expiration_date.toISOString().slice(0, 10)}).`;
 
             this.logger.warn(message);
 
