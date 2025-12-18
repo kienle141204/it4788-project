@@ -12,6 +12,7 @@ import NotificationCard from '@/components/NotificationCard';
 import FeatureGrid from '@/components/FeatureGrid';
 import { COLORS } from '@/constants/themes';
 import { getAccess } from '@/utils/api';
+import { getMyShoppingLists } from '@/service/shopping';
 
 type UserProfile = {
   id: number;
@@ -25,10 +26,16 @@ type UserProfile = {
   updated_at: string;
 };
 
+interface TodayTasks {
+  totalItems: number;
+  completedItems: number;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const backPressCount = useRef(0);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [todayTasks, setTodayTasks] = useState<TodayTasks>({ totalItems: 0, completedItems: 0 });
 
   console.log('🏠 Đang ở HOME');
 
@@ -42,15 +49,72 @@ export default function HomePage() {
     }
   }, []);
 
+  // Helper function to check if two dates are the same day
+  const isSameDay = (date1: Date, date2: Date): boolean => {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  };
+
+  // Fetch shopping lists của hôm nay để tính nhiệm vụ
+  const fetchTodayTasks = useCallback(async () => {
+    try {
+      console.log('📋 Fetching today tasks...');
+      const lists = await getMyShoppingLists();
+      console.log('📋 Shopping lists:', lists);
+
+      if (!Array.isArray(lists)) {
+        console.log('📋 Lists is not array, setting 0');
+        setTodayTasks({ totalItems: 0, completedItems: 0 });
+        return;
+      }
+
+      // Lấy ngày hôm nay
+      const today = new Date();
+      console.log('📋 Today:', today.toISOString());
+
+      // Lọc shopping lists của hôm nay
+      let totalItems = 0;
+      let completedItems = 0;
+
+      lists.forEach((list: any) => {
+        if (!list.shopping_date) return;
+
+        // So sánh ngày shopping_date với ngày hôm nay
+        const listDate = new Date(list.shopping_date);
+        console.log('📋 List date:', listDate.toISOString(), 'Is same day:', isSameDay(listDate, today), 'Items:', list.items?.length);
+
+        if (isSameDay(listDate, today) && Array.isArray(list.items)) {
+          list.items.forEach((item: any) => {
+            totalItems += 1;
+            if (item.is_checked) {
+              completedItems += 1;
+            }
+          });
+        }
+      });
+
+      console.log('📋 Today tasks result:', { totalItems, completedItems });
+      setTodayTasks({ totalItems, completedItems });
+    } catch (err: any) {
+      console.error('📋 Error fetching today tasks:', err);
+      setTodayTasks({ totalItems: 0, completedItems: 0 });
+    }
+  }, []);
+
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+    fetchTodayTasks();
+  }, [fetchProfile, fetchTodayTasks]);
 
-  // Refresh profile khi màn hình được focus
+  // Refresh data khi màn hình được focus
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
-    }, [fetchProfile])
+      fetchTodayTasks();
+    }, [fetchProfile, fetchTodayTasks])
   );
 
   useEffect(() => {
@@ -93,7 +157,8 @@ export default function HomePage() {
   };
 
   const handleViewTasks = () => {
-    Alert.alert('Nhiệm vụ', 'Xem danh sách nhiệm vụ');
+    // Chuyển đến trang Nhiệm vụ của tôi (calendar)
+    router.push('/(tabs)/calendar' as any);
   };
 
   return (
@@ -111,13 +176,14 @@ export default function HomePage() {
         />
 
         <TaskSummaryCard
-          totalTasks={10}
+          totalTasks={todayTasks.totalItems}
+          completedTasks={todayTasks.completedItems}
           onViewTasks={handleViewTasks}
         />
 
         <View style={styles.notificationSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Notification</Text>
+            <Text style={styles.sectionTitle}>Thông báo</Text>
             <Ionicons name="sparkles" size={20} color={COLORS.purple} />
           </View>
 
