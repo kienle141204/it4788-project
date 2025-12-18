@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsPositive } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateFridgeDishDto {
     @IsNotEmpty()
@@ -13,4 +14,9 @@ export class CreateFridgeDishDto {
     @IsOptional()
     @IsNumber()
     price?: number;
+
+    @IsOptional()
+    @Type(() => Date)
+    @IsDate()
+    expiration_date?: Date;
 }

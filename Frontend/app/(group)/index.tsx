@@ -9,13 +9,16 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, type Family } from '../../service/family';
+import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, createFamily, type Family } from '../../service/family';
 import { getFamilySharedLists } from '../../service/shopping';
+import { getAccess } from '../../utils/api';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import JoinFamilyModal from '../../components/JoinFamilyModal';
@@ -41,6 +44,9 @@ export default function GroupPage() {
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newFamilyName, setNewFamilyName] = useState('');
+  const [creatingFamily, setCreatingFamily] = useState(false);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -141,7 +147,11 @@ export default function GroupPage() {
   }, [fetchFamilies]);
 
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleHeaderMenu = () => {
@@ -220,7 +230,57 @@ export default function GroupPage() {
   };
 
   const handleAddFamily = () => {
-    setShowJoinModal(true);
+    setShowCreateModal(true);
+  };
+
+  const handleCreateFamily = async () => {
+    if (!newFamilyName.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên gia đình');
+      return;
+    }
+
+    setCreatingFamily(true);
+    try {
+      // Get user profile to get owner_id
+      const userProfile = await getAccess('auth/profile');
+      
+      const ownerId = typeof userProfile.id === 'string' 
+        ? parseInt(userProfile.id, 10) 
+        : Number(userProfile.id);
+      
+      if (isNaN(ownerId)) {
+        Alert.alert('Lỗi', 'ID người dùng không hợp lệ');
+        setCreatingFamily(false);
+        return;
+      }
+
+      const data: any = {
+        name: newFamilyName.trim(),
+        owner_id: ownerId,
+      };
+
+      await createFamily(data);
+
+      Alert.alert('Thành công', 'Đã tạo gia đình thành công!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowCreateModal(false);
+            setNewFamilyName('');
+            fetchFamilies();
+          },
+        },
+      ]);
+    } catch (err: any) {
+      console.error('Error creating family:', err);
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tạo gia đình. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setCreatingFamily(false);
+    }
   };
 
   const handleJoinFamily = async (invitationCode: string) => {
@@ -453,6 +513,128 @@ export default function GroupPage() {
         }}
         onJoin={handleJoinFamily}
       />
+
+      {/* Create Family Modal */}
+      <Modal
+        visible={showCreateModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowCreateModal(false);
+          setNewFamilyName('');
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: COLORS.white,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: 20,
+              maxHeight: '50%',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  color: COLORS.darkGrey,
+                }}
+              >
+                Tạo gia đình mới
+              </Text>
+              <TouchableOpacity onPress={() => {
+                setShowCreateModal(false);
+                setNewFamilyName('');
+              }}>
+                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: COLORS.darkGrey,
+                  marginBottom: 8,
+                }}
+              >
+                Tên gia đình <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: COLORS.background || '#F5F5F5',
+                  borderRadius: 12,
+                  padding: 16,
+                  fontSize: 16,
+                  borderWidth: 1,
+                  borderColor: COLORS.background || '#E5E5E5',
+                }}
+                placeholder="Nhập tên gia đình"
+                value={newFamilyName}
+                onChangeText={setNewFamilyName}
+                placeholderTextColor={COLORS.grey}
+              />
+            </View>
+
+            <View
+              style={{
+                backgroundColor: '#E0F2FE',
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 20,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Ionicons name="information-circle" size={18} color="#0EA5E9" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={{ fontSize: 12, color: '#0369A1', flex: 1, lineHeight: 16 }}>
+                  Bạn sẽ trở thành chủ hộ của gia đình này
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: COLORS.purple || '#A855F7',
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+              }}
+              onPress={handleCreateFamily}
+              disabled={creatingFamily}
+            >
+              {creatingFamily ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: COLORS.white,
+                  }}
+                >
+                  Tạo gia đình
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
