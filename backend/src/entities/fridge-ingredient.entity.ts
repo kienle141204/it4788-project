@@ -39,6 +39,9 @@ export class FridgeIngredient {
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
+  @Column({ name: 'expiration_date', type: 'date', nullable: true })
+  expiration_date: Date | null;
+
   // -----------------------
   // Relations
   // -----------------------
