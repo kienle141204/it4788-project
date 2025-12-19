@@ -68,24 +68,11 @@ export const getMyFamily = async (): Promise<Family[]> => {
 export const getFamilyById = async (id: number): Promise<Family> => {
   try {
     const res = await getAccess(`families/${id}`);
-    
-    // API may return Family object directly or wrapped in { data } or { success: true, data: {...} }
-    if (res && typeof res === 'object') {
-      // Check if response has data property (wrapped response)
-      if (res.data && typeof res.data === 'object' && res.data.id) {
-        return res.data;
-      }
-      // Check if response has success flag and data
-      if (res.success !== false && res.data && typeof res.data === 'object' && res.data.id) {
-        return res.data;
-      }
-      // Check if response is Family object directly (has id, name, etc.)
-      if (res.id && res.name) {
-        return res as Family;
-      }
+    // API may return { data: {...} } or direct object
+    if (res?.data) {
+      return res.data;
     }
-    
-    throw new Error('Invalid family response format');
+    return res;
   } catch (error) {
     console.error(`Error getting family ${id}:`, error);
     throw error;
@@ -224,6 +211,10 @@ export const getAllFamilies = async () => {
 export const getFamilyMembers = async (familyId: number) => {
   try {
     const res = await getAccess(`families/${familyId}/members`);
+    // API may return { data: [...] } or direct array
+    if (res?.data) {
+      return res.data;
+    }
     return res;
   } catch (error) {
     console.error(`Error getting members for family ${familyId}:`, error);

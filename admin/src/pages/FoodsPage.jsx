@@ -283,8 +283,6 @@ const FoodsPage = () => {
       <Table
         columns={columns}
         data={currentFoods}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
       />
 
       {totalPages > 1 && (
@@ -305,13 +303,13 @@ const FoodsPage = () => {
           <Input
             label="Tên thực phẩm"
             value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
           />
           <Select
             label="Danh mục"
             value={formData.category_id}
-            onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
             options={[
               { value: '1', label: 'Thịt' },
               { value: '2', label: 'Rau củ' },
@@ -326,20 +324,20 @@ const FoodsPage = () => {
             label="Giá (VNĐ)"
             type="number"
             value={formData.price}
-            onChange={(e) => setFormData({...formData, price: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
             required
           />
           <Input
             label="URL Hình ảnh"
             value={formData.image_url}
-            onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             placeholder="https://example.com/image.jpg"
           />
           <Input
             label="ID Địa điểm (place_id)"
             type="number"
             value={formData.place_id}
-            onChange={(e) => setFormData({...formData, place_id: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, place_id: e.target.value })}
           />
           <div className="flex gap-2 justify-end mt-6">
             <Button variant="secondary" onClick={handleCloseModal}>Hủy</Button>

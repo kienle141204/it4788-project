@@ -225,6 +225,7 @@ export const groupStyles = StyleSheet.create({
   // Members List Styles
   membersList: {
     gap: 12,
+    paddingBottom: 20,
   },
   memberCard: {
     backgroundColor: COLORS.white,
@@ -279,6 +280,9 @@ export const groupStyles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
   },
+  roleBadgeOwner: {
+    backgroundColor: '#E3F2FD',
+  },
   roleBadgeManager: {
     backgroundColor: '#FFF3E0',
   },
@@ -288,6 +292,9 @@ export const groupStyles = StyleSheet.create({
   roleText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  roleTextOwner: {
+    color: '#1976D2',
   },
   roleTextManager: {
     color: '#F57C00',
@@ -511,6 +518,9 @@ export const groupStyles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 10,
+    flexDirection: 'column',
+    maxHeight: '85%',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',

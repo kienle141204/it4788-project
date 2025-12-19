@@ -1,16 +1,22 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/themes';
 import { homeStyles } from '../styles/home.styles';
+import { useNotifications } from '@/context/NotificationsContext';
 
 interface HeaderProps {
-  userName: string;
+  userName?: string;
+  avatarUrl?: string | null;
   onNotificationPress: () => void;
   onMenuPress: () => void;
 }
 
-export default function Header({ userName, onNotificationPress, onMenuPress }: HeaderProps) {
+const defaultAvatar = require('../assets/images/avatar.png');
+
+export default function Header({ userName, avatarUrl, onNotificationPress, onMenuPress }: HeaderProps) {
+  const { unreadCount } = useNotifications();
+
   return (
     <View style={homeStyles.header}>
       {/* Top bar */}
@@ -18,17 +24,37 @@ export default function Header({ userName, onNotificationPress, onMenuPress }: H
         {/* User profile section */}
         <View style={homeStyles.userProfile}>
           <View style={homeStyles.profileImageContainer}>
-            <Ionicons name="person" size={24} color={COLORS.white} />
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={homeStyles.profileImage}
+              />
+            ) : (
+              <Image
+                source={defaultAvatar}
+                style={homeStyles.profileImage}
+              />
+            )}
           </View>
           <View style={homeStyles.userInfo}>
             <Text style={homeStyles.greeting}>Hello!</Text>
-            <Text style={homeStyles.userName}>{userName}</Text>
+            <Text style={homeStyles.userName}>{userName || 'Người dùng'}</Text>
           </View>
         </View>
         <View style={homeStyles.headerActions}>
           <TouchableOpacity onPress={onNotificationPress} style={homeStyles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
-            <View style={homeStyles.notificationBadge} />
+            <Ionicons
+              name={unreadCount > 0 ? "notifications" : "notifications-outline"}
+              size={24}
+              color={COLORS.darkGrey}
+            />
+            {unreadCount > 0 && (
+              <View style={homeStyles.notificationBadge}>
+                <Text style={homeStyles.notificationBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={onMenuPress}>
             <Ionicons name="ellipsis-horizontal" size={24} color={COLORS.darkGrey} />

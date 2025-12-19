@@ -1,4 +1,5 @@
 import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { MarketService } from './market.service';
 
 @Controller('api/markets')
@@ -11,14 +12,14 @@ export class MarketController {
     @Query('lon') lon: string,
   ) {
     if (!lat || !lon) {
-      throw new BadRequestException('Latitude and longitude are required');
+      throw new BadRequestException(ResponseMessageVi[ResponseCode.C00310]);
     }
 
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lon);
 
     if (isNaN(latitude) || isNaN(longitude)) {
-      throw new BadRequestException('Invalid latitude or longitude');
+      throw new BadRequestException(ResponseMessageVi[ResponseCode.C00311]);
     }
 
     return this.marketService.findNearest(latitude, longitude);

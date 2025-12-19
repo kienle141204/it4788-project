@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090
 // Main auth fetch function with token refresh logic
 export const authFetch = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   // Get access token from localStorage
   const accessToken = localStorage.getItem('access_token');
 
@@ -49,7 +49,13 @@ export const authFetch = async (endpoint, options = {}) => {
 
             if (!retryResponse.ok) {
               const errorData = await retryResponse.json().catch(() => ({}));
-              throw new Error(errorData.message || `API error: ${retryResponse.status}`);
+              let errorMessage = `API error: ${retryResponse.status}`;
+              if (typeof errorData.message === 'string') {
+                errorMessage = errorData.message;
+              } else if (errorData.resultMessage?.vn) {
+                errorMessage = errorData.resultMessage.vn;
+              }
+              throw new Error(errorMessage);
             }
 
             if (retryResponse.status === 204) {
@@ -76,7 +82,16 @@ export const authFetch = async (endpoint, options = {}) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API error: ${response.status}`);
+      // Ensure message is always a string
+      let errorMessage = `API error: ${response.status}`;
+      if (typeof errorData.message === 'string') {
+        errorMessage = errorData.message;
+      } else if (errorData.resultMessage?.vn) {
+        errorMessage = errorData.resultMessage.vn;
+      } else if (errorData.error) {
+        errorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
+      }
+      throw new Error(errorMessage);
     }
 
     // For DELETE requests, we might not have response body

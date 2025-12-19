@@ -33,9 +33,11 @@ export default function EditProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const profile = await getAccess('auth/profile');
+        const response = await getAccess('auth/profile');
+        // API response có cấu trúc: { success, message, data: { ...userInfo } }
+        const profile = response?.data || response;
         if (profile) {
-          setfullname(profile.full_name || '');
+          setfullname(profile.full_name || profile.fullname || '');
           setAvatarUrl(profile.avatar_url || '');
           setAddress(profile.address || '');
         }
@@ -117,17 +119,27 @@ export default function EditProfileScreen() {
     try {
       console.log('📷 Image URI:', imageUri);
       
-      // Ensure URI is in correct format for React Native
-      // It should start with file:// or content://
-      const normalizedUri = imageUri.startsWith('file://') || imageUri.startsWith('content://') 
-        ? imageUri 
-        : `file://${imageUri}`;
+      // Keep URI as-is for React Native (expo-image-picker returns correct format)
+      // Don't modify file:// or content:// URIs
+      const normalizedUri = imageUri;
       
+      // Extract file extension from URI
+      // Handle both file:// and content:// URIs
       const uriParts = normalizedUri.split('.');
-      const fileType = uriParts[uriParts.length - 1].toLowerCase();
+      let fileType = uriParts[uriParts.length - 1]?.toLowerCase() || 'jpg';
+      
+      // Remove query parameters if present (e.g., content://...?id=123)
+      if (fileType.includes('?')) {
+        fileType = fileType.split('?')[0];
+      }
+      
+      // Default to jpeg if extension is unclear
+      if (!fileType || !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileType)) {
+        fileType = 'jpg';
+      }
       
       // Determine correct MIME type
-      let mimeType = `image/${fileType}`;
+      let mimeType = 'image/jpeg'; // default
       if (fileType === 'jpg' || fileType === 'jpeg') {
         mimeType = 'image/jpeg';
       } else if (fileType === 'png') {
@@ -140,17 +152,21 @@ export default function EditProfileScreen() {
       
       console.log('📷 File type:', fileType, 'MIME type:', mimeType);
       
+      // Create FormData with proper React Native file object structure
       const formData = new FormData();
-      const fileObject = {
+      
+      // React Native FormData requires this specific structure
+      formData.append('file', {
         uri: normalizedUri,
         name: `avatar.${fileType}`,
         type: mimeType,
-      };
+      } as any);
       
-      console.log('📷 File object:', fileObject);
-      
-      formData.append('file', fileObject as any);
-      // Don't append folder here, let uploadFileAccess handle it
+      console.log('📷 FormData created with file:', {
+        uri: normalizedUri.substring(0, 50) + '...',
+        name: `avatar.${fileType}`,
+        type: mimeType,
+      });
 
       console.log('📤 Starting upload...');
       const response = await uploadFileAccess(formData, 'avatars');
@@ -158,12 +174,18 @@ export default function EditProfileScreen() {
       if (response && response.success && response.data) {
         const imageUrl = response.data.url || response.data.secure_url || response.data;
         setAvatarUrl(imageUrl);
-        // Alert.alert('Thành công', 'Upload ảnh đại diện thành công.');
+        console.log('✅ Avatar uploaded successfully:', imageUrl);
       } else {
         throw new Error(response?.message || 'Upload failed');
       }
     } catch (error: any) {
       console.error('Error uploading image:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
       
       let errorMessage = 'Không thể upload ảnh. Vui lòng thử lại.';
       const errorData = error?.response?.data;
@@ -171,8 +193,12 @@ export default function EditProfileScreen() {
       // Handle network errors
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         errorMessage = 'Upload quá lâu. Vui lòng kiểm tra kết nối mạng và thử lại.';
-      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
-        errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error') || error.message?.includes('Network request failed')) {
+        errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra:\n- Kết nối internet\n- Backend server đang chạy\n- Địa chỉ API đúng';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+      } else if (error.response?.status === 400) {
+        errorMessage = errorData?.message || 'File không hợp lệ hoặc quá lớn (tối đa 10MB).';
       } else if (errorData?.message) {
         errorMessage = errorData.message;
         // If it's a Cloudinary config error, show a more user-friendly message
@@ -205,7 +231,11 @@ export default function EditProfileScreen() {
       });
 
       Alert.alert('Thành công', 'Cập nhật thông tin cá nhân thành công.');
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/home' as any);
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Lỗi', 'Không thể cập nhật thông tin. Vui lòng thử lại.');
@@ -221,7 +251,13 @@ export default function EditProfileScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/home' as any);
+            }
+          }}>
             <Ionicons name="arrow-back" size={22} color={COLORS.darkGrey} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Sửa thông tin cá nhân</Text>
@@ -322,7 +358,13 @@ export default function EditProfileScreen() {
           <View style={styles.footerButtons}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home' as any);
+                }
+              }}
               disabled={loading}
             >
               <Text style={[styles.buttonText, styles.cancelButtonText]}>Hủy</Text>

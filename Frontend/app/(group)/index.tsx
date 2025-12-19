@@ -9,16 +9,20 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, type Family } from '../../service/family';
+import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, createFamily, type Family } from '../../service/family';
 import { getFamilySharedLists } from '../../service/shopping';
+import { getAccess } from '../../utils/api';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import JoinFamilyModal from '../../components/JoinFamilyModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface FamilyWithStats extends Family {
   memberCount: number;
@@ -29,6 +33,46 @@ interface FamilyWithStats extends Family {
     totalItems?: number;
   };
 }
+
+// Helper function to decode JWT and get user ID
+const decodeJWT = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Helper function to get current user ID from JWT token
+const getCurrentUserId = async (): Promise<number | null> => {
+  try {
+    const token = await AsyncStorage.getItem('access_token');
+    if (!token) {
+      console.log('[Group Page] No token found');
+      return null;
+    }
+    const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+    const decoded = decodeJWT(cleanToken);
+    if (decoded && decoded.sub) {
+      const userId = parseInt(decoded.sub, 10);
+      console.log('[Group Page] Decoded user ID from token:', { sub: decoded.sub, userId });
+      return userId;
+    }
+    console.log('[Group Page] No sub in decoded token:', decoded);
+    return null;
+  } catch (error) {
+    console.error('[Group Page] Error getting current user ID:', error);
+    return null;
+  }
+};
 
 export default function GroupPage() {
   const router = useRouter();
@@ -41,6 +85,10 @@ export default function GroupPage() {
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newFamilyName, setNewFamilyName] = useState('');
+  const [creatingFamily, setCreatingFamily] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -140,8 +188,21 @@ export default function GroupPage() {
     fetchFamilies();
   }, [fetchFamilies]);
 
+  // Load current user ID
+  useEffect(() => {
+    const loadCurrentUserId = async () => {
+      const userId = await getCurrentUserId();
+      setCurrentUserId(userId);
+    };
+    loadCurrentUserId();
+  }, []);
+
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home' as any);
+    }
   };
 
   const handleHeaderMenu = () => {
@@ -162,8 +223,8 @@ export default function GroupPage() {
         label: 'Thông báo',
         icon: 'notifications-outline' as const,
         onPress: () => {
-          // TODO: Navigate to notifications
-          console.log('Notification clicked');
+          setShowHeaderMenu(false);
+          router.push('/(notifications)' as any);
         },
       },
     ];
@@ -181,19 +242,32 @@ export default function GroupPage() {
   const getFamilyMenuOptions = () => {
     if (!selectedFamily) return [];
     
+    // Kiểm tra xem user có phải owner không
+    const isOwner = currentUserId && selectedFamily.owner_id && currentUserId === selectedFamily.owner_id;
+    
+    // Kiểm tra xem user có phải manager không
+    const isManager = currentUserId && selectedFamily.members && 
+      selectedFamily.members.some((member: any) => 
+        member.user_id === currentUserId && member.role === 'manager'
+      );
+    
+    // Cho phép cả owner và manager xem mã mời
+    const canViewInvitation = isOwner || isManager;
+    
     return [
       {
         label: 'Xem chi tiết',
         icon: 'eye-outline' as const,
         onPress: () => handleViewFamily(selectedFamily),
       },
-      {
+      // Chỉ hiển thị nút "Mã mời" nếu user là owner hoặc manager
+      ...(canViewInvitation ? [{
         label: 'Mã mời',
         icon: 'qr-code-outline' as const,
         onPress: () => {
           setShowInvitationModal(true);
         },
-      },
+      }] : []),
       {
         label: 'Rời nhóm',
         icon: 'log-out-outline' as const,
@@ -220,7 +294,59 @@ export default function GroupPage() {
   };
 
   const handleAddFamily = () => {
-    setShowJoinModal(true);
+    setShowCreateModal(true);
+  };
+
+  const handleCreateFamily = async () => {
+    if (!newFamilyName.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên gia đình');
+      return;
+    }
+
+    setCreatingFamily(true);
+    try {
+      // Get user profile to get owner_id
+      const response = await getAccess('auth/profile');
+      // API response có cấu trúc: { success, message, data: { ...userInfo } }
+      const userProfile = response?.data || response;
+      
+      const ownerId = typeof userProfile.id === 'string' 
+        ? parseInt(userProfile.id, 10) 
+        : Number(userProfile.id);
+      
+      if (isNaN(ownerId)) {
+        Alert.alert('Lỗi', 'ID người dùng không hợp lệ');
+        setCreatingFamily(false);
+        return;
+      }
+
+      const data: any = {
+        name: newFamilyName.trim(),
+        owner_id: ownerId,
+      };
+
+      await createFamily(data);
+
+      Alert.alert('Thành công', 'Đã tạo gia đình thành công!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowCreateModal(false);
+            setNewFamilyName('');
+            fetchFamilies();
+          },
+        },
+      ]);
+    } catch (err: any) {
+      console.error('Error creating family:', err);
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tạo gia đình. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setCreatingFamily(false);
+    }
   };
 
   const handleJoinFamily = async (invitationCode: string) => {
@@ -453,6 +579,128 @@ export default function GroupPage() {
         }}
         onJoin={handleJoinFamily}
       />
+
+      {/* Create Family Modal */}
+      <Modal
+        visible={showCreateModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowCreateModal(false);
+          setNewFamilyName('');
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: COLORS.white,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: 20,
+              maxHeight: '50%',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  color: COLORS.darkGrey,
+                }}
+              >
+                Tạo gia đình mới
+              </Text>
+              <TouchableOpacity onPress={() => {
+                setShowCreateModal(false);
+                setNewFamilyName('');
+              }}>
+                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: COLORS.darkGrey,
+                  marginBottom: 8,
+                }}
+              >
+                Tên gia đình <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: COLORS.background || '#F5F5F5',
+                  borderRadius: 12,
+                  padding: 16,
+                  fontSize: 16,
+                  borderWidth: 1,
+                  borderColor: COLORS.background || '#E5E5E5',
+                }}
+                placeholder="Nhập tên gia đình"
+                value={newFamilyName}
+                onChangeText={setNewFamilyName}
+                placeholderTextColor={COLORS.grey}
+              />
+            </View>
+
+            <View
+              style={{
+                backgroundColor: '#E0F2FE',
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 20,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Ionicons name="information-circle" size={18} color="#0EA5E9" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={{ fontSize: 12, color: '#0369A1', flex: 1, lineHeight: 16 }}>
+                  Bạn sẽ trở thành chủ hộ của gia đình này
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: COLORS.purple || '#A855F7',
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+              }}
+              onPress={handleCreateFamily}
+              disabled={creatingFamily}
+            >
+              {creatingFamily ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: COLORS.white,
+                  }}
+                >
+                  Tạo gia đình
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

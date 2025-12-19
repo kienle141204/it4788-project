@@ -14,6 +14,7 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from '../../common/types/user.type';
+import { buildSuccessResponse, ResponseCode } from 'src/common/errors/error-codes';
 
 @ApiTags('Members')
 @Controller('api/members')
@@ -65,7 +66,8 @@ export class MemberController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy gia đình hoặc người dùng' })
   @ApiResponse({ status: 409, description: 'Thành viên đã tồn tại trong gia đình' })
   async addMember(@Body() dto: AddMemberDto, @User() user: JwtUser) {
-    return this.memberService.addMember(dto, user);
+    const data = await this.memberService.addMember(dto, user);
+    return buildSuccessResponse(ResponseCode.C00219, data);
   }
 
   /** Update member role */
@@ -110,11 +112,12 @@ export class MemberController {
     @Body() dto: UpdateMemberRoleDto,
     @User() user: JwtUser,
   ) {
-    return this.memberService.updateMemberRole(
+    const data = await this.memberService.updateMemberRole(
       id,
       dto.role,
       user
     );
+    return buildSuccessResponse(ResponseCode.C00220, data);
   }
 
   /** Remove member */
@@ -138,6 +141,7 @@ export class MemberController {
     @Param('id', ParseIntPipe) id: number,
     @User() user: JwtUser,
   ) {
-    return this.memberService.removeMember(id, user);
+    await this.memberService.removeMember(id, user);
+    return buildSuccessResponse(ResponseCode.C00221, { member_id: id });
   }
 }

@@ -26,6 +26,10 @@ export class CreateRecipeDto {
 }
 
 export class UpdateRecipeStepDto {
+  @IsOptional()
+  @IsInt()
+  id?: number; // ID của step đã tồn tại, nếu có thì giữ lại step và images
+
   @IsInt()
   @Min(1)
   step_number: number;

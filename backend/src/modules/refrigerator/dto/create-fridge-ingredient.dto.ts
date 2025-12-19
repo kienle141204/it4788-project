@@ -5,7 +5,9 @@ import {
     IsPositive,
     IsInt,
     Min,
+    IsDate
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateFridgeIngredientDto {
     @IsOptional()
@@ -25,4 +27,9 @@ export class CreateFridgeIngredientDto {
     @IsOptional()
     @IsNumber()
     price?: number;
+
+    @IsOptional()
+    @Type(() => Date)
+    @IsDate()
+    expiration_date?: Date;
 }

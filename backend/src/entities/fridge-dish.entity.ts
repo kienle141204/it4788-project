@@ -29,6 +29,9 @@ export class FridgeDish {
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
+  @Column({ name: 'expiration_date', type: 'date', nullable: true })
+  expiration_date: Date | null;
+
   @ManyToOne(() => Refrigerator, (refrigerator) => refrigerator.fridgeDishes)
   @JoinColumn({ name: 'refrigerator_id' })
   refrigerator: Refrigerator;

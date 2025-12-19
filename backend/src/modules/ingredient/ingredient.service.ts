@@ -5,6 +5,7 @@ import { Ingredient } from '../../entities/ingredient.entity';
 import { IngredientCategory } from '../../entities/ingredient-category.entity';
 import { Place } from '../../entities/place.entity';
 import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import {
   PaginationDto,
   SearchByNameDto,
@@ -13,6 +14,7 @@ import {
   SearchIngredientDto
 } from './dto/search-ingredient.dto';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
+import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 
 @Injectable()
 export class IngredientService {
@@ -56,7 +58,7 @@ export class IngredientService {
     });
 
     if (!ingredient) {
-      throw new NotFoundException('Không tìm thấy nguyên liệu');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
     }
 
     return ingredient;
@@ -87,7 +89,7 @@ export class IngredientService {
         where: { id: createIngredientDto.category_id },
       });
       if (!category) {
-        throw new BadRequestException('Danh mục không tồn tại');
+        throw new BadRequestException(ResponseMessageVi[ResponseCode.C00301]);
       }
     }
 
@@ -97,7 +99,7 @@ export class IngredientService {
         where: { place_id: createIngredientDto.place_id },
       });
       if (!place) {
-        throw new BadRequestException('Địa chỉ không tồn tại');
+        throw new BadRequestException(ResponseMessageVi[ResponseCode.C00302]);
       }
     }
 
@@ -113,6 +115,49 @@ export class IngredientService {
 
     if (!result) {
       throw new NotFoundException('Không thể lấy lại nguyên liệu vừa tạo');
+    }
+
+    return result;
+  }
+
+  /**
+   * Cập nhật nguyên liệu
+   */
+  async update(id: number, updateIngredientDto: UpdateIngredientDto): Promise<Ingredient> {
+    const ingredient = await this.ingredientRepository.findOne({ where: { id } });
+
+    if (!ingredient) {
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
+    }
+
+    if (updateIngredientDto.category_id) {
+      const category = await this.categoryRepository.findOne({
+        where: { id: updateIngredientDto.category_id },
+      });
+      if (!category) {
+        throw new BadRequestException(ResponseMessageVi[ResponseCode.C00301]);
+      }
+    }
+
+    if (updateIngredientDto.place_id) {
+      const place = await this.placeRepository.findOne({
+        where: { place_id: updateIngredientDto.place_id },
+      });
+      if (!place) {
+        throw new BadRequestException(ResponseMessageVi[ResponseCode.C00302]);
+      }
+    }
+
+    const updatedIngredient = this.ingredientRepository.merge(ingredient, updateIngredientDto);
+    await this.ingredientRepository.save(updatedIngredient);
+
+    const result = await this.ingredientRepository.findOne({
+      where: { id },
+      relations: ['category', 'place'],
+    });
+
+    if (!result) {
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
     }
 
     return result;
@@ -387,5 +432,18 @@ export class IngredientService {
     });
 
     return result;
+  }
+
+  /**
+   * Xóa nguyên liệu
+   */
+  async remove(id: number): Promise<void> {
+    const ingredient = await this.ingredientRepository.findOne({ where: { id } });
+
+    if (!ingredient) {
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
+    }
+
+    await this.ingredientRepository.delete(id);
   }
 }

@@ -15,6 +15,22 @@ export const getMyShoppingLists = async () => {
   }
 };
 
+/**
+ * Lấy danh sách mua sắm của family (đã chia sẻ)
+ * GET /shopping-lists/my-family-shared/:familyId
+ */
+export const getFamilyShoppingLists = async (familyId: number) => {
+  console.log('API CALL: getFamilyShoppingLists', { familyId });
+  try {
+    const res = await getAccess(`shopping-lists/my-family-shared/${familyId}`);
+    console.log('API RESPONSE: getFamilyShoppingLists', res);
+    return res;
+  } catch (error) {
+    console.error('Error getting family shopping lists:', error);
+    throw error;
+  }
+};
+
 
 
 /**

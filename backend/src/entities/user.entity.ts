@@ -11,7 +11,8 @@ import { FamilyMember } from './family-member.entity';
 import { Recipe } from './recipe.entity';
 import { ShoppingList } from './shopping-list.entity';
 import { FamilyNote } from './family-note.entity';
-import { DeviceToken } from './device-token.entity'
+import { DeviceToken } from './device-token.entity';
+import { Notification } from './notification.entity';
 
 @Entity('users')
 export class User {
@@ -78,5 +79,8 @@ export class User {
 
   @OneToMany(() => DeviceToken, (token) => token.user)
   deviceTokens: DeviceToken[];
+
+  @OneToMany(() => Notification, (notification) => notification.user)
+  notifications: Notification[];
 
 }

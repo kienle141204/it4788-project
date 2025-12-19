@@ -8,9 +8,10 @@ import { ShoppingItemController } from './shopping-item.controller';
 import { ShoppingListModule } from '../shopping-list/shopping-list.module';
 import { IngredientModule } from '../ingredient/ingredient.module';
 import { FamilyModule } from '../family/family.module';
+import { MemberModule } from '../member/member.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ShoppingItem, ShoppingList, Ingredient]), ShoppingListModule, IngredientModule, FamilyModule],
+  imports: [TypeOrmModule.forFeature([ShoppingItem, ShoppingList, Ingredient]), ShoppingListModule, IngredientModule, FamilyModule, MemberModule],
   controllers: [ShoppingItemController],
   providers: [ShoppingItemService],
   exports: [ShoppingItemService],

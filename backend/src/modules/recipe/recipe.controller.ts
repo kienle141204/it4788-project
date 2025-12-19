@@ -17,11 +17,12 @@ import { GetRecipesDto } from './dto/get-recipes.dto';
 import { CreateRecipeDto, UpdateRecipeDto } from './dto/create-recipe.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../../entities/user.entity';
+import { buildSuccessResponse, ResponseCode } from 'src/common/errors/error-codes';
 
 @ApiTags('Recipes')
 @Controller('api/recipes')
 export class RecipeController {
-  constructor(private readonly recipeService: RecipeService) {}
+  constructor(private readonly recipeService: RecipeService) { }
 
 
   @Get()
@@ -30,7 +31,7 @@ export class RecipeController {
   async findAll(@Query() getRecipesDto: GetRecipesDto, @Request() req) {
     const user: User = req.user;
     const result = await this.recipeService.findAllWithPagination(getRecipesDto, user);
-    
+
     let message = `Lấy danh sách công thức trang ${result.page} thành công`;
     if (getRecipesDto.dishId) {
       message += ` cho món ăn ID ${getRecipesDto.dishId}`;
@@ -39,10 +40,7 @@ export class RecipeController {
       message += ` của user ID ${getRecipesDto.ownerId}`;
     }
 
-    return {
-      success: true,
-      message,
-      data: result.data,
+    return buildSuccessResponse(ResponseCode.C00112, result.data, {
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
@@ -51,7 +49,7 @@ export class RecipeController {
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,
       },
-    };
+    });
   }
 
   /**
@@ -64,11 +62,7 @@ export class RecipeController {
   async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
     const user: User = req.user;
     const recipe = await this.recipeService.findOneWithDetails(id, user);
-    return {
-      success: true,
-      message: 'Lấy thông tin công thức thành công',
-      data: recipe,
-    };
+    return buildSuccessResponse(ResponseCode.C00113, recipe);
   }
 
   /**
@@ -78,13 +72,13 @@ export class RecipeController {
   @Get('by-dish/:dishId')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy công thức theo món ăn',
     description: 'API này trả về danh sách công thức của một món ăn cụ thể.'
   })
   @ApiParam({ name: 'dishId', type: 'number', example: 1, description: 'ID của món ăn' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách công thức thành công',
     example: {
       success: true,
@@ -95,11 +89,7 @@ export class RecipeController {
   async findByDishId(@Param('dishId', ParseIntPipe) dishId: number, @Request() req) {
     const user: User = req.user;
     const recipes = await this.recipeService.findByDishId(dishId, user);
-    return {
-      success: true,
-      message: `Lấy ${recipes.length} công thức cho món ăn ID ${dishId}`,
-      data: recipes,
-    };
+    return buildSuccessResponse(ResponseCode.C00120, recipes);
   }
 
   /**
@@ -109,13 +99,13 @@ export class RecipeController {
   @Get('by-owner/:ownerId')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy công thức của user',
     description: 'API này trả về danh sách công thức của một người dùng cụ thể.'
   })
   @ApiParam({ name: 'ownerId', type: 'number', example: 1, description: 'ID của người dùng' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách công thức thành công',
     example: {
       success: true,
@@ -125,11 +115,7 @@ export class RecipeController {
   })
   async findByOwnerId(@Param('ownerId', ParseIntPipe) ownerId: number) {
     const recipes = await this.recipeService.findByOwnerId(ownerId);
-    return {
-      success: true,
-      message: `Lấy ${recipes.length} công thức của user ID ${ownerId}`,
-      data: recipes,
-    };
+    return buildSuccessResponse(ResponseCode.C00121, recipes);
   }
 
   /**
@@ -139,13 +125,13 @@ export class RecipeController {
   @Get('popular')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Lấy công thức phổ biến',
     description: 'API này trả về danh sách các công thức phổ biến nhất trong hệ thống.'
   })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Số lượng công thức cần lấy (mặc định: 10)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách công thức phổ biến thành công',
     example: {
       success: true,
@@ -156,11 +142,7 @@ export class RecipeController {
   async getPopularRecipes(@Query('limit') limit?: number, @Request() req?: any) {
     const user: User = req.user;
     const recipes = await this.recipeService.getPopularRecipes(limit || 10, user);
-    return {
-      success: true,
-      message: `Lấy ${recipes.length} công thức phổ biến`,
-      data: recipes,
-    };
+    return buildSuccessResponse(ResponseCode.C00122, recipes);
   }
 
   /**
@@ -176,12 +158,8 @@ export class RecipeController {
   ) {
     const userId = req.user.id;
     const recipe = await this.recipeService.createRecipe(createRecipeDto, userId);
-    
-    return {
-      success: true,
-      message: 'Tạo công thức thành công',
-      data: recipe,
-    };
+
+    return buildSuccessResponse(ResponseCode.C00111, recipe);
   }
 
   /**
@@ -191,7 +169,7 @@ export class RecipeController {
   @Put(':id')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Cập nhật công thức',
     description: 'API này cho phép người dùng cập nhật công thức của mình.'
   })
@@ -212,8 +190,8 @@ export class RecipeController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật công thức thành công',
     example: {
       success: true,
@@ -233,13 +211,10 @@ export class RecipeController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    const recipe = await this.recipeService.updateRecipe(id, updateRecipeDto, userId);
-    
-    return {
-      success: true,
-      message: 'Cập nhật công thức thành công',
-      data: recipe,
-    };
+    const userRole = req.user.role;
+    const recipe = await this.recipeService.updateRecipe(id, updateRecipeDto, userId, userRole);
+
+    return buildSuccessResponse(ResponseCode.C00114, recipe);
   }
 
   /**
@@ -249,13 +224,13 @@ export class RecipeController {
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Xóa công thức',
     description: 'API này cho phép người dùng xóa công thức của mình.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của công thức' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Xóa công thức thành công',
     example: {
       success: true,
@@ -269,11 +244,9 @@ export class RecipeController {
     @Request() req: any,
   ) {
     const userId = req.user.id;
-    await this.recipeService.deleteRecipe(id, userId);
-    
-    return {
-      success: true,
-      message: 'Xóa công thức thành công',
-    };
+    const userRole = req.user.role;
+    await this.recipeService.deleteRecipe(id, userId, userRole);
+
+    return buildSuccessResponse(ResponseCode.C00115, { recipeId: id });
   }
 }
