@@ -68,4 +68,37 @@ export const deleteAllNotifications = async () => {
   return response;
 };
 
+// Device Token APIs
+export interface RegisterDeviceTokenRequest {
+  deviceToken: string;
+  platform: 'ios' | 'android';
+}
+
+export interface DeviceTokenResponse {
+  success: boolean;
+  message: string;
+  data: {
+    id: number;
+    userId: number;
+    deviceToken: string;
+    platform: 'ios' | 'android';
+    createdAt: string;
+  };
+}
+
+export const registerDeviceToken = async (data: RegisterDeviceTokenRequest): Promise<DeviceTokenResponse> => {
+  const response = await postAccess('notifications/device-token', data);
+  return response;
+};
+
+export const getDeviceTokens = async () => {
+  const response = await getAccess('notifications/device-token');
+  return response;
+};
+
+export const deleteDeviceToken = async (token: string) => {
+  const response = await deleteAccess(`notifications/device-token/${token}`);
+  return response;
+};
+
 

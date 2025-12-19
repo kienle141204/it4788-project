@@ -13,6 +13,7 @@ import { User } from '../../entities/user.entity';
 import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { NotificationsGateway } from './notifications.gateway';
+import { FirebaseService } from '../../firebase/firebase.service';
 
 @Injectable()
 export class NotificationsService {
@@ -23,6 +24,7 @@ export class NotificationsService {
     private userRepository: Repository<User>,
     @Inject(forwardRef(() => NotificationsGateway))
     private notificationsGateway: NotificationsGateway,
+    private firebaseService: FirebaseService,
   ) {}
 
   /**
@@ -67,6 +69,33 @@ export class NotificationsService {
     } catch (error) {
       // Log lỗi nhưng không throw để không ảnh hưởng đến việc lưu thông báo
       console.error(`[NotificationsService] ⚠️ Error emitting notification via WebSocket (notification still saved to DB):`, error);
+    }
+
+    // Gửi push notification đến tất cả devices của user
+    try {
+      console.log(`[NotificationsService] Attempting to send push notification to user ${user_id}`);
+      const pushData = {
+        notificationId: savedNotification.id.toString(),
+        type: 'notification',
+      };
+      const pushResult = await this.firebaseService.sendToUser(
+        user_id,
+        title,
+        body || '',
+        pushData,
+      );
+      console.log(
+        `[NotificationsService] ✅ Push notification sent: ${pushResult.success} success, ${pushResult.failed} failed`,
+      );
+      if (pushResult.errors.length > 0) {
+        console.warn(`[NotificationsService] ⚠️ Push notification errors:`, pushResult.errors);
+      }
+    } catch (error) {
+      // Log lỗi nhưng không throw để không ảnh hưởng đến việc lưu thông báo
+      console.error(
+        `[NotificationsService] ⚠️ Error sending push notification (notification still saved to DB):`,
+        error,
+      );
     }
 
     return savedNotification;
