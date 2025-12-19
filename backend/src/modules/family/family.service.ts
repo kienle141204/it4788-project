@@ -103,7 +103,12 @@ export class FamilyService {
   }
 
   async getFamilyById(id: number) {
-    return this.findFamilyOrFail(id);
+    const family = await this.familyRepository.findOne({
+      where: { id },
+      relations: ['members', 'members.user', 'owner'], // Thêm relation owner
+    });
+    if (!family) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00190]);
+    return family;
   }
 
   /**
@@ -197,8 +202,21 @@ export class FamilyService {
   async getInvitationCode(familyId: number, userId: number, role: string) {
     const family = await this.findFamilyOrFail(familyId);
 
-    // Chỉ owner hoặc admin mới có thể xem mã mời
-    this.ensureOwnerOrAdmin(family, userId, role);
+    // Kiểm tra quyền: owner, admin hoặc manager
+    const isOwner = family.owner_id === userId;
+    const isAdmin = role === 'admin';
+    
+    // Kiểm tra xem user có phải manager không
+    let isManager = false;
+    if (!isOwner && !isAdmin) {
+      const members = await this.memberService.getMembersByFamily(familyId);
+      const currentMember = members.find(m => m.user_id === userId);
+      isManager = currentMember?.role === 'manager';
+    }
+
+    if (!isOwner && !isAdmin && !isManager) {
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00191]);
+    }
 
     if (!family.invitation_code) {
       // Nếu chưa có mã mời, tạo mới

@@ -12,12 +12,14 @@ import NotificationCard from '@/components/NotificationCard';
 import FeatureGrid from '@/components/FeatureGrid';
 import { COLORS } from '@/constants/themes';
 import { getAccess } from '@/utils/api';
+import { useNotifications } from '@/context/NotificationsContext';
 import { getMyShoppingLists } from '@/service/shopping';
 
 type UserProfile = {
   id: number;
   email: string;
-  full_name: string;
+  full_name?: string;
+  fullname?: string;
   avatar_url: string | null;
   address: string | null;
   phone: string | null;
@@ -36,13 +38,16 @@ export default function HomePage() {
   const backPressCount = useRef(0);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [todayTasks, setTodayTasks] = useState<TodayTasks>({ totalItems: 0, completedItems: 0 });
+  const { unreadCount, refreshNotifications } = useNotifications();
 
   console.log('🏠 Đang ở HOME');
 
   const fetchProfile = useCallback(async () => {
     try {
-      const data = await getAccess('auth/profile');
-      setProfile(data);
+      const response = await getAccess('auth/profile');
+      // API response có cấu trúc: { success, message, data: { ...userInfo } }
+      const userData = response?.data || response;
+      setProfile(userData);
     } catch (err: any) {
       console.error('Error fetching profile:', err);
       // Không hiển thị lỗi để không làm gián đoạn trải nghiệm người dùng
@@ -107,14 +112,16 @@ export default function HomePage() {
   useEffect(() => {
     fetchProfile();
     fetchTodayTasks();
-  }, [fetchProfile, fetchTodayTasks]);
+    refreshNotifications();
+  }, [fetchProfile, fetchTodayTasks, refreshNotifications]);
 
   // Refresh data khi màn hình được focus
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
       fetchTodayTasks();
-    }, [fetchProfile, fetchTodayTasks])
+      refreshNotifications();
+    }, [fetchProfile, fetchTodayTasks, refreshNotifications])
   );
 
   useEffect(() => {
@@ -149,7 +156,7 @@ export default function HomePage() {
   ];
 
   const handleNotificationPress = () => {
-    Alert.alert('Thông báo', 'Bạn có 6 thông báo mới');
+    router.push('/(notifications)' as any);
   };
 
   const handleMenuPress = () => {
@@ -169,7 +176,7 @@ export default function HomePage() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <Header
-          userName={profile?.full_name || 'Người dùng'}
+          userName={profile?.full_name || profile?.fullname || 'Người dùng'}
           avatarUrl={profile?.avatar_url}
           onNotificationPress={handleNotificationPress}
           onMenuPress={handleMenuPress}

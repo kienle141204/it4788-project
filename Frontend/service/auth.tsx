@@ -64,7 +64,8 @@ export const refreshToken = async (refresh_token: string): Promise<RefreshTokenR
 export interface UserProfile {
   id: number;
   email: string;
-  fullname: string;
+  fullname?: string;
+  full_name?: string;
   avatar_url?: string;
   address?: string;
   phone?: string;
@@ -76,7 +77,8 @@ export interface UserProfile {
 export const getUserProfile = async (): Promise<UserProfile> => {
   try {
     const res = await getAccess('auth/profile');
-    return res;
+    // API response có cấu trúc: { success, message, data: { ...userInfo } }
+    return res?.data || res;
   } catch (error) {
     console.error('Error getting user profile:', error);
     throw error;

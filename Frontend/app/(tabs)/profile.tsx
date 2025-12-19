@@ -12,7 +12,8 @@ import ActionMenu from '@/components/ActionMenu';
 type UserProfile = {
   id: number;
   email: string;
-  full_name: string;
+  full_name?: string;
+  fullname?: string;
   avatar_url: string | null;
   address: string | null;
   phone: string | null;
@@ -37,8 +38,10 @@ export default function ProfileScreen() {
     }
     setError(null);
     try {
-      const data = await getAccess('auth/profile');
-      setProfile(data);
+      const response = await getAccess('auth/profile');
+      // API response có cấu trúc: { success, message, data: { ...userInfo } }
+      const userData = response?.data || response;
+      setProfile(userData);
     } catch (err: any) {
       const message =
         err instanceof Error && err.message === 'SESSION_EXPIRED'
@@ -143,7 +146,7 @@ export default function ProfileScreen() {
             source={profile.avatar_url ? { uri: profile.avatar_url } : defaultAvatar}
             style={styles.avatar}
           />
-          <Text style={styles.nameText}>{profile.full_name || 'Không có tên'}</Text>
+          <Text style={styles.nameText}>{profile.full_name || profile.fullname || 'Không có tên'}</Text>
           <Text style={styles.emailText}>{profile.email}</Text>
           <View style={styles.roleBadge}>
             <Ionicons name="shield-checkmark" size={16} color={COLORS.white} />
