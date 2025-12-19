@@ -44,7 +44,9 @@ export default function CreateFridgePage() {
 
   const fetchUserProfile = useCallback(async () => {
     try {
-      const profile = await getAccess('auth/profile');
+      const response = await getAccess('auth/profile');
+      // API response có cấu trúc: { success, message, data: { ...userInfo } }
+      const profile = response?.data || response;
       setUserProfile(profile);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {

@@ -12,6 +12,7 @@ import {
   TextInput,
   Modal,
   FlatList,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -231,11 +232,19 @@ export default function GroupDetailPage() {
 
       // Extract members from family object and transform to Member[] format
       let membersData: Member[] = [];
+      console.log('[Members] Family data:', {
+        hasMembers: !!familyData.members,
+        membersType: Array.isArray(familyData.members),
+        membersLength: familyData.members?.length,
+        ownerId: familyData.owner_id,
+        hasOwner: !!familyData.owner,
+      });
+
       if (familyData.members && Array.isArray(familyData.members)) {
         membersData = familyData.members.map((member: any) => ({
           id: member.id,
           user_id: member.user_id,
-          role: member.role,
+          role: member.role || 'member', // Đảm bảo có role, mặc định là 'member'
           joined_at: member.joined_at,
           user: {
             id: member.user?.id || member.user_id,
@@ -244,7 +253,38 @@ export default function GroupDetailPage() {
             avatar_url: member.user?.avatar_url || null,
           },
         }));
+        console.log('[Members] Mapped members:', membersData.length, membersData);
       }
+
+      // Đảm bảo owner có role đúng và được hiển thị
+      if (familyData.owner_id) {
+        const ownerMemberIndex = membersData.findIndex(m => m.user_id === familyData.owner_id);
+        if (ownerMemberIndex >= 0) {
+          // Owner đã có trong members, đảm bảo role là 'owner'
+          membersData[ownerMemberIndex].role = 'owner';
+          console.log('[Members] Owner found in members, set role to owner');
+        } else if (familyData.owner) {
+          // Owner chưa có trong members, thêm vào đầu danh sách
+          const ownerMember: Member = {
+            id: 0, // Temporary ID
+            user_id: familyData.owner_id,
+            role: 'owner', // Owner có role đặc biệt
+            joined_at: familyData.created_at || new Date().toISOString(),
+            user: {
+              id: familyData.owner.id || familyData.owner_id,
+              full_name: familyData.owner.full_name || familyData.owner.fullname || '',
+              email: familyData.owner.email || '',
+              avatar_url: familyData.owner.avatar_url || null,
+            },
+          };
+          membersData.unshift(ownerMember);
+          console.log('[Members] Owner added to members list');
+        } else {
+          console.warn('[Members] Owner ID exists but owner data not found in response');
+        }
+      }
+
+      console.log('[Members] Final members data:', membersData.length, membersData);
 
       // Fetch shopping lists (handle error gracefully)
       let shoppingListsData: ShoppingList[] = [];
@@ -342,13 +382,14 @@ export default function GroupDetailPage() {
           setShowMembersView(true);
         },
       },
-      {
+      // Chỉ hiển thị nút "Mã mời" nếu user là owner hoặc manager của family
+      ...(currentUserId && family && (currentUserId === family.owner_id || isManager) ? [{
         label: 'Mã mời',
         icon: 'qr-code-outline' as const,
         onPress: () => {
           setShowInvitationModal(true);
         },
-      },
+      }] : []),
       {
         label: 'Chỉnh sửa thông tin',
         icon: 'create-outline' as const,
@@ -751,6 +792,23 @@ export default function GroupDetailPage() {
   }, [members, searchTerm]);
 
   const renderMembersList = () => {
+    console.log('[Members] Rendering list:', {
+      membersCount: members.length,
+      filteredCount: filteredMembers.length,
+      searchTerm,
+    });
+
+    if (!members || members.length === 0) {
+      return (
+        <View style={groupStyles.emptyState}>
+          <Ionicons name='people-outline' size={48} color={COLORS.grey} />
+          <Text style={groupStyles.emptyStateText}>
+            Chưa có thành viên nào
+          </Text>
+        </View>
+      );
+    }
+
     if (filteredMembers.length === 0) {
       return (
         <View style={groupStyles.emptyState}>
@@ -764,9 +822,13 @@ export default function GroupDetailPage() {
 
     return (
       <View style={groupStyles.membersList}>
-        {filteredMembers.map(member => (
+        {filteredMembers.map((member, index) => {
+          console.log('[Members] Rendering member:', member.id, member.user?.full_name, member.role);
+          // Sử dụng unique key - nếu member.id = 0 (owner), dùng user_id
+          const memberKey = member.id === 0 ? `owner-${member.user_id}-${index}` : `member-${member.id}`;
+          return (
           <TouchableOpacity
-            key={member.id}
+            key={memberKey}
             style={groupStyles.memberCard}
             onPress={() => handleMemberMenu(member)}
             activeOpacity={0.7}
@@ -795,17 +857,21 @@ export default function GroupDetailPage() {
 
             <View style={[
               groupStyles.roleBadge,
+              member.role === 'owner' ? groupStyles.roleBadgeOwner :
               member.role === 'manager' ? groupStyles.roleBadgeManager : groupStyles.roleBadgeMember
             ]}>
               <Text style={[
                 groupStyles.roleText,
+                member.role === 'owner' ? groupStyles.roleTextOwner :
                 member.role === 'manager' ? groupStyles.roleTextManager : groupStyles.roleTextMember
               ]}>
-                {member.role === 'manager' ? 'Quản lý' : 'Thành viên'}
+                {member.role === 'owner' ? 'Chủ nhóm' : 
+                 member.role === 'manager' ? 'Quản lý' : 'Thành viên'}
               </Text>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </View>
     );
   };
@@ -1350,48 +1416,69 @@ export default function GroupDetailPage() {
         onRequestClose={() => setShowMembersView(false)}
       >
         <View style={groupStyles.modalOverlay}>
-          <View style={[groupStyles.modalContent, { maxHeight: '85%', width: '95%' }]}>
-            <View style={groupStyles.modalHeader}>
-              <Text style={groupStyles.modalTitle}>Thành viên nhóm</Text>
-              <TouchableOpacity
-                style={groupStyles.modalCloseButton}
-                onPress={() => setShowMembersView(false)}
-              >
-                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
-              </TouchableOpacity>
-            </View>
+          {(() => {
+            const screenHeight = Dimensions.get('window').height;
+            const modalMaxHeight = screenHeight * 0.85;
+            // Tính toán chiều cao cho ScrollView: modalMaxHeight - header - memberCount - searchBar - padding
+            const headerHeight = 60; // modalHeader + marginBottom
+            const memberCountHeight = 40; // memberCountContainer
+            const searchBarHeight = 48; // searchContainer
+            const padding = 48; // padding top + bottom của modalContent
+            const scrollViewMaxHeight = modalMaxHeight - headerHeight - memberCountHeight - searchBarHeight - padding;
+            
+            return (
+              <View style={[groupStyles.modalContent, { 
+                maxHeight: modalMaxHeight, 
+                width: '95%',
+                height: modalMaxHeight,
+              }]}>
+                <View style={groupStyles.modalHeader}>
+                  <Text style={groupStyles.modalTitle}>Thành viên nhóm</Text>
+                  <TouchableOpacity
+                    style={groupStyles.modalCloseButton}
+                    onPress={() => setShowMembersView(false)}
+                  >
+                    <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                  </TouchableOpacity>
+                </View>
 
-            {/* Member count */}
-            <View style={groupStyles.memberCountContainer}>
-              <Text style={groupStyles.memberCountText}>
-                {members.length} thành viên
-              </Text>
-            </View>
+                {/* Member count */}
+                <View style={groupStyles.memberCountContainer}>
+                  <Text style={groupStyles.memberCountText}>
+                    {members.length} thành viên
+                  </Text>
+                </View>
 
-            {/* Search bar */}
-            <View style={groupStyles.searchContainer}>
-              <Ionicons name='search' size={20} color={COLORS.grey} style={groupStyles.searchIcon} />
-              <TextInput
-                style={groupStyles.searchInput}
-                placeholder='Tìm thành viên theo tên'
-                placeholderTextColor={COLORS.grey}
-                value={searchTerm}
-                onChangeText={setSearchTerm}
-              />
-              {searchTerm.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchTerm('')}>
-                  <Ionicons name='close-circle' size={20} color={COLORS.grey} />
-                </TouchableOpacity>
-              )}
-            </View>
+                {/* Search bar */}
+                <View style={groupStyles.searchContainer}>
+                  <Ionicons name='search' size={20} color={COLORS.grey} style={groupStyles.searchIcon} />
+                  <TextInput
+                    style={groupStyles.searchInput}
+                    placeholder='Tìm thành viên theo tên'
+                    placeholderTextColor={COLORS.grey}
+                    value={searchTerm}
+                    onChangeText={setSearchTerm}
+                  />
+                  {searchTerm.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchTerm('')}>
+                      <Ionicons name='close-circle' size={20} color={COLORS.grey} />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-            <ScrollView
-              style={{ flex: 1 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {renderMembersList()}
-            </ScrollView>
-          </View>
+                {/* Scrollable members list */}
+                <ScrollView
+                  style={{ maxHeight: scrollViewMaxHeight }}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                  bounces={true}
+                >
+                  {renderMembersList()}
+                </ScrollView>
+              </View>
+            );
+          })()}
         </View>
       </Modal>
 

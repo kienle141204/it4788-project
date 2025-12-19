@@ -9,6 +9,7 @@ import { Ingredient } from '../../entities/ingredient.entity';
 import type { JwtUser } from 'src/common/types/user.type';
 import { FamilyService } from '../family/family.service';
 import { ShoppingListService } from '../shopping-list/shopping-list.service';
+import { MemberService } from '../member/member.service';
 
 @Injectable()
 export class ShoppingItemService {
@@ -26,6 +27,8 @@ export class ShoppingItemService {
     
     @Inject(forwardRef(() => ShoppingListService))
     private readonly shoppingListService: ShoppingListService,
+
+    private readonly memberService: MemberService,
   ) { }
 
   /** Tạo item mới */
@@ -36,11 +39,31 @@ export class ShoppingItemService {
     const shoppingList = await this.shoppingListRepo.findOne({ where: { id: list_id } });
     if (!shoppingList) throw new NotFoundException(`Không tìm thấy danh sách mua sắm ${list_id}`);
 
-    // Kiểm tra quyền: owner, admin hoặc trưởng nhóm family
+    // Kiểm tra quyền: owner của list, admin, owner của family, manager của family, hoặc member nếu list được share
     const family = await this.familyService.getFamilyById(shoppingList.family_id);
-    const isOwner = family && family.owner_id === user.id;
+    const isFamilyOwner = family && family.owner_id === user.id;
+    const isListOwner = shoppingList.owner_id === user.id;
+    const isAdmin = user.role === 'admin';
 
-    if (shoppingList.owner_id !== user.id && user.role !== 'admin' && !isOwner) {
+    // Kiểm tra user có phải là member của family không
+    let isManager = false;
+    let isMember = false;
+    if (family) {
+      const members = await this.memberService.getMembersByFamily(family.id);
+      const currentMember = members.find(m => m.user_id === user.id);
+      isManager = currentMember?.role === 'manager';
+      isMember = !!currentMember; // member hoặc manager đều là member
+    }
+
+    // Cho phép nếu:
+    // 1. Owner của shopping list
+    // 2. Admin
+    // 3. Owner của family
+    // 4. Manager của family
+    // 5. Member của family VÀ shopping list được share
+    const hasPermission = isListOwner || isAdmin || isFamilyOwner || isManager || (isMember && shoppingList.is_shared);
+
+    if (!hasPermission) {
       throw new UnauthorizedException('Bạn không có quyền thêm nguyên liệu vào danh sách này');
     }
 
@@ -95,11 +118,31 @@ export class ShoppingItemService {
     const shoppingList = item.shoppingList;
     if (!shoppingList) throw new NotFoundException(`Không tìm thấy danh sách mua sắm`);
 
-    // Kiểm tra quyền: owner, admin hoặc trưởng nhóm family
+    // Kiểm tra quyền: owner của list, admin, owner của family, manager của family, hoặc member nếu list được share
     const family = await this.familyService.getFamilyById(shoppingList.family_id);
-    const isOwner = family && family.owner_id === user.id;
+    const isFamilyOwner = family && family.owner_id === user.id;
+    const isListOwner = shoppingList.owner_id === user.id;
+    const isAdmin = user.role === 'admin';
 
-    if (shoppingList.owner_id !== user.id && user.role !== 'admin' && !isOwner) {
+    // Kiểm tra user có phải là member của family không
+    let isManager = false;
+    let isMember = false;
+    if (family) {
+      const members = await this.memberService.getMembersByFamily(family.id);
+      const currentMember = members.find(m => m.user_id === user.id);
+      isManager = currentMember?.role === 'manager';
+      isMember = !!currentMember; // member hoặc manager đều là member
+    }
+
+    // Cho phép nếu:
+    // 1. Owner của shopping list
+    // 2. Admin
+    // 3. Owner của family
+    // 4. Manager của family
+    // 5. Member của family VÀ shopping list được share
+    const hasPermission = isListOwner || isAdmin || isFamilyOwner || isManager || (isMember && shoppingList.is_shared);
+
+    if (!hasPermission) {
       throw new UnauthorizedException('Bạn không có quyền xem hoặc chỉnh sửa item này');
     }
 

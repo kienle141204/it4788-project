@@ -22,6 +22,7 @@ import { getAccess } from '../../utils/api';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import JoinFamilyModal from '../../components/JoinFamilyModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface FamilyWithStats extends Family {
   memberCount: number;
@@ -32,6 +33,46 @@ interface FamilyWithStats extends Family {
     totalItems?: number;
   };
 }
+
+// Helper function to decode JWT and get user ID
+const decodeJWT = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Helper function to get current user ID from JWT token
+const getCurrentUserId = async (): Promise<number | null> => {
+  try {
+    const token = await AsyncStorage.getItem('access_token');
+    if (!token) {
+      console.log('[Group Page] No token found');
+      return null;
+    }
+    const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+    const decoded = decodeJWT(cleanToken);
+    if (decoded && decoded.sub) {
+      const userId = parseInt(decoded.sub, 10);
+      console.log('[Group Page] Decoded user ID from token:', { sub: decoded.sub, userId });
+      return userId;
+    }
+    console.log('[Group Page] No sub in decoded token:', decoded);
+    return null;
+  } catch (error) {
+    console.error('[Group Page] Error getting current user ID:', error);
+    return null;
+  }
+};
 
 export default function GroupPage() {
   const router = useRouter();
@@ -47,6 +88,7 @@ export default function GroupPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState('');
   const [creatingFamily, setCreatingFamily] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -146,6 +188,15 @@ export default function GroupPage() {
     fetchFamilies();
   }, [fetchFamilies]);
 
+  // Load current user ID
+  useEffect(() => {
+    const loadCurrentUserId = async () => {
+      const userId = await getCurrentUserId();
+      setCurrentUserId(userId);
+    };
+    loadCurrentUserId();
+  }, []);
+
   const handleBack = () => {
     if (router.canGoBack()) {
       router.back();
@@ -172,8 +223,8 @@ export default function GroupPage() {
         label: 'Thông báo',
         icon: 'notifications-outline' as const,
         onPress: () => {
-          // TODO: Navigate to notifications
-          console.log('Notification clicked');
+          setShowHeaderMenu(false);
+          router.push('/(notifications)' as any);
         },
       },
     ];
@@ -191,19 +242,32 @@ export default function GroupPage() {
   const getFamilyMenuOptions = () => {
     if (!selectedFamily) return [];
     
+    // Kiểm tra xem user có phải owner không
+    const isOwner = currentUserId && selectedFamily.owner_id && currentUserId === selectedFamily.owner_id;
+    
+    // Kiểm tra xem user có phải manager không
+    const isManager = currentUserId && selectedFamily.members && 
+      selectedFamily.members.some((member: any) => 
+        member.user_id === currentUserId && member.role === 'manager'
+      );
+    
+    // Cho phép cả owner và manager xem mã mời
+    const canViewInvitation = isOwner || isManager;
+    
     return [
       {
         label: 'Xem chi tiết',
         icon: 'eye-outline' as const,
         onPress: () => handleViewFamily(selectedFamily),
       },
-      {
+      // Chỉ hiển thị nút "Mã mời" nếu user là owner hoặc manager
+      ...(canViewInvitation ? [{
         label: 'Mã mời',
         icon: 'qr-code-outline' as const,
         onPress: () => {
           setShowInvitationModal(true);
         },
-      },
+      }] : []),
       {
         label: 'Rời nhóm',
         icon: 'log-out-outline' as const,
@@ -242,7 +306,9 @@ export default function GroupPage() {
     setCreatingFamily(true);
     try {
       // Get user profile to get owner_id
-      const userProfile = await getAccess('auth/profile');
+      const response = await getAccess('auth/profile');
+      // API response có cấu trúc: { success, message, data: { ...userInfo } }
+      const userProfile = response?.data || response;
       
       const ownerId = typeof userProfile.id === 'string' 
         ? parseInt(userProfile.id, 10) 

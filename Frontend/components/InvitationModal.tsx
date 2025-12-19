@@ -56,8 +56,21 @@ export default function InvitationModal({
       setInvitationData(data);
     } catch (error: any) {
       console.error('Error fetching invitation:', error);
-      Alert.alert('Lỗi', 'Không thể tải mã mời. Vui lòng thử lại.');
-      onClose();
+      
+      // Xử lý lỗi 403 - Không có quyền
+      if (error?.response?.status === 403 || error?.response?.statusCode === 403) {
+        const errorMessage = error?.response?.data?.message || 
+                            error?.response?.data?.resultMessage?.vn || 
+                            'Bạn không có quyền xem mã mời. Chỉ chủ nhóm mới có quyền này.';
+        Alert.alert('Không có quyền', errorMessage, [
+          { text: 'Đóng', onPress: onClose }
+        ]);
+      } else {
+        // Lỗi khác
+        Alert.alert('Lỗi', 'Không thể tải mã mời. Vui lòng thử lại.', [
+          { text: 'Đóng', onPress: onClose }
+        ]);
+      }
     } finally {
       setLoading(false);
     }

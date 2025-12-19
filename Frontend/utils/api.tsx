@@ -1,9 +1,23 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-// const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
-// const API_DOMAIN = process.env.API_DOMAIN || 'http://10.0.2.2:8090/api/';
-const API_DOMAIN = 'http://localhost:8090/api/';
+// Tự động phát hiện môi trường để chọn API domain phù hợp
+// Web: localhost, Android emulator: 10.0.2.2, iOS simulator: localhost
+const getApiDomain = () => {
+  if (Platform.OS === 'web') {
+    return 'http://localhost:8090/api/';
+  } else if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8090/api/';
+  } else {
+    // iOS simulator hoặc các platform khác
+    return 'http://localhost:8090/api/';
+  }
+};
+
+const API_DOMAIN = getApiDomain();
+console.log(`🌐 API Domain: ${API_DOMAIN} (Platform: ${Platform.OS})`);
+//const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {
@@ -120,15 +134,13 @@ export const upImage = async (path: string, data: object) => {
 }
 
 export const uploadFileAccess = async (formData: FormData, folder?: string, retryCount = 0): Promise<any> => {
-  let tokenHeader = {};
+  let tokenHeader: { Authorization?: string } = {};
   try {
     await ensureTokenValid();
     tokenHeader = await getTokenHeader();
 
     // Only append folder if not already in formData
     if (folder) {
-      // Check if folder is already appended (React Native FormData doesn't have has method)
-      // So we'll just append it - if duplicate, backend should handle it
       formData.append('folder', folder);
     }
 
@@ -137,94 +149,8 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
     console.log('📤 API_DOMAIN:', API_DOMAIN);
     console.log('📤 Token header:', tokenHeader);
 
-    // For React Native FormData upload, we need to be careful with headers
-    // Axios should automatically detect FormData and set Content-Type with boundary
-    // But we need to ensure we don't override it
-
-    // Create headers object without Content-Type for FormData
-    const uploadHeaders: any = {
-      ...tokenHeader,
-      Accept: 'application/json',
-    };
-
-    // Remove Content-Type if it exists - let axios set it automatically
-    delete uploadHeaders['Content-Type'];
-    delete uploadHeaders['content-type'];
-
-    console.log('📤 Upload headers:', uploadHeaders);
-    console.log('📤 FormData type:', formData.constructor.name);
-
-    try {
-      const res = await axios.post(uploadUrl, formData, {
-        headers: uploadHeaders,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-        timeout: 60000, // Increase to 60 seconds for file upload
-        // Let axios automatically handle FormData serialization
-      });
-
-      console.log('✅ Upload successful:', res.data);
-      return res.data;
-    } catch (axiosError: any) {
-      // If axios fails, try with fetch API as fallback
-      if (axiosError.code === 'NETWORK_ERROR' || axiosError.message?.includes('Network Error')) {
-        console.log('⚠️ Axios failed, trying fetch API as fallback...');
-        return await uploadFileWithFetch(formData, uploadUrl, tokenHeader);
-      }
-      throw axiosError;
-    }
-  } catch (error: any) {
-    if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
-      throw error;
-    }
-    if (axios.isAxiosError(error)) {
-      if (error.response?.status === 401 && retryCount === 0) {
-        console.log('🔄 Token expired, attempting to refresh...');
-        await refreshAccessToken();
-        return uploadFileAccess(formData, folder, retryCount + 1);
-      }
-
-      // Log detailed error information
-      const errorData = error.response?.data;
-      console.error('❌ Upload error:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        message: errorData?.message || error.message,
-        error: errorData?.error,
-        data: errorData,
-        code: error.code,
-        request: error.request ? 'Request object exists' : 'No request object',
-        config: error.config ? {
-          url: error.config.url,
-          method: error.config.method,
-          headers: error.config.headers,
-        } : 'No config',
-      });
-
-      if (error.response?.status === 401) {
-        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
-        console.error('Token header:', tokenHeader);
-        console.error('Request URL:', API_DOMAIN + 'upload/file');
-      }
-
-      // If error message mentions api_key, it's likely a backend Cloudinary config issue
-      if (errorData?.message?.includes('api_key') || errorData?.error?.includes('api_key')) {
-        console.error('⚠️ Cloudinary configuration error detected. Backend may need to configure Cloudinary credentials.');
-      }
-
-      throw error;
-    } else {
-      console.error('Unknown error:', error);
-      throw error;
-    }
-  }
-};
-
-// Fallback function using fetch API for file upload
-const uploadFileWithFetch = async (formData: FormData, url: string, tokenHeader: any): Promise<any> => {
-  try {
-    console.log('📤 Trying fetch API for upload...');
-
+    // Use React Native's fetch API instead of axios for FormData uploads
+    // React Native's fetch handles FormData better than axios
     const headers: any = {
       Accept: 'application/json',
     };
@@ -234,26 +160,121 @@ const uploadFileWithFetch = async (formData: FormData, url: string, tokenHeader:
       headers.Authorization = tokenHeader.Authorization;
     }
 
-    // Don't set Content-Type - fetch will set it automatically with boundary
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: formData,
-    });
+    // Don't set Content-Type - fetch will set it automatically with boundary for FormData
+    console.log('📤 Upload headers:', headers);
+    console.log('📤 FormData type:', formData.constructor.name);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    try {
+      // Use fetch API with timeout
+      // Create a promise that rejects after timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Upload timeout')), 60000); // 60 seconds
+      });
+
+      // Race between fetch and timeout
+      const response = await Promise.race([
+        fetch(uploadUrl, {
+          method: 'POST',
+          headers: headers,
+          body: formData,
+        }),
+        timeoutPromise,
+      ]);
+
+      // Check if response is valid (not from timeout)
+      if (!(response instanceof Response)) {
+        throw new Error('Upload timeout');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: `HTTP ${response.status}: ${response.statusText}`,
+        }));
+        
+        // Handle 401 Unauthorized
+        if (response.status === 401 && retryCount === 0) {
+          console.log('🔄 Token expired, attempting to refresh...');
+          await refreshAccessToken();
+          return uploadFileAccess(formData, folder, retryCount + 1);
+        }
+
+        throw {
+          response: {
+            status: response.status,
+            statusText: response.statusText,
+            data: errorData,
+          },
+          message: errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+        };
+      }
+
+      const data = await response.json();
+      console.log('✅ Upload successful:', data);
+      return data;
+    } catch (fetchError: any) {
+      // Handle timeout
+      if (fetchError.message?.includes('Upload timeout') || fetchError.message?.includes('timeout')) {
+        throw {
+          code: 'ECONNABORTED',
+          message: 'Upload timeout. Please check your connection and try again.',
+        };
+      }
+
+      // Handle network errors
+      if (fetchError.message?.includes('Network request failed') || 
+          fetchError.message?.includes('Failed to fetch') ||
+          fetchError.message?.includes('NetworkError') ||
+          fetchError.message?.includes('Network Error')) {
+        throw {
+          code: 'ERR_NETWORK',
+          message: 'Network request failed. Please check:\n- Internet connection\n- Backend server is running\n- API address is correct',
+        };
+      }
+
+      // Re-throw if it's already formatted
+      if (fetchError.response) {
+        throw fetchError;
+      }
+
+      // Wrap other errors
+      throw {
+        code: 'UNKNOWN_ERROR',
+        message: fetchError.message || 'Unknown error occurred',
+        originalError: fetchError,
+      };
+    }
+  } catch (error: any) {
+    if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
+      throw error;
     }
 
-    const data = await response.json();
-    console.log('✅ Upload successful with fetch:', data);
-    return data;
-  } catch (error: any) {
-    console.error('❌ Fetch upload error:', error);
+    // Handle 401 errors
+    if (error.response?.status === 401) {
+      console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
+      console.error('Token header:', tokenHeader);
+      console.error('Request URL:', API_DOMAIN + 'upload/file');
+    }
+
+    // Log detailed error information
+    const errorData = error.response?.data;
+    console.error('❌ Upload error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      message: errorData?.message || error.message,
+      error: errorData?.error,
+      data: errorData,
+      code: error.code,
+    });
+
+    // If error message mentions api_key, it's likely a backend Cloudinary config issue
+    if (errorData?.message?.includes('api_key') || errorData?.error?.includes('api_key')) {
+      console.error('⚠️ Cloudinary configuration error detected. Backend may need to configure Cloudinary credentials.');
+    }
+
     throw error;
   }
 };
+
 
 // Helper to decode JWT without verification (just to check expiration)
 export const decodeJWT = (token: string) => {
