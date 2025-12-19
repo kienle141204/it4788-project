@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import io, { Socket } from 'socket.io-client';
+import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
 import {
   NotificationItem,
   getNotifications,
@@ -9,6 +11,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '@/service/notifications';
+import { pushNotificationService } from '@/service/pushNotifications';
 
 interface NotificationsContextValue {
   notifications: NotificationItem[];
@@ -98,6 +101,48 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshNotifications();
   }, [refreshNotifications]);
 
+  const router = useRouter();
+
+  // Setup push notification listeners
+  useEffect(() => {
+    // Setup notification listeners
+    const cleanup = pushNotificationService.setupNotificationListeners(
+      // Khi nhận notification (app đang foreground)
+      (notification) => {
+        console.log('[Notifications] Push notification received:', notification);
+        // Refresh notifications list
+        refreshNotifications();
+      },
+      // Khi user tap vào notification
+      (response) => {
+        console.log('[Notifications] Push notification tapped:', response);
+        const data = response.notification.request.content.data;
+        
+        // Navigate đến màn hình notifications
+        router.push('/(notifications)');
+        
+        // Refresh notifications list
+        refreshNotifications();
+        
+        // Nếu có notificationId, có thể mark as read
+        if (data?.notificationId) {
+          markAsRead(parseInt(data.notificationId));
+        }
+      },
+    );
+
+    // Kiểm tra notification khi app được mở từ notification (app đang closed)
+    pushNotificationService.checkInitialNotification().then((notification) => {
+      if (notification) {
+        console.log('[Notifications] App opened from notification:', notification);
+        router.push('/(notifications)');
+        refreshNotifications();
+      }
+    });
+
+    return cleanup;
+  }, [router, refreshNotifications, markAsRead]);
+
   // Kết nối WebSocket để nhận realtime notifications nếu backend bật gateway
   useEffect(() => {
     let isMounted = true;
@@ -134,6 +179,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
         s.on('new_notification', (notification: NotificationItem) => {
           setNotifications((prev) => [notification, ...prev]);
+          // Cập nhật unread count
+          loadUnreadCount();
         });
 
         s.on('unread_count', (data: { count: number }) => {
@@ -158,7 +205,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         socket.disconnect();
       }
     };
-  }, []);
+  }, [loadUnreadCount]);
 
   return (
     <NotificationsContext.Provider

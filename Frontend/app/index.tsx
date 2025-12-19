@@ -3,6 +3,7 @@ import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View } from 'react-native';
 import { checkAsyncStorage } from '@/utils/checkAsyncStorage';
+import { pushNotificationService } from '@/service/pushNotifications';
 
 export default function Index() {
   const [isReady, setIsReady] = useState(false);
@@ -15,6 +16,16 @@ export default function Index() {
       try {
         const token = await checkAsyncStorage();
         setIsLoggedIn(token);
+        
+        // Nếu đã đăng nhập, đăng ký push notification token
+        if (token) {
+          try {
+            await pushNotificationService.registerTokenWithBackend();
+          } catch (error) {
+            console.error('[Index] Error registering push token:', error);
+            // Không block app flow nếu đăng ký token fail
+          }
+        }
       } catch (e) {
         console.error('Lỗi kiểm tra token:', e);
       } finally {
