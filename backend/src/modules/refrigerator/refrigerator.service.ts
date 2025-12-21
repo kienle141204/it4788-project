@@ -38,7 +38,10 @@ export class RefrigeratorService {
   async create(dto: CreateRefrigeratorDto, user: JwtUser): Promise<Refrigerator> {
     // Nếu là admin => có quyền tạo cho bất kỳ family nào
     if (user.role === 'admin') {
-      const fridge = this.refrigeratorRepo.create(dto);
+      const fridge = this.refrigeratorRepo.create({
+        ...dto,
+        owner_id: dto.owner_id ?? user.id, // Nếu không có owner_id trong dto thì dùng user.id
+      });
       return await this.refrigeratorRepo.save(fridge);
     }
 
@@ -125,7 +128,7 @@ export class RefrigeratorService {
     return fridge;
   }
 
-  // Đưa ra các tủ lạnh mình sở hữu với phân trang
+  // Đưa ra các tủ lạnh mình sở hữu VÀ tủ lạnh của gia đình mà mình là thành viên
   async myFridge(user: JwtUser, paginationDto: PaginationDto): Promise<{
     data: Refrigerator[];
     total: number;
@@ -136,13 +139,30 @@ export class RefrigeratorService {
     const { page = 1, limit = 10 } = paginationDto;
     const skip = (page - 1) * limit;
 
-    const [data, total] = await this.refrigeratorRepo.findAndCount({
-      where: { owner_id: user.id },
-      relations: ['owner', 'family', 'family.members'],
-      order: { created_at: 'DESC' },
-      skip,
-      take: limit,
-    });
+    // Get family IDs where user is owner or member
+    const userFamilies = await this.familyService.getMyFamily(user.id);
+    const familyIds = userFamilies.map(f => f.id);
+
+    // Query: fridges where user is owner OR fridges of user's families
+    const queryBuilder = this.refrigeratorRepo.createQueryBuilder('fridge')
+      .leftJoinAndSelect('fridge.owner', 'owner')
+      .leftJoinAndSelect('fridge.family', 'family')
+      .leftJoinAndSelect('family.members', 'members');
+
+    if (familyIds.length > 0) {
+      queryBuilder.where('fridge.owner_id = :userId OR fridge.family_id IN (:...familyIds)', {
+        userId: user.id,
+        familyIds,
+      });
+    } else {
+      queryBuilder.where('fridge.owner_id = :userId', { userId: user.id });
+    }
+
+    queryBuilder.orderBy('fridge.created_at', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     const totalPages = Math.ceil(total / limit);
 

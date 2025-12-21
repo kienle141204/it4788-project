@@ -148,7 +148,7 @@ export default function HomePage() {
     { id: 'group', name: 'Nhóm', icon: 'people' as const, color: '#A855F7', bgColor: '#F3E8FF', onPress: () => router.push('/(group)') },
     { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
     { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
-    { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
+    // { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
     { id: 'fridge', name: 'Tủ lạnh', icon: 'snow' as const, color: COLORS.green, bgColor: COLORS.greenLight, onPress: () => router.push('/(fridge)') },
     { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
     { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
@@ -188,7 +188,7 @@ export default function HomePage() {
           onViewTasks={handleViewTasks}
         />
 
-        <View style={styles.notificationSection}>
+        {/* <View style={styles.notificationSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Thông báo</Text>
             <Ionicons name="sparkles" size={20} color={COLORS.purple} />
@@ -199,13 +199,13 @@ export default function HomePage() {
             message="Kiểm tra tủ lạnh của bạn ngay!"
             type="warning"
           />
-        </View>
+        </View> */}
 
         {/* Features Grid */}
         <View style={styles.featuresSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Chức năng</Text>
-            <Ionicons name="sparkles" size={20} color={COLORS.purple} />
+            {/* <Ionicons name="sparkles" size={20} color={COLORS.purple} /> */}
           </View>
           <FeatureGrid features={features} />
         </View>
