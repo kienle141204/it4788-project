@@ -13,6 +13,8 @@ import {
   Modal,
   FlatList,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import GroupStatistics from '../../components/GroupStatistics';
+import { getChatMessages, sendChatMessage, type ChatMessage } from '../../service/chat';
 
 // InfoRow component for member profile
 const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
@@ -154,7 +157,7 @@ export default function GroupDetailPage() {
   const { id } = useLocalSearchParams();
   const familyId = parseInt(id as string);
 
-  const [activeTab, setActiveTab] = useState<'shopping' | 'statistics'>('shopping');
+  const [activeTab, setActiveTab] = useState<'shopping' | 'chat' | 'statistics'>('shopping');
   const [showMembersView, setShowMembersView] = useState(false);
   const [family, setFamily] = useState<Family | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -195,6 +198,12 @@ export default function GroupDetailPage() {
   const [showMemberProfileModal, setShowMemberProfileModal] = useState(false);
   const [memberProfile, setMemberProfile] = useState<any>(null);
   const [loadingMemberProfile, setLoadingMemberProfile] = useState(false);
+
+  // Chat states
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -549,6 +558,277 @@ export default function GroupDetailPage() {
 
   const handleRefresh = () => {
     fetchFamilyData(true);
+    if (activeTab === 'chat') {
+      fetchChatMessages();
+    }
+  };
+
+  // ============ CHAT FUNCTIONS ============
+  const fetchChatMessages = useCallback(async () => {
+    setChatLoading(true);
+    try {
+      const messages = await getChatMessages(familyId);
+      setChatMessages(messages);
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.error('Error fetching chat messages:', err);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [familyId, handleSessionExpired]);
+
+  // Load chat messages when chat tab is active
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      fetchChatMessages();
+    }
+  }, [activeTab, fetchChatMessages]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage) return;
+
+    setSendingMessage(true);
+    try {
+      await sendChatMessage({
+        familyId,
+        title: 'Tin nhắn',
+        message: newMessage.trim(),
+      });
+      setNewMessage('');
+      await fetchChatMessages();
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      console.error('Error sending message:', err);
+      Alert.alert('Lỗi', 'Không thể gửi tin nhắn. Vui lòng thử lại.');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const formatChatTime = (dateString: string) => {
+    // Convert to Vietnam timezone (UTC+7)
+    const utcDate = new Date(dateString);
+    const vietnamOffset = 7 * 60 * 60 * 1000; // 7 hours in milliseconds
+    const vietnamDate = new Date(utcDate.getTime() + vietnamOffset);
+
+    const now = new Date();
+    const nowVietnam = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + vietnamOffset);
+
+    const diffMs = nowVietnam.getTime() - vietnamDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+
+    // Format date in Vietnam timezone
+    const hours = vietnamDate.getUTCHours().toString().padStart(2, '0');
+    const minutes = vietnamDate.getUTCMinutes().toString().padStart(2, '0');
+    const day = vietnamDate.getUTCDate().toString().padStart(2, '0');
+    const month = (vietnamDate.getUTCMonth() + 1).toString().padStart(2, '0');
+
+    return `${hours}:${minutes} ${day}/${month}`;
+  };
+
+  const getMemberByUserId = useCallback((userId: number) => {
+    return members.find(m => m.user_id === userId) || null;
+  }, [members]);
+
+  const renderChatMessage = ({ item }: { item: ChatMessage }) => {
+    const member = getMemberByUserId(item.userId);
+    // Use == for type coercion or explicitly convert to same type
+    const isOwnMessage = String(item.userId) === String(currentUserId);
+    const senderName = member?.user?.full_name || 'Người dùng';
+    const avatarUrl = member?.user?.avatar_url;
+    const role = member?.role || 'member';
+
+    const getRoleBadgeStyle = () => {
+      switch (role) {
+        case 'owner': return groupStyles.chatMessageRoleBadgeOwner;
+        case 'manager': return groupStyles.chatMessageRoleBadgeManager;
+        default: return groupStyles.chatMessageRoleBadgeMember;
+      }
+    };
+
+    const getRoleTextStyle = () => {
+      switch (role) {
+        case 'owner': return groupStyles.chatMessageRoleTextOwner;
+        case 'manager': return groupStyles.chatMessageRoleTextManager;
+        default: return groupStyles.chatMessageRoleTextMember;
+      }
+    };
+
+    const getAvatarPlaceholderStyle = () => {
+      switch (role) {
+        case 'owner': return groupStyles.chatMessageAvatarPlaceholderOwner;
+        case 'manager': return groupStyles.chatMessageAvatarPlaceholderManager;
+        default: return groupStyles.chatMessageAvatarPlaceholderMember;
+      }
+    };
+
+    const getRoleLabel = () => {
+      switch (role) {
+        case 'owner': return 'Chủ nhóm';
+        case 'manager': return 'Quản lý';
+        default: return 'Thành viên';
+      }
+    };
+
+    // Own message: align right, no avatar header
+    if (isOwnMessage) {
+      return (
+        <View style={[
+          groupStyles.chatMessageCard,
+          groupStyles.chatMessageCardOwn,
+        ]}>
+          {item.title && item.title !== 'Tin nhắn' && (
+            <Text style={groupStyles.chatMessageTitle}>{item.title}</Text>
+          )}
+          <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
+          <Text style={[groupStyles.chatMessageTime, { textAlign: 'right', marginTop: 6 }]}>
+            {formatChatTime(item.createdAt)}
+          </Text>
+        </View>
+      );
+    }
+
+    // Other's message: align left, show avatar and info
+    return (
+      <View style={[
+        groupStyles.chatMessageCard,
+        groupStyles.chatMessageCardOther,
+      ]}>
+        <View style={groupStyles.chatMessageHeader}>
+          <View style={groupStyles.chatMessageAvatar}>
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={groupStyles.chatMessageAvatarImage}
+              />
+            ) : (
+              <View style={[
+                groupStyles.chatMessageAvatarPlaceholder,
+                getAvatarPlaceholderStyle(),
+              ]}>
+                <Text style={groupStyles.chatMessageAvatarText}>
+                  {senderName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={groupStyles.chatMessageHeaderInfo}>
+            <View style={groupStyles.chatMessageSenderRow}>
+              <Text style={groupStyles.chatMessageSenderName}>
+                {senderName}
+              </Text>
+              <View style={[groupStyles.chatMessageRoleBadge, getRoleBadgeStyle()]}>
+                <Text style={[groupStyles.chatMessageRoleText, getRoleTextStyle()]}>
+                  {getRoleLabel()}
+                </Text>
+              </View>
+            </View>
+            <Text style={groupStyles.chatMessageTime}>
+              {formatChatTime(item.createdAt)}
+            </Text>
+          </View>
+        </View>
+        {item.title && item.title !== 'Tin nhắn' && (
+          <Text style={groupStyles.chatMessageTitle}>{item.title}</Text>
+        )}
+        <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
+      </View>
+    );
+  };
+
+  const renderChatTab = () => {
+    if (chatLoading && chatMessages.length === 0) {
+      return (
+        <View style={groupStyles.chatLoadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.purple} />
+          <Text style={groupStyles.chatLoadingText}>Đang tải tin nhắn...</Text>
+        </View>
+      );
+    }
+
+    return (
+      <KeyboardAvoidingView
+        style={groupStyles.chatContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={100}
+      >
+        {chatMessages.length === 0 ? (
+          <View style={groupStyles.chatEmptyState}>
+            <View style={groupStyles.chatEmptyIcon}>
+              <Ionicons name="chatbubbles-outline" size={40} color={COLORS.purple} />
+            </View>
+            <Text style={groupStyles.chatEmptyTitle}>
+              Chưa có tin nhắn nào
+            </Text>
+            <Text style={groupStyles.chatEmptySubtitle}>
+              Hãy bắt đầu cuộc trò chuyện với các thành viên trong nhóm!
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={[...chatMessages].sort((a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            )}
+            renderItem={renderChatMessage}
+            keyExtractor={(item) => item.id.toString()}
+            style={groupStyles.chatMessagesList}
+            contentContainerStyle={groupStyles.chatMessagesContent}
+            showsVerticalScrollIndicator={false}
+            inverted={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={chatLoading}
+                onRefresh={fetchChatMessages}
+                colors={[COLORS.purple]}
+                tintColor={COLORS.purple}
+              />
+            }
+          />
+        )}
+
+        <View style={groupStyles.chatInputContainer}>
+          <View style={groupStyles.chatInputWrapper}>
+            <TextInput
+              style={groupStyles.chatInput}
+              placeholder="Nhập tin nhắn..."
+              placeholderTextColor={COLORS.grey}
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={1000}
+              editable={!sendingMessage}
+            />
+          </View>
+          <TouchableOpacity
+            style={[
+              groupStyles.chatSendButton,
+              (!newMessage.trim() || sendingMessage) && groupStyles.chatSendButtonDisabled,
+            ]}
+            onPress={handleSendMessage}
+            disabled={!newMessage.trim() || sendingMessage}
+          >
+            {sendingMessage ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Ionicons name="send" size={20} color={COLORS.white} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
   };
 
   // Generate date range for carousel (5 dates: 2 before, current, 2 after based on offset)
@@ -827,49 +1107,49 @@ export default function GroupDetailPage() {
           // Sử dụng unique key - nếu member.id = 0 (owner), dùng user_id
           const memberKey = member.id === 0 ? `owner-${member.user_id}-${index}` : `member-${member.id}`;
           return (
-          <TouchableOpacity
-            key={memberKey}
-            style={groupStyles.memberCard}
-            onPress={() => handleMemberMenu(member)}
-            activeOpacity={0.7}
-          >
-            <View style={groupStyles.memberAvatar}>
-              {member.user.avatar_url ? (
-                <Image
-                  source={{ uri: member.user.avatar_url }}
-                  style={groupStyles.memberAvatarImage}
-                />
-              ) : (
-                <View style={groupStyles.memberAvatarPlaceholder}>
-                  <Text style={groupStyles.memberAvatarText}>
-                    {member.user.full_name?.charAt(0).toUpperCase() || 'U'}
-                  </Text>
-                </View>
-              )}
-            </View>
+            <TouchableOpacity
+              key={memberKey}
+              style={groupStyles.memberCard}
+              onPress={() => handleMemberMenu(member)}
+              activeOpacity={0.7}
+            >
+              <View style={groupStyles.memberAvatar}>
+                {member.user.avatar_url ? (
+                  <Image
+                    source={{ uri: member.user.avatar_url }}
+                    style={groupStyles.memberAvatarImage}
+                  />
+                ) : (
+                  <View style={groupStyles.memberAvatarPlaceholder}>
+                    <Text style={groupStyles.memberAvatarText}>
+                      {member.user.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            <View style={groupStyles.memberInfo}>
-              <Text style={groupStyles.memberName}>
-                {member.user.full_name || 'Người dùng'}
-              </Text>
-              <Text style={groupStyles.memberEmail}>{member.user.email}</Text>
-            </View>
+              <View style={groupStyles.memberInfo}>
+                <Text style={groupStyles.memberName}>
+                  {member.user.full_name || 'Người dùng'}
+                </Text>
+                <Text style={groupStyles.memberEmail}>{member.user.email}</Text>
+              </View>
 
-            <View style={[
-              groupStyles.roleBadge,
-              member.role === 'owner' ? groupStyles.roleBadgeOwner :
-              member.role === 'manager' ? groupStyles.roleBadgeManager : groupStyles.roleBadgeMember
-            ]}>
-              <Text style={[
-                groupStyles.roleText,
-                member.role === 'owner' ? groupStyles.roleTextOwner :
-                member.role === 'manager' ? groupStyles.roleTextManager : groupStyles.roleTextMember
+              <View style={[
+                groupStyles.roleBadge,
+                member.role === 'owner' ? groupStyles.roleBadgeOwner :
+                  member.role === 'manager' ? groupStyles.roleBadgeManager : groupStyles.roleBadgeMember
               ]}>
-                {member.role === 'owner' ? 'Chủ nhóm' : 
-                 member.role === 'manager' ? 'Quản lý' : 'Thành viên'}
-              </Text>
-            </View>
-          </TouchableOpacity>
+                <Text style={[
+                  groupStyles.roleText,
+                  member.role === 'owner' ? groupStyles.roleTextOwner :
+                    member.role === 'manager' ? groupStyles.roleTextManager : groupStyles.roleTextMember
+                ]}>
+                  {member.role === 'owner' ? 'Chủ nhóm' :
+                    member.role === 'manager' ? 'Quản lý' : 'Thành viên'}
+                </Text>
+              </View>
+            </TouchableOpacity>
           );
         })}
       </View>
@@ -1113,6 +1393,21 @@ export default function GroupDetailPage() {
         <TouchableOpacity
           style={[
             groupStyles.tab,
+            activeTab === 'chat' && groupStyles.tabActive
+          ]}
+          onPress={() => setActiveTab('chat')}
+        >
+          <Text style={[
+            groupStyles.tabText,
+            activeTab === 'chat' && groupStyles.tabTextActive
+          ]}>
+            Trò chuyện
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            groupStyles.tab,
             activeTab === 'statistics' && groupStyles.tabActive
           ]}
           onPress={() => setActiveTab('statistics')}
@@ -1132,6 +1427,9 @@ export default function GroupDetailPage() {
           <ActivityIndicator size='large' color={COLORS.blue} />
           <Text style={groupStyles.loadingText}>Đang tải...</Text>
         </View>
+      ) : activeTab === 'chat' ? (
+        // Chat tab has its own FlatList and KeyboardAvoidingView
+        renderChatTab()
       ) : (
         <ScrollView
           style={groupStyles.scrollView}
@@ -1425,10 +1723,10 @@ export default function GroupDetailPage() {
             const searchBarHeight = 48; // searchContainer
             const padding = 48; // padding top + bottom của modalContent
             const scrollViewMaxHeight = modalMaxHeight - headerHeight - memberCountHeight - searchBarHeight - padding;
-            
+
             return (
-              <View style={[groupStyles.modalContent, { 
-                maxHeight: modalMaxHeight, 
+              <View style={[groupStyles.modalContent, {
+                maxHeight: modalMaxHeight,
                 width: '95%',
                 height: modalMaxHeight,
               }]}>

@@ -806,4 +806,213 @@ export const groupStyles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.grey,
   },
+  // ============ CHAT STYLES ============
+  chatContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  chatMessagesList: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  chatMessagesContent: {
+    paddingVertical: 16,
+    gap: 12,
+  },
+  chatMessageCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  chatMessageCardOwn: {
+    backgroundColor: '#DCF8C6',
+    marginLeft: 60,
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+  },
+  chatMessageCardOther: {
+    marginRight: 60,
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+  },
+  chatMessageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  chatMessageAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  chatMessageAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  chatMessageAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatMessageAvatarPlaceholderOwner: {
+    backgroundColor: '#1976D2',
+  },
+  chatMessageAvatarPlaceholderManager: {
+    backgroundColor: '#F57C00',
+  },
+  chatMessageAvatarPlaceholderMember: {
+    backgroundColor: '#7B1FA2',
+  },
+  chatMessageAvatarText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  chatMessageHeaderInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  chatMessageSenderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatMessageSenderName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.darkGrey,
+  },
+  chatMessageRoleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  chatMessageRoleBadgeOwner: {
+    backgroundColor: '#E3F2FD',
+  },
+  chatMessageRoleBadgeManager: {
+    backgroundColor: '#FFF3E0',
+  },
+  chatMessageRoleBadgeMember: {
+    backgroundColor: '#E8F5E9',
+  },
+  chatMessageRoleText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  chatMessageRoleTextOwner: {
+    color: '#1976D2',
+  },
+  chatMessageRoleTextManager: {
+    color: '#F57C00',
+  },
+  chatMessageRoleTextMember: {
+    color: '#2E7D32',
+  },
+  chatMessageTime: {
+    fontSize: 11,
+    color: COLORS.grey,
+  },
+  chatMessageTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.purple,
+    marginBottom: 4,
+  },
+  chatMessageContent: {
+    fontSize: 14,
+    color: COLORS.darkGrey,
+    lineHeight: 20,
+  },
+  chatInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    padding: 12,
+    paddingBottom: 20,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGrey,
+    gap: 10,
+  },
+  chatInputWrapper: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minHeight: 44,
+    maxHeight: 120,
+  },
+  chatInput: {
+    fontSize: 15,
+    color: COLORS.darkGrey,
+    paddingVertical: 0,
+    maxHeight: 100,
+  },
+  chatSendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.purple,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.purple,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  chatSendButtonDisabled: {
+    backgroundColor: COLORS.grey,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  chatEmptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+    gap: 16,
+  },
+  chatEmptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EDE7F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  chatEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.darkGrey,
+    textAlign: 'center',
+  },
+  chatEmptySubtitle: {
+    fontSize: 14,
+    color: COLORS.grey,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  chatLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+    gap: 12,
+  },
+  chatLoadingText: {
+    fontSize: 14,
+    color: COLORS.grey,
+  },
 });

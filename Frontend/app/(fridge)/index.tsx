@@ -27,6 +27,10 @@ interface Refrigerator {
   ingredients?: any[];
   fridgeDishes?: any[]; // Backend returns this
   fridgeIngredients?: any[]; // Backend returns this
+  family?: {
+    id: number;
+    name: string;
+  };
 }
 
 export default function FridgeListPage() {
@@ -59,8 +63,10 @@ export default function FridgeListPage() {
       setError(null);
 
       const response = await getMyRefrigerators();
-      
-      // Handle response - backend returns single object or array
+
+      console.log('[Fridge Debug] API Response:', response);
+
+      // getMyRefrigerators now returns array directly
       let refrigeratorsData: Refrigerator[] = [];
       if (Array.isArray(response)) {
         refrigeratorsData = response;
@@ -70,30 +76,33 @@ export default function FridgeListPage() {
         // Backend returns single refrigerator object, wrap it in array
         refrigeratorsData = [response];
       }
-      
+
+      console.log('[Fridge Debug] Processed data:', refrigeratorsData);
+      console.log('[Fridge Debug] Count:', refrigeratorsData.length);
+
       setRefrigerators(refrigeratorsData);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
         return;
       }
-      
+
       // Handle 404 as "no refrigerators" - not an error
       // Check both axios error structure and direct statusCode
       const statusCode = err?.response?.status || err?.response?.data?.statusCode || err?.statusCode;
       if (statusCode === 404) {
         const errorMessage = err?.response?.data?.message || err?.message || '';
         // If the message indicates "no refrigerators", treat as empty list, not error
-        if (errorMessage.includes('chưa có tủ lạnh') || 
-            errorMessage.includes('Not Found') || 
-            errorMessage.includes('not found')) {
+        if (errorMessage.includes('chưa có tủ lạnh') ||
+          errorMessage.includes('Not Found') ||
+          errorMessage.includes('not found')) {
           // User doesn't have any refrigerators yet - this is normal, not an error
           setRefrigerators([]);
           setError(null);
           return;
         }
       }
-      
+
       console.error('Error fetching refrigerators:', err);
       setError('Không thể tải danh sách tủ lạnh. Vui lòng thử lại.');
       setRefrigerators([]);
@@ -140,6 +149,10 @@ export default function FridgeListPage() {
     const dishCount = refrigerator.fridgeDishes?.length || refrigerator.dishes?.length || 0;
     const ingredientCount = refrigerator.fridgeIngredients?.length || refrigerator.ingredients?.length || 0;
     const isFamily = refrigerator.family_id !== null && refrigerator.family_id !== undefined;
+    // Display name: use family name for family fridges, "Tủ lạnh Cá nhân" otherwise
+    const displayName = isFamily && refrigerator.family?.name
+      ? refrigerator.family.name
+      : (refrigerator.name || 'Tủ lạnh Cá nhân');
 
     return (
       <TouchableOpacity
@@ -178,7 +191,7 @@ export default function FridgeListPage() {
                 marginBottom: 4,
               }}
             >
-              Tủ lạnh {isFamily ? 'Gia đình' : 'Cá nhân'}
+              {displayName}
             </Text>
             <View
               style={{
@@ -244,7 +257,7 @@ export default function FridgeListPage() {
             <Text style={{ fontSize: 12, color: COLORS.grey }}>Nguyên liệu</Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </TouchableOpacity >
     );
   };
 

@@ -5,7 +5,20 @@ import { getAccess, postAccess, patchAccess, deleteAccess } from "@/utils/api";
 // Lấy danh sách tủ lạnh của tôi
 export const getMyRefrigerators = async () => {
   const res = await getAccess('fridge/my-frifge');
-  return res;
+  // API returns { success, message, data: [...], pagination: {...} }
+  // We need to extract the data array
+  if (res?.data && Array.isArray(res.data)) {
+    return res.data;
+  }
+  // Fallback: if response is already an array
+  if (Array.isArray(res)) {
+    return res;
+  }
+  // If response has id, it's a single object
+  if (res?.id) {
+    return [res];
+  }
+  return [];
 };
 
 // Tạo tủ lạnh mới
@@ -41,7 +54,17 @@ export const deleteRefrigerator = async (id: number) => {
 // Lấy tủ lạnh của gia đình
 export const getFamilyRefrigerators = async (familyId: number) => {
   const res = await getAccess(`fridge/my-family/${familyId}`);
-  return res;
+  // API returns { success, message, data: [...], pagination: {...} }
+  if (res?.data && Array.isArray(res.data)) {
+    return res.data;
+  }
+  if (Array.isArray(res)) {
+    return res;
+  }
+  if (res?.id) {
+    return [res];
+  }
+  return [];
 };
 
 // ==================== Fridge Dishes APIs ====================
