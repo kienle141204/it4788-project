@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ScrollView,
   StatusBar,
@@ -205,6 +205,10 @@ export default function GroupDetailPage() {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
+  // Refs for scrolling
+  const chatListRef = useRef<FlatList<ChatMessage>>(null);
+  const tabScrollRef = useRef<ScrollView>(null);
+
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
       'Phiên đăng nhập hết hạn',
@@ -281,7 +285,7 @@ export default function GroupDetailPage() {
             joined_at: familyData.created_at || new Date().toISOString(),
             user: {
               id: familyData.owner.id || familyData.owner_id,
-              full_name: familyData.owner.full_name || familyData.owner.fullname || '',
+              full_name: familyData.owner?.fullname || familyData.owner?.fullname || 'Người dùng',
               email: familyData.owner.email || '',
               avatar_url: familyData.owner.avatar_url || null,
             },
@@ -587,6 +591,15 @@ export default function GroupDetailPage() {
     }
   }, [activeTab, fetchChatMessages]);
 
+  // Auto-scroll to bottom when chat messages are loaded
+  useEffect(() => {
+    if (chatMessages.length > 0 && activeTab === 'chat' && !chatLoading) {
+      setTimeout(() => {
+        chatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [chatMessages, activeTab, chatLoading]);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage) return;
 
@@ -639,8 +652,8 @@ export default function GroupDetailPage() {
     return `${hours}:${minutes} ${day}/${month}`;
   };
 
-  const getMemberByUserId = useCallback((userId: number) => {
-    return members.find(m => m.user_id === userId) || null;
+  const getMemberByUserId = useCallback((userId: number | string) => {
+    return members.find(m => String(m.user_id) === String(userId)) || null;
   }, [members]);
 
   const renderChatMessage = ({ item }: { item: ChatMessage }) => {
@@ -651,22 +664,6 @@ export default function GroupDetailPage() {
     const avatarUrl = member?.user?.avatar_url;
     const role = member?.role || 'member';
 
-    const getRoleBadgeStyle = () => {
-      switch (role) {
-        case 'owner': return groupStyles.chatMessageRoleBadgeOwner;
-        case 'manager': return groupStyles.chatMessageRoleBadgeManager;
-        default: return groupStyles.chatMessageRoleBadgeMember;
-      }
-    };
-
-    const getRoleTextStyle = () => {
-      switch (role) {
-        case 'owner': return groupStyles.chatMessageRoleTextOwner;
-        case 'manager': return groupStyles.chatMessageRoleTextManager;
-        default: return groupStyles.chatMessageRoleTextMember;
-      }
-    };
-
     const getAvatarPlaceholderStyle = () => {
       switch (role) {
         case 'owner': return groupStyles.chatMessageAvatarPlaceholderOwner;
@@ -675,13 +672,7 @@ export default function GroupDetailPage() {
       }
     };
 
-    const getRoleLabel = () => {
-      switch (role) {
-        case 'owner': return 'Chủ nhóm';
-        case 'manager': return 'Quản lý';
-        default: return 'Thành viên';
-      }
-    };
+
 
     // Own message: align right, no avatar header
     if (isOwnMessage) {
@@ -726,16 +717,9 @@ export default function GroupDetailPage() {
             )}
           </View>
           <View style={groupStyles.chatMessageHeaderInfo}>
-            <View style={groupStyles.chatMessageSenderRow}>
-              <Text style={groupStyles.chatMessageSenderName}>
-                {senderName}
-              </Text>
-              <View style={[groupStyles.chatMessageRoleBadge, getRoleBadgeStyle()]}>
-                <Text style={[groupStyles.chatMessageRoleText, getRoleTextStyle()]}>
-                  {getRoleLabel()}
-                </Text>
-              </View>
-            </View>
+            <Text style={groupStyles.chatMessageSenderName}>
+              {senderName}
+            </Text>
             <Text style={groupStyles.chatMessageTime}>
               {formatChatTime(item.createdAt)}
             </Text>
@@ -779,6 +763,7 @@ export default function GroupDetailPage() {
           </View>
         ) : (
           <FlatList
+            ref={chatListRef}
             data={[...chatMessages].sort((a, b) =>
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             )}
@@ -788,6 +773,9 @@ export default function GroupDetailPage() {
             contentContainerStyle={groupStyles.chatMessagesContent}
             showsVerticalScrollIndicator={false}
             inverted={false}
+            onContentSizeChange={() => {
+              chatListRef.current?.scrollToEnd({ animated: true });
+            }}
             refreshControl={
               <RefreshControl
                 refreshing={chatLoading}
@@ -1374,7 +1362,12 @@ export default function GroupDetailPage() {
       </View>
 
       {/* Tabs */}
-      <View style={groupStyles.tabContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={groupStyles.tabContainer}
+        style={{ flexGrow: 0 }}
+      >
         <TouchableOpacity
           style={[
             groupStyles.tab,
@@ -1419,7 +1412,7 @@ export default function GroupDetailPage() {
             Thống kê
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* Content */}
       {loading ? (

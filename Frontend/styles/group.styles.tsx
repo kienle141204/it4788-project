@@ -166,10 +166,10 @@ export const groupStyles = StyleSheet.create({
   // Tab Styles
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     backgroundColor: COLORS.background,
-    gap: 12,
+    // justifyContent: 'space-evenly', // Removed to allow scrolling
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGrey,
   },
@@ -877,8 +877,9 @@ export const groupStyles = StyleSheet.create({
     color: COLORS.white,
   },
   chatMessageHeaderInfo: {
-    flex: 1,
+    // flex: 1, // Removed to allow container to size to name width
     gap: 2,
+    marginRight: 8, // Add some spacing just in case
   },
   chatMessageSenderRow: {
     flexDirection: 'row',
