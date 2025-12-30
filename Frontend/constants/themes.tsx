@@ -1,7 +1,7 @@
 export const COLORS = {
   primary: "#15803D", // Chủ đạo xanh lá
   secondary: "#4ADE80", // Xanh lá nhạt hơn
-  green: "#10B981", // Xanh lá emerald (cho tủ lạnh)
+  green: "#15803D", // Xanh lá primary (cho tủ lạnh)
   greenLight: "#D1FAE5", // Xanh lá nhạt (background cho tủ lạnh)
   background: "#fff",
   backgroundLight: "#E8F5E9",

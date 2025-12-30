@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ScrollView,
   StatusBar,
@@ -20,7 +20,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getFamilyById, getFamilyInvitationCode } from '../../service/family';
+import { getFamilyById, getFamilyInvitationCode, leaveFamily, deleteFamily } from '../../service/family';
 import {
   getShoppingListsByFamily,
   createShoppingList,
@@ -38,6 +38,8 @@ import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import GroupStatistics from '../../components/GroupStatistics';
 import { getChatMessages, sendChatMessage, type ChatMessage } from '../../service/chat';
+
+const defaultAvatar = require('../../assets/images/avatar.png');
 
 // InfoRow component for member profile
 const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
@@ -199,11 +201,21 @@ export default function GroupDetailPage() {
   const [memberProfile, setMemberProfile] = useState<any>(null);
   const [loadingMemberProfile, setLoadingMemberProfile] = useState(false);
 
+  // Leave family state
+  const [leavingFamily, setLeavingFamily] = useState<boolean>(false);
+
+  // Delete family state
+  const [deletingFamily, setDeletingFamily] = useState<boolean>(false);
+
   // Chat states
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+
+  // Refs for scrolling
+  const chatListRef = useRef<FlatList<ChatMessage>>(null);
+  const tabScrollRef = useRef<ScrollView>(null);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -281,7 +293,7 @@ export default function GroupDetailPage() {
             joined_at: familyData.created_at || new Date().toISOString(),
             user: {
               id: familyData.owner.id || familyData.owner_id,
-              full_name: familyData.owner.full_name || familyData.owner.fullname || '',
+              full_name: familyData.owner?.fullname || familyData.owner?.fullname || 'Người dùng',
               email: familyData.owner.email || '',
               avatar_url: familyData.owner.avatar_url || null,
             },
@@ -318,6 +330,17 @@ export default function GroupDetailPage() {
       setRefreshing(false);
     }
   }, [familyId, handleSessionExpired]);
+
+  // Fetch only shopping lists (optimized for faster updates)
+  const fetchShoppingLists = useCallback(async () => {
+    try {
+      const shoppingListsData = await getShoppingListsByFamily(familyId);
+      setShoppingLists(shoppingListsData);
+    } catch (error) {
+      console.error('Error fetching shopping lists:', error);
+      // Don't show error to user, just log it
+    }
+  }, [familyId]);
 
   // Get current user ID from JWT token
   useEffect(() => {
@@ -380,8 +403,147 @@ export default function GroupDetailPage() {
     setShowFamilyMenu(true);
   };
 
+  const handleLeaveFamily = useCallback(async () => {
+    if (!family) return;
+
+    setLeavingFamily(true);
+    try {
+      await leaveFamily(family.id);
+      Alert.alert(
+        'Thành công',
+        'Bạn đã rời khỏi nhóm thành công',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/(group)' as any);
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      try {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Extract error message from backend response
+        // Backend returns: { statusCode, message, resultMessage: { vn, en } }
+        const errorData = err?.response?.data || {};
+        let errorMessage = 'Không thể rời khỏi nhóm. Vui lòng thử lại.';
+        
+        if (errorData && Object.keys(errorData).length > 0) {
+          // Try resultMessage.vn first (Vietnamese message), then message, then resultMessage.en
+          errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        // Check if it's an owner error (400 Bad Request from backend)
+        const resultCode = errorData.resultCode || errorData.code;
+        const statusCode = err?.response?.status;
+        const isOwnerError = statusCode === 400 && (
+          errorMessage.includes('chuyển quyền') || 
+          errorMessage.includes('owner') ||
+          errorMessage.includes('chủ nhóm') ||
+          resultCode === '00196' || // ResponseCode for owner must transfer ownership
+          resultCode === '00195' || // ResponseCode for owner cannot leave if alone
+          resultCode === 'C00196' ||
+          resultCode === 'C00195'
+        );
+        
+        if (isOwnerError) {
+          // Show specific message based on resultCode
+          if (resultCode === '00195' || resultCode === 'C00195') {
+            // Only owner - can delete group or transfer ownership
+            Alert.alert(
+              'Không thể rời nhóm',
+              'Bạn là chủ nhóm duy nhất. Vui lòng xóa nhóm hoặc chuyển quyền chủ nhóm trước khi rời.',
+            );
+          } else {
+            // Has other members - must transfer ownership
+            Alert.alert(
+              'Không thể rời nhóm',
+              'Bạn là chủ nhóm. Vui lòng chuyển quyền chủ nhóm cho thành viên khác trước khi rời nhóm.',
+            );
+          }
+        } else {
+          Alert.alert('Lỗi', errorMessage);
+        }
+      } catch (alertError) {
+        // Fallback if Alert fails
+        console.error('Error showing alert:', alertError);
+        console.error('Original error:', err);
+      }
+    } finally {
+      setLeavingFamily(false);
+    }
+  }, [family, router, handleSessionExpired]);
+
+  const handleDeleteFamily = useCallback(async () => {
+    if (!family) return;
+
+    setDeletingFamily(true);
+    try {
+      await deleteFamily(family.id);
+      Alert.alert(
+        'Thành công',
+        'Nhóm đã được xóa thành công',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/(group)' as any);
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      try {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Extract error message from backend response
+        const errorData = err?.response?.data || {};
+        let errorMessage = 'Không thể xóa nhóm. Vui lòng thử lại.';
+        
+        if (errorData && Object.keys(errorData).length > 0) {
+          errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        Alert.alert('Lỗi', errorMessage);
+      } catch (alertError) {
+        console.error('Error showing alert:', alertError);
+        console.error('Original error:', err);
+      }
+    } finally {
+      setDeletingFamily(false);
+    }
+  }, [family, router, handleSessionExpired]);
+
   const getFamilyMenuOptions = () => {
     if (!family) return [];
+
+    // Kiểm tra xem user có phải owner không
+    const isOwner = currentUserId && family.owner_id && Number(currentUserId) === Number(family.owner_id);
+    
+    // isManager đã được tính từ useMemo ở trên
+    const canDelete = isOwner || isManager;
+    
+    // Debug logs
+    console.log('[Delete Family Menu] Check permissions:', {
+      currentUserId,
+      ownerId: family.owner_id,
+      isOwner,
+      isManager,
+      currentMemberRole: currentMember?.role,
+      canDelete
+    });
 
     return [
       {
@@ -392,12 +554,33 @@ export default function GroupDetailPage() {
         },
       },
       // Chỉ hiển thị nút "Mã mời" nếu user là owner hoặc manager của family
-      ...(currentUserId && family && (currentUserId === family.owner_id || isManager) ? [{
+      ...(canDelete ? [{
         label: 'Mã mời',
         icon: 'qr-code-outline' as const,
         onPress: () => {
           setShowInvitationModal(true);
         },
+      }] : []),
+      // Chỉ hiển thị nút "Xóa nhóm" nếu user là owner hoặc manager của family
+      ...(canDelete ? [{
+        label: deletingFamily ? 'Đang xóa nhóm...' : 'Xóa nhóm',
+        icon: 'trash-outline' as const,
+        onPress: () => {
+          if (deletingFamily) return;
+          Alert.alert(
+            'Xác nhận xóa nhóm',
+            'Bạn có chắc chắn muốn xóa nhóm này? Hành động này không thể hoàn tác và tất cả dữ liệu của nhóm sẽ bị xóa vĩnh viễn.',
+            [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Xóa nhóm',
+                style: 'destructive',
+                onPress: handleDeleteFamily,
+              },
+            ]
+          );
+        },
+        destructive: true,
       }] : []),
       {
         label: 'Chỉnh sửa thông tin',
@@ -416,9 +599,10 @@ export default function GroupDetailPage() {
         },
       },
       {
-        label: 'Rời khỏi nhóm',
+        label: leavingFamily ? 'Đang rời nhóm...' : 'Rời khỏi nhóm',
         icon: 'log-out-outline' as const,
         onPress: () => {
+          if (leavingFamily) return;
           Alert.alert(
             'Xác nhận',
             'Bạn có chắc chắn muốn rời khỏi nhóm này?',
@@ -427,15 +611,13 @@ export default function GroupDetailPage() {
               {
                 text: 'Rời nhóm',
                 style: 'destructive',
-                onPress: () => {
-                  // TODO: Implement leave family
-                  console.log('Leave family:', family.id);
-                },
+                onPress: handleLeaveFamily,
               },
             ]
           );
         },
         destructive: true,
+        disabled: leavingFamily,
       },
     ];
   };
@@ -587,6 +769,15 @@ export default function GroupDetailPage() {
     }
   }, [activeTab, fetchChatMessages]);
 
+  // Auto-scroll to bottom when chat messages are loaded
+  useEffect(() => {
+    if (chatMessages.length > 0 && activeTab === 'chat' && !chatLoading) {
+      setTimeout(() => {
+        chatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [chatMessages, activeTab, chatLoading]);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage) return;
 
@@ -639,8 +830,8 @@ export default function GroupDetailPage() {
     return `${hours}:${minutes} ${day}/${month}`;
   };
 
-  const getMemberByUserId = useCallback((userId: number) => {
-    return members.find(m => m.user_id === userId) || null;
+  const getMemberByUserId = useCallback((userId: number | string) => {
+    return members.find(m => String(m.user_id) === String(userId)) || null;
   }, [members]);
 
   const renderChatMessage = ({ item }: { item: ChatMessage }) => {
@@ -651,22 +842,6 @@ export default function GroupDetailPage() {
     const avatarUrl = member?.user?.avatar_url;
     const role = member?.role || 'member';
 
-    const getRoleBadgeStyle = () => {
-      switch (role) {
-        case 'owner': return groupStyles.chatMessageRoleBadgeOwner;
-        case 'manager': return groupStyles.chatMessageRoleBadgeManager;
-        default: return groupStyles.chatMessageRoleBadgeMember;
-      }
-    };
-
-    const getRoleTextStyle = () => {
-      switch (role) {
-        case 'owner': return groupStyles.chatMessageRoleTextOwner;
-        case 'manager': return groupStyles.chatMessageRoleTextManager;
-        default: return groupStyles.chatMessageRoleTextMember;
-      }
-    };
-
     const getAvatarPlaceholderStyle = () => {
       switch (role) {
         case 'owner': return groupStyles.chatMessageAvatarPlaceholderOwner;
@@ -675,13 +850,7 @@ export default function GroupDetailPage() {
       }
     };
 
-    const getRoleLabel = () => {
-      switch (role) {
-        case 'owner': return 'Chủ nhóm';
-        case 'manager': return 'Quản lý';
-        default: return 'Thành viên';
-      }
-    };
+
 
     // Own message: align right, no avatar header
     if (isOwnMessage) {
@@ -726,16 +895,9 @@ export default function GroupDetailPage() {
             )}
           </View>
           <View style={groupStyles.chatMessageHeaderInfo}>
-            <View style={groupStyles.chatMessageSenderRow}>
-              <Text style={groupStyles.chatMessageSenderName}>
-                {senderName}
-              </Text>
-              <View style={[groupStyles.chatMessageRoleBadge, getRoleBadgeStyle()]}>
-                <Text style={[groupStyles.chatMessageRoleText, getRoleTextStyle()]}>
-                  {getRoleLabel()}
-                </Text>
-              </View>
-            </View>
+            <Text style={groupStyles.chatMessageSenderName}>
+              {senderName}
+            </Text>
             <Text style={groupStyles.chatMessageTime}>
               {formatChatTime(item.createdAt)}
             </Text>
@@ -779,6 +941,7 @@ export default function GroupDetailPage() {
           </View>
         ) : (
           <FlatList
+            ref={chatListRef}
             data={[...chatMessages].sort((a, b) =>
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             )}
@@ -788,6 +951,9 @@ export default function GroupDetailPage() {
             contentContainerStyle={groupStyles.chatMessagesContent}
             showsVerticalScrollIndicator={false}
             inverted={false}
+            onContentSizeChange={() => {
+              chatListRef.current?.scrollToEnd({ animated: true });
+            }}
             refreshControl={
               <RefreshControl
                 refreshing={chatLoading}
@@ -873,7 +1039,7 @@ export default function GroupDetailPage() {
     });
   }, [shoppingLists, selectedDate]);
 
-  // Handle create shopping list
+  // Handle create shopping list (optimized)
   const handleCreateShoppingList = async () => {
     try {
       // Format date in local timezone (YYYY-MM-DD)
@@ -887,11 +1053,16 @@ export default function GroupDetailPage() {
 
       console.log('Creating shopping list with:', { familyId, dateStr, ownerId });
 
-      await createShoppingList(familyId, dateStr, ownerId);
-      await fetchFamilyData(true);
+      const newList = await createShoppingList(familyId, dateStr, ownerId);
+      
+      // Close modal immediately
       setShowAddListModal(false);
       setAssignedOwner(null);
       setShowAssignMemberDropdown(false);
+      
+      // Only fetch shopping lists (much faster)
+      await fetchShoppingLists();
+      
       Alert.alert('Thành công', 'Đã tạo danh sách mua sắm mới');
     } catch (error) {
       console.error('Error creating shopping list:', error);
@@ -899,7 +1070,7 @@ export default function GroupDetailPage() {
     }
   };
 
-  // Handle delete shopping list
+  // Handle delete shopping list (optimized with optimistic update)
   const handleDeleteShoppingList = async (listId: number) => {
     Alert.alert(
       'Xác nhận xóa',
@@ -910,12 +1081,30 @@ export default function GroupDetailPage() {
           text: 'Xóa',
           style: 'destructive',
           onPress: async () => {
+            // Store deleted list for rollback
+            let deletedList: ShoppingList | null = null;
+            
+            // Optimistic update: Remove list immediately
+            setShoppingLists(prevLists => {
+              const listToDelete = prevLists.find(l => l.id === listId);
+              if (listToDelete) {
+                deletedList = { ...listToDelete };
+              }
+              return prevLists.filter(l => l.id !== listId);
+            });
+
             try {
               await deleteShoppingList(listId);
-              await fetchFamilyData(true);
+              // Only fetch shopping lists (much faster)
+              await fetchShoppingLists();
               Alert.alert('Thành công', 'Đã xóa danh sách mua sắm');
             } catch (error) {
               console.error('Error deleting shopping list:', error);
+              // Rollback on error
+              if (deletedList) {
+                setShoppingLists(prevLists => [...prevLists, deletedList!]);
+              }
+              await fetchShoppingLists();
               Alert.alert('Lỗi', 'Không thể xóa danh sách mua sắm');
             }
           },
@@ -980,33 +1169,31 @@ export default function GroupDetailPage() {
     }
   }, [newItemStock, selectedIngredient]);
 
-  // Handle add item to list
+  // Handle add item to list (optimized with optimistic update)
   const handleAddItem = async () => {
     if (!selectedListId || !newItemIngredientId || !newItemStock) {
       Alert.alert('Lỗi', 'Vui lòng chọn nguyên liệu và nhập số lượng');
       return;
     }
 
-    try {
-      // Ensure all values are correct types
-      const listId = Number(selectedListId);
-      const ingredientId = Number(newItemIngredientId);
-      const stock = parseInt(newItemStock);
-      const price = newItemPrice ? parseFloat(newItemPrice) : undefined;
+    // Ensure all values are correct types
+    const listId = Number(selectedListId);
+    const ingredientId = Number(newItemIngredientId);
+    const stock = parseInt(newItemStock);
+    // Backend expects price per kg, not total price
+    const price = selectedIngredient?.price ? Number(selectedIngredient.price) : undefined;
 
-      // Validate numbers
-      if (isNaN(listId) || isNaN(ingredientId) || isNaN(stock)) {
-        Alert.alert('Lỗi', 'Dữ liệu không hợp lệ');
-        return;
-      }
+    // Validate numbers
+    if (isNaN(listId) || isNaN(ingredientId) || isNaN(stock)) {
+      Alert.alert('Lỗi', 'Dữ liệu không hợp lệ');
+      return;
+    }
 
-      console.log('Adding item with:', { listId, ingredientId, stock, price });
-
-      await addItemToList(listId, ingredientId, stock, price);
-      await fetchFamilyData(true);
-
-      // Reset form
-      setShowAddItemModal(false);
+    // Close modal immediately for better UX
+    setShowAddItemModal(false);
+    
+    // Reset form immediately
+    const resetForm = () => {
       setSelectedListId(null);
       setNewItemIngredientId(null);
       setSelectedIngredient(null);
@@ -1014,26 +1201,87 @@ export default function GroupDetailPage() {
       setNewItemPrice('');
       setIngredientSearchTerm('');
       setSearchedIngredients([]);
+    };
 
-      Alert.alert('Thành công', 'Đã thêm mặt hàng vào danh sách');
+    // Optimistic update: Add item to state immediately
+    const optimisticItem: ShoppingItem = {
+      id: Date.now(), // Temporary ID
+      list_id: listId,
+      ingredient_id: ingredientId,
+      stock: stock,
+      price: price || selectedIngredient?.price || 0,
+      is_checked: false,
+      created_at: new Date().toISOString(),
+      ingredient: {
+        id: selectedIngredient.id,
+        name: selectedIngredient.name,
+        image_url: selectedIngredient.image_url || null,
+        price: selectedIngredient.price || null,
+        description: selectedIngredient.description || null,
+      },
+    };
+
+    // Update local state immediately
+    setShoppingLists(prevLists => 
+      prevLists.map(list => 
+        list.id === listId
+          ? {
+              ...list,
+              items: [...(list.items || []), optimisticItem],
+              cost: list.cost + ((optimisticItem.price || 0) * stock / 1000),
+            }
+          : list
+      )
+    );
+
+    resetForm();
+
+    // Call API in background
+    try {
+      const newItem = await addItemToList(listId, ingredientId, stock, price);
+      
+      // Only fetch shopping lists (much faster than fetchFamilyData)
+      await fetchShoppingLists();
     } catch (error) {
       console.error('Error adding item:', error);
-      Alert.alert('Lỗi', 'Không thể thêm mặt hàng');
+      
+      // Rollback optimistic update on error
+      await fetchShoppingLists();
+      
+      Alert.alert('Lỗi', 'Không thể thêm mặt hàng. Vui lòng thử lại.');
     }
   };
 
-  // Handle toggle item checked
+  // Handle toggle item checked (optimized with optimistic update)
   const handleToggleItem = async (itemId: number) => {
+    // Optimistic update: Toggle immediately
+    let previousState: boolean = false;
+    setShoppingLists(prevLists => 
+      prevLists.map(list => ({
+        ...list,
+        items: list.items?.map(item => {
+          if (item.id === itemId) {
+            previousState = item.is_checked;
+            return { ...item, is_checked: !item.is_checked };
+          }
+          return item;
+        }) || [],
+      }))
+    );
+
     try {
       await toggleItemChecked(itemId);
-      await fetchFamilyData(true);
+      // Only fetch shopping lists (much faster)
+      await fetchShoppingLists();
     } catch (error) {
       console.error('Error toggling item:', error);
+      // Rollback on error
+      await fetchShoppingLists();
       Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
     }
   };
 
-  // Handle delete item
+  // Handle delete item (optimized with optimistic update)
   const handleDeleteItem = async (itemId: number) => {
     Alert.alert(
       'Xác nhận',
@@ -1044,12 +1292,48 @@ export default function GroupDetailPage() {
           text: 'Xóa',
           style: 'destructive',
           onPress: async () => {
+            // Find the item to delete for rollback
+            let deletedItem: ShoppingItem | null = null;
+            let listId: number | null = null;
+            
+            // Optimistic update: Remove item immediately
+            setShoppingLists(prevLists => 
+              prevLists.map(list => {
+                const item = list.items?.find(i => i.id === itemId);
+                if (item) {
+                  deletedItem = item;
+                  listId = list.id;
+                  return {
+                    ...list,
+                    items: list.items?.filter(i => i.id !== itemId) || [],
+                    cost: list.cost - ((item.price || 0) * item.stock / 1000),
+                  };
+                }
+                return list;
+              })
+            );
+
             try {
               await deleteShoppingItem(itemId);
-              await fetchFamilyData(true);
-              Alert.alert('Thành công', 'Đã xóa mặt hàng');
+              // Only fetch shopping lists (much faster)
+              await fetchShoppingLists();
             } catch (error) {
               console.error('Error deleting item:', error);
+              // Rollback on error
+              if (deletedItem && listId) {
+                setShoppingLists(prevLists => 
+                  prevLists.map(list => 
+                    list.id === listId
+                      ? {
+                          ...list,
+                          items: [...(list.items || []), deletedItem!],
+                          cost: list.cost + ((deletedItem!.price || 0) * deletedItem!.stock / 1000),
+                        }
+                      : list
+                  )
+                );
+              }
+              await fetchShoppingLists();
               Alert.alert('Lỗi', 'Không thể xóa mặt hàng');
             }
           },
@@ -1295,7 +1579,19 @@ export default function GroupDetailPage() {
                     </Text>
                     {list.owner && (
                       <View style={groupStyles.ownerInfo}>
-                        <View style={groupStyles.ownerAvatar} />
+                        <View style={groupStyles.ownerAvatar}>
+                          {list.owner.avatar_url ? (
+                            <Image
+                              source={{ uri: list.owner.avatar_url }}
+                              style={groupStyles.ownerAvatarImage}
+                            />
+                          ) : (
+                            <Image
+                              source={defaultAvatar}
+                              style={groupStyles.ownerAvatarImage}
+                            />
+                          )}
+                        </View>
                         <Text style={groupStyles.ownerName}>
                           {list.owner.full_name}
                         </Text>
@@ -1374,7 +1670,12 @@ export default function GroupDetailPage() {
       </View>
 
       {/* Tabs */}
-      <View style={groupStyles.tabContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={groupStyles.tabContainer}
+        style={{ flexGrow: 0 }}
+      >
         <TouchableOpacity
           style={[
             groupStyles.tab,
@@ -1419,7 +1720,7 @@ export default function GroupDetailPage() {
             Thống kê
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* Content */}
       {loading ? (

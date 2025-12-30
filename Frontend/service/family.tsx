@@ -181,13 +181,8 @@ export const joinFamilyByCode = async (invitationCode: string) => {
  * POST /families/:id/leave
  */
 export const leaveFamily = async (familyId: number) => {
-  try {
-    const res = await postAccess(`families/${familyId}/leave`, {});
-    return res;
-  } catch (error) {
-    console.error(`Error leaving family ${familyId}:`, error);
-    throw error;
-  }
+  const res = await postAccess(`families/${familyId}/leave`, {});
+  return res;
 };
 
 /**

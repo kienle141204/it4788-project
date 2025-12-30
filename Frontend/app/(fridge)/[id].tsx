@@ -40,6 +40,7 @@ interface FridgeDish {
   dish_id: number;
   stock?: number;
   price?: number;
+  expiration_date?: string | null;
   dish?: {
     id: number;
     name: string;
@@ -55,6 +56,7 @@ interface FridgeIngredient {
   dish_ingredient_id?: number;
   stock?: number;
   price?: number;
+  expiration_date?: string | null;
   ingredient?: {
     id: number;
     name: string;
@@ -121,7 +123,17 @@ export default function FridgeDetailPage() {
       let ingredientsData: any[] = [];
       
       try {
-        dishesData = await getRefrigeratorDishes(refrigeratorId);
+        const dishesResponse = await getRefrigeratorDishes(refrigeratorId);
+        console.log('[FridgeDetail] Dishes response:', dishesResponse);
+        // Backend trả về { success, message, data, pagination }
+        if (dishesResponse?.data && Array.isArray(dishesResponse.data)) {
+          dishesData = dishesResponse.data;
+        } else if (Array.isArray(dishesResponse)) {
+          dishesData = dishesResponse;
+        } else {
+          dishesData = [];
+        }
+        console.log('[FridgeDetail] Processed dishes:', dishesData);
       } catch (dishErr: any) {
         // 404 means no dishes yet - this is normal, not an error
         const is404NoDishes = dishErr?.response?.status === 404 && 
@@ -134,7 +146,17 @@ export default function FridgeDetailPage() {
       }
       
       try {
-        ingredientsData = await getRefrigeratorIngredients(refrigeratorId);
+        const ingredientsResponse = await getRefrigeratorIngredients(refrigeratorId);
+        console.log('[FridgeDetail] Ingredients response:', ingredientsResponse);
+        // Backend trả về { success, message, data, pagination }
+        if (ingredientsResponse?.data && Array.isArray(ingredientsResponse.data)) {
+          ingredientsData = ingredientsResponse.data;
+        } else if (Array.isArray(ingredientsResponse)) {
+          ingredientsData = ingredientsResponse;
+        } else {
+          ingredientsData = [];
+        }
+        console.log('[FridgeDetail] Processed ingredients:', ingredientsData);
       } catch (ingredientErr: any) {
         // 404 means no ingredients yet - this is normal, not an error
         const is404NoIngredients = ingredientErr?.response?.status === 404 && 
@@ -146,8 +168,8 @@ export default function FridgeDetailPage() {
         ingredientsData = [];
       }
 
-      setDishes(Array.isArray(dishesData) ? dishesData : []);
-      setIngredients(Array.isArray(ingredientsData) ? ingredientsData : []);
+      setDishes(dishesData);
+      setIngredients(ingredientsData);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -294,6 +316,42 @@ export default function FridgeDetailPage() {
     ];
   };
 
+  // Helper function to calculate days until expiration and get color
+  const getExpirationInfo = (expirationDate: string | null | undefined) => {
+    if (!expirationDate) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(expirationDate);
+    expiry.setHours(0, 0, 0, 0);
+
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      // Đã hết hạn
+      return {
+        text: `Đã hết hạn ${Math.abs(diffDays)} ngày`,
+        color: COLORS.red || '#EF4444',
+        days: diffDays,
+      };
+    } else if (diffDays <= 3) {
+      // Sắp hết hạn (≤ 3 ngày)
+      return {
+        text: `Còn ${diffDays} ngày`,
+        color: '#F59E0B', // Orange
+        days: diffDays,
+      };
+    } else {
+      // Còn hạn
+      return {
+        text: `Hết hạn: ${expiry.toLocaleDateString('vi-VN')}`,
+        color: COLORS.grey,
+        days: diffDays,
+      };
+    }
+  };
+
   const renderDishItem = ({ item }: { item: FridgeDish }) => (
     <View
       style={{
@@ -343,6 +401,20 @@ export default function FridgeDetailPage() {
             Giá: {item.price.toLocaleString('vi-VN')} đ
           </Text>
         )}
+        {(() => {
+          const expInfo = getExpirationInfo(item.expiration_date);
+          if (expInfo) {
+            return (
+              <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="time-outline" size={14} color={expInfo.color} />
+                <Text style={{ fontSize: 13, color: expInfo.color, marginLeft: 4, fontWeight: '500' }}>
+                  {expInfo.text}
+                </Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
       </View>
       <TouchableOpacity
         onPress={() => handleDeleteDish(item.id)}
@@ -402,6 +474,20 @@ export default function FridgeDetailPage() {
             Giá: {item.price.toLocaleString('vi-VN')} đ
           </Text>
         )}
+        {(() => {
+          const expInfo = getExpirationInfo(item.expiration_date);
+          if (expInfo) {
+            return (
+              <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="time-outline" size={14} color={expInfo.color} />
+                <Text style={{ fontSize: 13, color: expInfo.color, marginLeft: 4, fontWeight: '500' }}>
+                  {expInfo.text}
+                </Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
       </View>
       <TouchableOpacity
         onPress={() => handleDeleteIngredient(item.id)}
@@ -450,7 +536,7 @@ export default function FridgeDetailPage() {
         </Text>
         {item.matchedIngredients.length > 0 && (
           <Text
-            style={{ fontSize: 12, color: '#10B981', marginTop: 4 }}
+            style={{ fontSize: 12, color: COLORS.primary, marginTop: 4 }}
             numberOfLines={1}
           >
             Có: {item.matchedIngredients.join(', ')}
@@ -490,7 +576,7 @@ export default function FridgeDetailPage() {
           )}
           <TouchableOpacity
             style={{
-              backgroundColor: COLORS.green,
+              backgroundColor: COLORS.primary,
               borderRadius: 12,
               padding: 16,
               alignItems: 'center',
@@ -527,7 +613,7 @@ export default function FridgeDetailPage() {
           )}
           <TouchableOpacity
             style={{
-              backgroundColor: COLORS.green,
+              backgroundColor: COLORS.primary,
               borderRadius: 12,
               padding: 16,
               alignItems: 'center',
@@ -549,7 +635,7 @@ export default function FridgeDetailPage() {
         <>
           {loadingSuggestions ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <ActivityIndicator size="large" color={COLORS.green} />
+              <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
           ) : suggestionsError ? (
             <View style={{ alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 }}>
@@ -560,7 +646,7 @@ export default function FridgeDetailPage() {
               <TouchableOpacity
                 style={{
                   marginTop: 16,
-                  backgroundColor: COLORS.green,
+                  backgroundColor: COLORS.primary,
                   paddingHorizontal: 20,
                   paddingVertical: 10,
                   borderRadius: 8,
@@ -643,7 +729,7 @@ export default function FridgeDetailPage() {
             paddingVertical: 16,
             alignItems: 'center',
             borderBottomWidth: 2,
-            borderBottomColor: activeTab === 'dishes' ? COLORS.green : 'transparent',
+            borderBottomColor: activeTab === 'dishes' ? COLORS.primary : 'transparent',
           }}
           onPress={() => setActiveTab('dishes')}
         >
@@ -651,7 +737,7 @@ export default function FridgeDetailPage() {
             style={{
               fontSize: 14,
               fontWeight: activeTab === 'dishes' ? 'bold' : '600',
-              color: activeTab === 'dishes' ? COLORS.green : COLORS.grey,
+              color: activeTab === 'dishes' ? COLORS.primary : COLORS.grey,
             }}
           >
             Món ăn
@@ -664,7 +750,7 @@ export default function FridgeDetailPage() {
             paddingVertical: 16,
             alignItems: 'center',
             borderBottomWidth: 2,
-            borderBottomColor: activeTab === 'ingredients' ? COLORS.green : 'transparent',
+            borderBottomColor: activeTab === 'ingredients' ? COLORS.primary : 'transparent',
           }}
           onPress={() => setActiveTab('ingredients')}
         >
@@ -672,7 +758,7 @@ export default function FridgeDetailPage() {
             style={{
               fontSize: 14,
               fontWeight: activeTab === 'ingredients' ? 'bold' : '600',
-              color: activeTab === 'ingredients' ? COLORS.green : COLORS.grey,
+              color: activeTab === 'ingredients' ? COLORS.primary : COLORS.grey,
             }}
           >
             Nguyên liệu
@@ -685,7 +771,7 @@ export default function FridgeDetailPage() {
             paddingVertical: 16,
             alignItems: 'center',
             borderBottomWidth: 2,
-            borderBottomColor: activeTab === 'suggestions' ? COLORS.green : 'transparent',
+            borderBottomColor: activeTab === 'suggestions' ? COLORS.primary : 'transparent',
           }}
           onPress={() => setActiveTab('suggestions')}
         >
@@ -693,7 +779,7 @@ export default function FridgeDetailPage() {
             style={{
               fontSize: 14,
               fontWeight: activeTab === 'suggestions' ? 'bold' : '600',
-              color: activeTab === 'suggestions' ? COLORS.green : COLORS.grey,
+              color: activeTab === 'suggestions' ? COLORS.primary : COLORS.grey,
             }}
           >
             Gợi ý
@@ -704,7 +790,7 @@ export default function FridgeDetailPage() {
       {/* Content */}
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#10B981" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={{ marginTop: 12, color: COLORS.grey }}>Đang tải...</Text>
         </View>
       ) : error ? (
@@ -718,7 +804,7 @@ export default function FridgeDetailPage() {
               marginTop: 16,
               paddingHorizontal: 24,
               paddingVertical: 12,
-              backgroundColor: COLORS.green,
+              backgroundColor: COLORS.primary,
               borderRadius: 8,
             }}
             onPress={() => fetchRefrigeratorData()}
@@ -735,8 +821,8 @@ export default function FridgeDetailPage() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => fetchRefrigeratorData(true)}
-              colors={[COLORS.green]}
-              tintColor={COLORS.green}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
             />
           }
         >

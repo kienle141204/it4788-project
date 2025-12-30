@@ -16,8 +16,8 @@ const getApiDomain = () => {
 };
 
 const API_DOMAIN = getApiDomain();
-console.log(`🌐 API Domain: ${API_DOMAIN} (Platform: ${Platform.OS})`);
-//const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
+// console.log(`🌐 API Domain: ${API_DOMAIN} (Platform: ${Platform.OS})`);
+// const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {
@@ -190,7 +190,7 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
         const errorData = await response.json().catch(() => ({
           message: `HTTP ${response.status}: ${response.statusText}`,
         }));
-        
+
         // Handle 401 Unauthorized
         if (response.status === 401 && retryCount === 0) {
           console.log('🔄 Token expired, attempting to refresh...');
@@ -221,10 +221,10 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
       }
 
       // Handle network errors
-      if (fetchError.message?.includes('Network request failed') || 
-          fetchError.message?.includes('Failed to fetch') ||
-          fetchError.message?.includes('NetworkError') ||
-          fetchError.message?.includes('Network Error')) {
+      if (fetchError.message?.includes('Network request failed') ||
+        fetchError.message?.includes('Failed to fetch') ||
+        fetchError.message?.includes('NetworkError') ||
+        fetchError.message?.includes('Network Error')) {
         throw {
           code: 'ERR_NETWORK',
           message: 'Network request failed. Please check:\n- Internet connection\n- Backend server is running\n- API address is correct',

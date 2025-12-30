@@ -166,10 +166,10 @@ export const groupStyles = StyleSheet.create({
   // Tab Styles
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     backgroundColor: COLORS.background,
-    gap: 12,
+    // justifyContent: 'space-evenly', // Removed to allow scrolling
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGrey,
   },
@@ -801,6 +801,14 @@ export const groupStyles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     backgroundColor: COLORS.purple,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ownerAvatarImage: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
   },
   ownerName: {
     fontSize: 12,
@@ -877,8 +885,9 @@ export const groupStyles = StyleSheet.create({
     color: COLORS.white,
   },
   chatMessageHeaderInfo: {
-    flex: 1,
+    // flex: 1, // Removed to allow container to size to name width
     gap: 2,
+    marginRight: 8, // Add some spacing just in case
   },
   chatMessageSenderRow: {
     flexDirection: 'row',
