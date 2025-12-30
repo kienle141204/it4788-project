@@ -108,7 +108,6 @@ export default function EditMenuPage() {
         handleSessionExpired();
         return;
       }
-      console.error('fetchMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể tải thông tin thực đơn');
       if (router.canGoBack()) {
         router.back();
@@ -149,7 +148,6 @@ export default function EditMenuPage() {
           handleSessionExpired();
           return;
         }
-        console.error('fetchDishes error', err);
       } finally {
         setLoadingDishes(false);
       }
@@ -196,7 +194,6 @@ export default function EditMenuPage() {
           handleSessionExpired();
           return;
         }
-        console.error('handleRemoveDish error', err);
         Alert.alert('Lỗi', err?.message || 'Không thể xóa món ăn. Vui lòng thử lại.');
       }
     } else {
@@ -224,7 +221,6 @@ export default function EditMenuPage() {
           handleSessionExpired();
           return;
         }
-        console.error('handleUpdateDish error', err);
         // Revert state nếu lỗi
         setSelectedDishes(prev =>
           prev.map(sd =>
@@ -291,7 +287,6 @@ export default function EditMenuPage() {
         handleSessionExpired();
         return;
       }
-      console.error('handleSaveMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể cập nhật thực đơn. Vui lòng thử lại.');
     } finally {
       setLoading(false);

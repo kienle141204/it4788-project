@@ -27,14 +27,12 @@ export default function register() {
     try {
       const data = { email, phone_number: phone, password };
       const res = await registerUser(data);
-      console.log(res);
   
       route.push({
         pathname: '/verify',
         params: { email },  
       });
     } catch (error) {
-      console.log(error);
       Alert.alert('Lỗi', 'Đăng ký thất bại');
     } finally {
       setLoading(false);

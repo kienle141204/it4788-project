@@ -53,19 +53,16 @@ export default function login() {
       await AsyncStorage.setItem('access_token', access as any)
       await AsyncStorage.setItem('refresh_token', refresh as any)
       const key = await AsyncStorage.getAllKeys()
-      console.log(key)
       
       // Đăng ký push notification token sau khi đăng nhập thành công
       try {
         await pushNotificationService.registerTokenWithBackend();
       } catch (error) {
-        console.error('[Login] Error registering push token:', error);
         // Không block login flow nếu đăng ký token fail
       }
       
       route.push('../(tabs)/home');
     } catch (error) {
-      console.error(error);
       Alert.alert('Lỗi', 'Đăng nhập thất bại, vui lòng thử lại sau.');
     } finally{
       setLoading(false)

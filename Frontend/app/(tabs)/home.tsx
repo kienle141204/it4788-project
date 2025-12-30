@@ -40,7 +40,6 @@ export default function HomePage() {
   const [todayTasks, setTodayTasks] = useState<TodayTasks>({ totalItems: 0, completedItems: 0 });
   const { unreadCount, refreshNotifications } = useNotifications();
 
-  console.log('🏠 Đang ở HOME');
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -49,7 +48,6 @@ export default function HomePage() {
       const userData = response?.data || response;
       setProfile(userData);
     } catch (err: any) {
-      console.error('Error fetching profile:', err);
       // Không hiển thị lỗi để không làm gián đoạn trải nghiệm người dùng
     }
   }, []);
@@ -66,19 +64,15 @@ export default function HomePage() {
   // Fetch shopping lists của hôm nay để tính nhiệm vụ
   const fetchTodayTasks = useCallback(async () => {
     try {
-      console.log('📋 Fetching today tasks...');
       const lists = await getMyShoppingLists();
-      console.log('📋 Shopping lists:', lists);
 
       if (!Array.isArray(lists)) {
-        console.log('📋 Lists is not array, setting 0');
         setTodayTasks({ totalItems: 0, completedItems: 0 });
         return;
       }
 
       // Lấy ngày hôm nay
       const today = new Date();
-      console.log('📋 Today:', today.toISOString());
 
       // Lọc shopping lists của hôm nay
       let totalItems = 0;
@@ -89,7 +83,6 @@ export default function HomePage() {
 
         // So sánh ngày shopping_date với ngày hôm nay
         const listDate = new Date(list.shopping_date);
-        console.log('📋 List date:', listDate.toISOString(), 'Is same day:', isSameDay(listDate, today), 'Items:', list.items?.length);
 
         if (isSameDay(listDate, today) && Array.isArray(list.items)) {
           list.items.forEach((item: any) => {
@@ -101,10 +94,8 @@ export default function HomePage() {
         }
       });
 
-      console.log('📋 Today tasks result:', { totalItems, completedItems });
       setTodayTasks({ totalItems, completedItems });
     } catch (err: any) {
-      console.error('📋 Error fetching today tasks:', err);
       setTodayTasks({ totalItems: 0, completedItems: 0 });
     }
   }, []);

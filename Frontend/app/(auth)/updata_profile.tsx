@@ -36,7 +36,6 @@ export default function ProfileScreen() {
     }) as ImagePicker.ImagePickerResult;
     if (!result.canceled) {
       setImage(result.assets[0].uri);
-      console.log(result.assets[0].uri)
     }
   };
 
@@ -53,7 +52,6 @@ export default function ProfileScreen() {
     });
     if (!result.canceled){
       setImage(result.assets[0].uri);
-      console.log(result.assets[0].uri)
     }
   };
 
@@ -98,9 +96,7 @@ export default function ProfileScreen() {
       // });
       // const data = await res.json();
       Alert.alert("Thành công", "Cập nhật thông tin thành công!");
-      console.log("Upload:", formData);
     } catch (err) {
-      console.error(err);
       Alert.alert("Lỗi", "Không thể cập nhật thông tin!");
     }
   };

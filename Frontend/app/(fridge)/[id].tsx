@@ -124,7 +124,6 @@ export default function FridgeDetailPage() {
       
       try {
         const dishesResponse = await getRefrigeratorDishes(refrigeratorId);
-        console.log('[FridgeDetail] Dishes response:', dishesResponse);
         // Backend trả về { success, message, data, pagination }
         if (dishesResponse?.data && Array.isArray(dishesResponse.data)) {
           dishesData = dishesResponse.data;
@@ -133,21 +132,18 @@ export default function FridgeDetailPage() {
         } else {
           dishesData = [];
         }
-        console.log('[FridgeDetail] Processed dishes:', dishesData);
       } catch (dishErr: any) {
         // 404 means no dishes yet - this is normal, not an error
         const is404NoDishes = dishErr?.response?.status === 404 && 
           (dishErr?.response?.data?.message?.includes('Không tìm thấy món ăn') ||
            dishErr?.response?.data?.message?.includes('not found'));
         if (!is404NoDishes) {
-          console.error('Error fetching dishes:', dishErr);
         }
         dishesData = [];
       }
       
       try {
         const ingredientsResponse = await getRefrigeratorIngredients(refrigeratorId);
-        console.log('[FridgeDetail] Ingredients response:', ingredientsResponse);
         // Backend trả về { success, message, data, pagination }
         if (ingredientsResponse?.data && Array.isArray(ingredientsResponse.data)) {
           ingredientsData = ingredientsResponse.data;
@@ -156,14 +152,12 @@ export default function FridgeDetailPage() {
         } else {
           ingredientsData = [];
         }
-        console.log('[FridgeDetail] Processed ingredients:', ingredientsData);
       } catch (ingredientErr: any) {
         // 404 means no ingredients yet - this is normal, not an error
         const is404NoIngredients = ingredientErr?.response?.status === 404 && 
           (ingredientErr?.response?.data?.message?.includes('Không tìm thấy nguyên liệu') ||
            ingredientErr?.response?.data?.message?.includes('not found'));
         if (!is404NoIngredients) {
-          console.error('Error fetching ingredients:', ingredientErr);
         }
         ingredientsData = [];
       }
@@ -175,7 +169,6 @@ export default function FridgeDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching refrigerator data:', err);
       setError('Không thể tải thông tin tủ lạnh. Vui lòng thử lại.');
     } finally {
       setLoading(false);
@@ -190,7 +183,6 @@ export default function FridgeDetailPage() {
       const suggestionsData = await getDishSuggestions(refrigeratorId);
       setSuggestions(Array.isArray(suggestionsData) ? suggestionsData : []);
     } catch (err: any) {
-      console.error('Error fetching suggestions:', err);
       setSuggestions([]);
       // Kiểm tra nếu là lỗi database connection
       const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải gợi ý món ăn';

@@ -65,8 +65,6 @@ export default function FridgeListPage() {
 
       const response = await getMyRefrigerators();
 
-      console.log('[Fridge Debug] API Response:', response);
-
       // getMyRefrigerators now returns array directly
       let refrigeratorsData: Refrigerator[] = [];
       if (Array.isArray(response)) {
@@ -77,9 +75,6 @@ export default function FridgeListPage() {
         // Backend returns single refrigerator object, wrap it in array
         refrigeratorsData = [response];
       }
-
-      console.log('[Fridge Debug] Processed data:', refrigeratorsData);
-      console.log('[Fridge Debug] Count:', refrigeratorsData.length);
 
       setRefrigerators(refrigeratorsData);
     } catch (err: any) {
@@ -104,7 +99,6 @@ export default function FridgeListPage() {
         }
       }
 
-      console.error('Error fetching refrigerators:', err);
       setError('Không thể tải danh sách tủ lạnh. Vui lòng thử lại.');
       setRefrigerators([]);
     } finally {

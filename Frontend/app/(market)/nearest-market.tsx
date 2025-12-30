@@ -45,7 +45,6 @@ export default function NearestMarketScreen() {
             setCurrentLocation({ lat: location.coords.latitude, lon: location.coords.longitude });
             await fetchNearestMarkets(location.coords.latitude, location.coords.longitude);
         } catch (error: any) {
-            console.error('Error:', error);
             setErrorMsg('Không thể lấy vị trí của bạn');
             setLoading(false);
         }
@@ -61,7 +60,6 @@ export default function NearestMarketScreen() {
             const top5Markets = (response.data || []).slice(0, 5);
             setMarkets(top5Markets);
         } catch (err) {
-            console.error('Error fetching markets:', err);
             setErrorMsg('Không thể tải danh sách chợ');
         } finally {
             setLoading(false);

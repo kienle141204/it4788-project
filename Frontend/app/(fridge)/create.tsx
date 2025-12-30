@@ -53,7 +53,6 @@ export default function CreateFridgePage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching user profile:', err);
     }
   }, [handleSessionExpired]);
 
@@ -87,7 +86,6 @@ export default function CreateFridgePage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching families:', err);
     } finally {
       setLoadingFamilies(false);
     }
@@ -150,7 +148,6 @@ export default function CreateFridgePage() {
         data.family_id = familyId;
       }
 
-      console.log('[Create Fridge] Request data:', JSON.stringify(data, null, 2));
       await createRefrigerator(data);
 
       Alert.alert('Thành công', 'Đã tạo tủ lạnh thành công!', [
@@ -162,7 +159,6 @@ export default function CreateFridgePage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error creating refrigerator:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||

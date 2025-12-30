@@ -169,7 +169,6 @@ export default function FoodDetailPage() {
 
       // If pagination fails with 500, try without pagination as fallback
       if (err?.response?.status === 500 && !append) {
-        console.warn('Pagination failed, trying without pagination...');
         try {
           const fallbackPayload = await getAccess(`dishes/${dishId}/reviews`);
           if (fallbackPayload?.success && Array.isArray(fallbackPayload.data)) {
@@ -181,11 +180,9 @@ export default function FoodDetailPage() {
             return;
           }
         } catch (fallbackErr) {
-          console.error('Fallback also failed:', fallbackErr);
         }
       }
 
-      console.log(err);
       if (!append) {
         setReviews([]);
         setReviewsError('Không thể tải đánh giá. Vui lòng thử lại.');
@@ -221,7 +218,6 @@ export default function FoodDetailPage() {
           handleSessionExpired();
           return;
         }
-        console.log(err);
         setDish(null);
         setError('Không thể tải thông tin món ăn. Vui lòng thử lại.');
       } finally {
@@ -261,7 +257,6 @@ export default function FoodDetailPage() {
           handleSessionExpired();
           return;
         }
-        console.log('fetchRecipe error', err);
         setRecipe(null);
         setRecipeError('Không thể tải công thức. Vui lòng thử lại.');
       } finally {
@@ -287,7 +282,6 @@ export default function FoodDetailPage() {
           handleSessionExpired();
           return;
         }
-        console.log(err);
         setReviewStats(null);
       } finally {
         setStatsLoading(false);
@@ -307,7 +301,6 @@ export default function FoodDetailPage() {
           return;
         }
         // Không có review của user là trường hợp bình thường, không cần xử lý lỗi
-        console.log('No user review yet');
       }
     };
 
@@ -334,7 +327,6 @@ export default function FoodDetailPage() {
           handleSessionExpired();
           return;
         }
-        console.log(err);
         setNutrients([]);
         setNutrientsError('Không thể tải thông tin dinh dưỡng. Vui lòng thử lại.');
       } finally {
@@ -370,7 +362,6 @@ export default function FoodDetailPage() {
         }
         // Không có favorite hoặc lỗi khi kiểm tra là trường hợp bình thường
         // Mặc định set là false và không hiển thị lỗi cho user
-        console.log('Error checking favorite status:', err);
         setIsFavorite(false);
       }
     };
@@ -438,7 +429,6 @@ export default function FoodDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.error('handleToggleFavorite error', err);
 
       let errorMessage = 'Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.';
 
@@ -564,7 +554,6 @@ export default function FoodDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.log(err);
       Alert.alert('Lỗi', 'Không thể cập nhật đánh giá. Vui lòng thử lại.');
     } finally {
       setSubmittingReview(false);
@@ -610,7 +599,6 @@ export default function FoodDetailPage() {
                 handleSessionExpired();
                 return;
               }
-              console.log(err);
               Alert.alert('Lỗi', 'Không thể xóa đánh giá. Vui lòng thử lại.');
             }
           },
@@ -660,7 +648,6 @@ export default function FoodDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.log(err);
 
       // Xử lý lỗi 409 - User đã đánh giá rồi
       const errorMessage = err?.response?.data?.message || err?.message || '';
@@ -682,7 +669,6 @@ export default function FoodDetailPage() {
                     setIsEditingReview(true);
                   }
                 } catch (e) {
-                  console.log('Error fetching user review', e);
                 }
               }
             }

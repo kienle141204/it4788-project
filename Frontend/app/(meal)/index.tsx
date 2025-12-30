@@ -139,7 +139,6 @@ export default function MealPage() {
           handleSessionExpired();
           return;
         }
-        console.error('fetchMenus error', err);
         setError('Không thể tải danh sách thực đơn. Vui lòng thử lại.');
         if (reset) {
           setMenus([]);
@@ -240,9 +239,7 @@ export default function MealPage() {
                 throw new Error('ID thực đơn không hợp lệ');
               }
               
-              console.log('Deleting menu with ID:', menuId);
               const payload = await deleteAccess(`menus/${menuId}`);
-              console.log('Delete response:', payload);
     
               // Kiểm tra response - backend trả về { success: true, message: '...' }
               if (payload?.success === true) {
@@ -258,12 +255,6 @@ export default function MealPage() {
                 handleSessionExpired();
                 return;
               }
-              console.error('handleDeleteMenu error:', err);
-              console.error('Error details:', {
-                message: err?.message,
-                response: err?.response?.data,
-                status: err?.response?.status,
-              });
               
               let errorMessage = 'Không thể xóa thực đơn. Vui lòng thử lại.';
               

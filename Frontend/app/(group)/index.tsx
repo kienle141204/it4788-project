@@ -56,20 +56,16 @@ const getCurrentUserId = async (): Promise<number | null> => {
   try {
     const token = await AsyncStorage.getItem('access_token');
     if (!token) {
-      console.log('[Group Page] No token found');
       return null;
     }
     const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
     const decoded = decodeJWT(cleanToken);
     if (decoded && decoded.sub) {
       const userId = parseInt(decoded.sub, 10);
-      console.log('[Group Page] Decoded user ID from token:', { sub: decoded.sub, userId });
       return userId;
     }
-    console.log('[Group Page] No sub in decoded token:', decoded);
     return null;
   } catch (error) {
-    console.error('[Group Page] Error getting current user ID:', error);
     return null;
   }
 };
@@ -160,7 +156,6 @@ export default function GroupPage() {
               totalItems: allItems,
             };
           } catch (error) {
-            console.error(`Error fetching shopping stats for family ${family.id}:`, error);
           }
           
           return {
@@ -177,7 +172,6 @@ export default function GroupPage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching families:', err);
       setError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
       setFamilies([]);
     } finally {
@@ -310,8 +304,6 @@ export default function GroupPage() {
         }
       } catch (alertError) {
         // Fallback if Alert fails
-        console.error('Error showing alert:', alertError);
-        console.error('Original error:', err);
       }
     } finally {
       setLeavingFamilyId(null);
@@ -354,8 +346,6 @@ export default function GroupPage() {
         
         Alert.alert('Lỗi', errorMessage);
       } catch (alertError) {
-        console.error('Error showing alert:', alertError);
-        console.error('Original error:', err);
       }
     } finally {
       setDeletingFamilyId(null);
@@ -375,16 +365,6 @@ export default function GroupPage() {
         member && Number(member.user_id) === Number(currentUserId) && member.role === 'manager'
       );
     }
-    
-    // Debug logs
-    console.log('[Delete Family Menu] Check permissions:', {
-      currentUserId,
-      ownerId: selectedFamily.owner_id,
-      isOwner,
-      members: selectedFamily.members,
-      isManager,
-      canDelete: isOwner || isManager
-    });
     
     // Cho phép cả owner và manager xem mã mời và xóa nhóm
     const canViewInvitation = isOwner || isManager;
@@ -493,7 +473,6 @@ export default function GroupPage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error creating family:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||
@@ -536,7 +515,6 @@ export default function GroupPage() {
         ]);
       }
     } catch (error: any) {
-      console.error('Error joining family:', error);
       
       let errorMessage = 'Không thể tham gia nhóm. Vui lòng thử lại.';
       

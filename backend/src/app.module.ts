@@ -46,7 +46,7 @@ import { ChatModule } from './modules/chat/chat.module';
           database: config.get<string>('DB_NAME'),
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: false,
-          logging: true, // Bật logging để debug
+          logging: false, // Tắt logging query database để giảm log
           // Cấu hình timezone
           timezone: '+07:00', // GMT+7 (Vietnam timezone)
           // Cấu hình SSL để tắt hoàn toàn
@@ -58,14 +58,6 @@ import { ChatModule } from './modules/chat/chat.module';
             timezone: '+07:00',
           },
         };
-        console.log('Database config:', {
-          host: dbConfig.host,
-          port: dbConfig.port,
-          database: dbConfig.database,
-          username: dbConfig.username,
-          timezone: dbConfig.timezone,
-          extra_ssl: dbConfig.extra.ssl,
-        });
         return dbConfig;
       },
     }),

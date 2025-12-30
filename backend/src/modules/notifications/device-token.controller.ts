@@ -58,12 +58,14 @@ export class DeviceTokenController {
         @Body() registerDto: RegisterDeviceTokenDto,
         @User() user: JwtUser,
     ) {
+        console.log(`[DeviceTokenController] 📥 Received token registration request from user ${user.id}`);
         const deviceToken = await this.deviceTokenService.registerToken(
             user.id,
             registerDto.deviceToken,
             registerDto.platform,
         );
 
+        console.log(`[DeviceTokenController] ✅ Token registration completed for user ${user.id}`);
         return {
             success: true,
             message: 'Device token đã được đăng ký thành công',

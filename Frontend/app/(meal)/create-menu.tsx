@@ -85,7 +85,6 @@ export default function CreateMenuPage() {
         handleSessionExpired();
         return;
       }
-      console.error('fetchFamilies error', err);
     } finally {
       setLoadingFamilies(false);
     }
@@ -120,7 +119,6 @@ export default function CreateMenuPage() {
           handleSessionExpired();
           return;
         }
-        console.error('fetchDishes error', err);
       } finally {
         setLoadingDishes(false);
       }
@@ -230,7 +228,6 @@ export default function CreateMenuPage() {
         handleSessionExpired();
         return;
       }
-      console.error('handleCreateMenu error', err);
       Alert.alert('Lỗi', err?.message || 'Không thể tạo thực đơn. Vui lòng thử lại.');
     } finally {
       setLoading(false);

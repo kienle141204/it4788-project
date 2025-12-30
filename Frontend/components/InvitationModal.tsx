@@ -55,7 +55,6 @@ export default function InvitationModal({
       const data = await onFetchInvitation(familyId);
       setInvitationData(data);
     } catch (error: any) {
-      console.error('Error fetching invitation:', error);
       
       // Xử lý lỗi 403 - Không có quyền
       if (error?.response?.status === 403 || error?.response?.statusCode === 403) {
@@ -92,7 +91,6 @@ export default function InvitationModal({
         });
       } catch (error: any) {
         if (error?.message !== 'User did not share') {
-          console.error('Error sharing:', error);
         }
       }
     }

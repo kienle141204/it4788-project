@@ -22,7 +22,6 @@ import { OwnerGuard } from './guards/owner.guard';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const secret = config.get<string>('JWT_SECRET') || 'default-secret';
-        console.log('JWT Module initialized with secret:', secret ? `${secret.substring(0, 10)}...` : 'undefined');
         return {
           secret: secret,
           signOptions: { expiresIn: '7d' },

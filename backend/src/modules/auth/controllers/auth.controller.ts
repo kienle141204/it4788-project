@@ -133,7 +133,6 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Email không hợp lệ hoặc không tìm thấy yêu cầu đăng ký' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy yêu cầu đăng ký tạm thời với email này' })
   async resendOtp(@Body(ValidationPipe) resendOtpDto: ResendOtpDto) {
-    console.log('ResendOtpDto received:', resendOtpDto);
     return await this.authService.resendOtp(resendOtpDto);
   }
 

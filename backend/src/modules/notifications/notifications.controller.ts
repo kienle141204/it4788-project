@@ -131,7 +131,6 @@ export class NotificationsController {
         data: result,
       };
     } catch (error) {
-      console.error('[NotificationsController] Error getting unread count:', error);
       return {
         success: false,
         message: 'Lỗi khi lấy số lượng thông báo chưa đọc',

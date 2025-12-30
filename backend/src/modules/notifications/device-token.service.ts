@@ -20,6 +20,9 @@ export class DeviceTokenService {
         deviceToken: string,
         platform: 'ios' | 'android',
     ): Promise<DeviceToken> {
+        console.log(`[DeviceTokenService] 📝 Registering token for user ${userId}, platform: ${platform}`);
+        console.log(`[DeviceTokenService] 🔑 Token: ${deviceToken.substring(0, 20)}...`);
+        
         // Kiểm tra xem token đã tồn tại cho user này chưa
         const existingToken = await this.deviceTokenRepository.findOne({
             where: {
@@ -29,8 +32,10 @@ export class DeviceTokenService {
         });
 
         if (existingToken) {
+            console.log(`[DeviceTokenService] ✅ Token already exists for user ${userId}`);
             // Cập nhật platform nếu khác
             if (existingToken.platform !== platform) {
+                console.log(`[DeviceTokenService] 🔄 Updating platform from ${existingToken.platform} to ${platform}`);
                 existingToken.platform = platform;
                 return await this.deviceTokenRepository.save(existingToken);
             }
@@ -38,13 +43,16 @@ export class DeviceTokenService {
         }
 
         // Tạo token mới
+        console.log(`[DeviceTokenService] ➕ Creating new token for user ${userId}`);
         const newToken = this.deviceTokenRepository.create({
             userId,
             deviceToken,
             platform,
         });
 
-        return await this.deviceTokenRepository.save(newToken);
+        const savedToken = await this.deviceTokenRepository.save(newToken);
+        console.log(`[DeviceTokenService] ✅ Token registered successfully with ID: ${savedToken.id}`);
+        return savedToken;
     }
 
     /**
@@ -61,10 +69,23 @@ export class DeviceTokenService {
      * Lấy tất cả device tokens của user
      */
     async getUserTokens(userId: number): Promise<DeviceToken[]> {
-        return await this.deviceTokenRepository.find({
+        const tokens = await this.deviceTokenRepository.find({
             where: { userId },
             order: { createdAt: 'DESC' },
         });
+        console.log(`[DeviceTokenService] 🔍 Querying tokens for user ${userId}: found ${tokens.length} token(s)`);
+        if (tokens.length > 0) {
+            tokens.forEach((token, index) => {
+                console.log(`[DeviceTokenService]   Token ${index + 1}: ${token.deviceToken.substring(0, 20)}... (${token.platform}, created: ${token.createdAt})`);
+            });
+        } else {
+            console.warn(`[DeviceTokenService] ⚠️ User ${userId} has no registered device tokens. Possible reasons:
+  - User hasn't logged in on any device
+  - User hasn't granted notification permissions
+  - Token registration failed on client side
+  - Tokens were removed/unregistered`);
+        }
+        return tokens;
     }
 
     /**
@@ -74,10 +95,6 @@ export class DeviceTokenService {
         const result = await this.deviceTokenRepository.delete({
             deviceToken: token,
         });
-
-        if (result.affected && result.affected > 0) {
-            console.log(`✅ Removed invalid token from database (${result.affected} record(s))`);
-        }
     }
 
     /**
