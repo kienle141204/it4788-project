@@ -15,9 +15,9 @@ const getApiDomain = () => {
   }
 };
 
-// const API_DOMAIN = getApiDomain();
+const API_DOMAIN = getApiDomain();
 // console.log(`🌐 API Domain: ${API_DOMAIN} (Platform: ${Platform.OS})`);
-const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
+// const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {
