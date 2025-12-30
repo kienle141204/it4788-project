@@ -147,7 +147,9 @@ export class RefrigeratorService {
     const queryBuilder = this.refrigeratorRepo.createQueryBuilder('fridge')
       .leftJoinAndSelect('fridge.owner', 'owner')
       .leftJoinAndSelect('fridge.family', 'family')
-      .leftJoinAndSelect('family.members', 'members');
+      .leftJoinAndSelect('family.members', 'members')
+      .leftJoinAndSelect('fridge.fridgeDishes', 'fridgeDishes')
+      .leftJoinAndSelect('fridge.fridgeIngredients', 'fridgeIngredients');
 
     if (familyIds.length > 0) {
       queryBuilder.where('fridge.owner_id = :userId OR fridge.family_id IN (:...familyIds)', {
@@ -198,7 +200,7 @@ export class RefrigeratorService {
 
     const [data, total] = await this.refrigeratorRepo.findAndCount({
       where: { family_id },
-      relations: ['owner', 'family', 'family.members'],
+      relations: ['owner', 'family', 'family.members', 'fridgeDishes', 'fridgeIngredients'],
       order: { created_at: 'DESC' },
       skip,
       take: limit,

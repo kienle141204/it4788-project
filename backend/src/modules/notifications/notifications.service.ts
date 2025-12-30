@@ -263,11 +263,20 @@ export class NotificationsService {
    * Lấy số lượng thông báo chưa đọc
    */
   async getUnreadCount(userId: number): Promise<{ count: number }> {
-    const count = await this.notificationRepository.count({
-      where: { user_id: userId, is_read: false },
-    });
+    try {
+      const count = await this.notificationRepository.count({
+        where: { 
+          user_id: userId, 
+          is_read: false 
+        },
+      });
 
-    return { count };
+      return { count: count || 0 };
+    } catch (error) {
+      console.error(`[NotificationsService] Error getting unread count for user ${userId}:`, error);
+      // Trả về 0 nếu có lỗi để không block UI
+      return { count: 0 };
+    }
   }
 
   /**

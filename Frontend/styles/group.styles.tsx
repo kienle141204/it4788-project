@@ -801,6 +801,14 @@ export const groupStyles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     backgroundColor: COLORS.purple,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ownerAvatarImage: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
   },
   ownerName: {
     fontSize: 12,
