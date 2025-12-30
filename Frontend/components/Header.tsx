@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/themes';
 import { homeStyles } from '../styles/home.styles';
 import { useNotifications } from '@/context/NotificationsContext';
+import { useExpiringItems } from '@/hooks/useExpiringItems';
 
 interface HeaderProps {
   userName?: string;
@@ -16,6 +17,11 @@ const defaultAvatar = require('../assets/images/avatar.png');
 
 export default function Header({ userName, avatarUrl, onNotificationPress, onMenuPress }: HeaderProps) {
   const { unreadCount } = useNotifications();
+  const { expiringCount } = useExpiringItems();
+  
+  // Chỉ hiển thị badge dựa trên unreadCount từ backend
+  // Kiểm tra xem có notification về hết hạn không để đổi màu icon
+  const hasExpiringNotifications = expiringCount.totalExpiring > 0 || expiringCount.totalExpired > 0;
 
   return (
     <View style={homeStyles.header}>
@@ -46,10 +52,19 @@ export default function Header({ userName, avatarUrl, onNotificationPress, onMen
             <Ionicons
               name={unreadCount > 0 ? "notifications" : "notifications-outline"}
               size={24}
-              color={COLORS.darkGrey}
+              color={
+                hasExpiringNotifications
+                  ? COLORS.orange
+                  : (unreadCount > 0 ? COLORS.primary : COLORS.darkGrey)
+              }
             />
             {unreadCount > 0 && (
-              <View style={homeStyles.notificationBadge}>
+              <View style={[
+                homeStyles.notificationBadge,
+                hasExpiringNotifications && {
+                  backgroundColor: expiringCount.totalExpired > 0 ? COLORS.red : COLORS.orange,
+                }
+              ]}>
                 <Text style={homeStyles.notificationBadgeText}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </Text>

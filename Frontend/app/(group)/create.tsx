@@ -48,7 +48,6 @@ export default function CreateFamilyPage() {
           handleSessionExpired();
           return;
         }
-        console.error('Error fetching user profile:', err);
       }
     };
     fetchUserProfile();
@@ -102,7 +101,6 @@ export default function CreateFamilyPage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error creating family:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||

@@ -38,7 +38,6 @@ export default function SpendingCharts() {
                 // Calculate monthly data
                 calculateMonthlyData(lists || []);
             } catch (error) {
-                console.error('Error fetching my shopping lists:', error);
                 setMyLists([]);
                 setTotalCost(0);
             } finally {
@@ -86,7 +85,6 @@ export default function SpendingCharts() {
 
     // Prepare pie chart data - top 5 shopping lists by cost
     const preparePieData = () => {
-        console.log('Preparing pie data, myLists:', myLists);
         if (!myLists || myLists.length === 0) return [];
 
         const colors = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#A855F7'];
@@ -96,7 +94,6 @@ export default function SpendingCharts() {
             .sort((a, b) => Number(b.cost) - Number(a.cost))
             .slice(0, 5);
 
-        console.log('Sorted lists for pie:', sortedLists);
 
         const result = sortedLists.map((list, index) => ({
             name: formatDate(list.shopping_date),
@@ -106,7 +103,6 @@ export default function SpendingCharts() {
             legendFontSize: 12,
         }));
 
-        console.log('Pie chart data:', result);
         return result;
     };
 

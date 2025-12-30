@@ -42,7 +42,6 @@ export const getShoppingListsByFamily = async (familyId: number): Promise<Shoppi
     const data = await getAccess(`shopping-lists/my-family-shared/${familyId}`);
     return data;
   } catch (error) {
-    console.error('Error fetching shopping lists:', error);
     throw error;
   }
 };
@@ -68,13 +67,10 @@ export const createShoppingList = async (
       payload.owner_id = ownerId;
     }
     
-    console.log('Creating shopping list with payload:', payload);
     
     const data = await postAccess('shopping-lists', payload);
-    console.log('data', data);
     return data;
   } catch (error) {
-    console.error('Error creating shopping list:', error);
     throw error;
   }
 };
@@ -98,7 +94,6 @@ export const addItemToList = async (
     });
     return data;
   } catch (error) {
-    console.error('Error adding item to list:', error);
     throw error;
   }
 };
@@ -111,7 +106,6 @@ export const toggleItemChecked = async (itemId: number): Promise<ShoppingItem> =
     const data = await patchAccess(`shopping-items/${itemId}/toggle`, {});
     return data;
   } catch (error) {
-    console.error('Error toggling item checked:', error);
     throw error;
   }
 };
@@ -127,7 +121,6 @@ export const updateShoppingItem = async (
     const data = await patchAccess(`shopping-items/${itemId}`, updates);
     return data;
   } catch (error) {
-    console.error('Error updating shopping item:', error);
     throw error;
   }
 };
@@ -139,7 +132,6 @@ export const deleteShoppingItem = async (itemId: number): Promise<void> => {
   try {
     await deleteAccess(`shopping-items/${itemId}`);
   } catch (error) {
-    console.error('Error deleting shopping item:', error);
     throw error;
   }
 };
@@ -151,7 +143,6 @@ export const deleteShoppingList = async (listId: number): Promise<void> => {
   try {
     await deleteAccess(`shopping-lists/${listId}`);
   } catch (error) {
-    console.error('Error deleting shopping list:', error);
     throw error;
   }
 };

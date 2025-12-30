@@ -77,7 +77,6 @@ export default function ExploreScreen() {
         handleSessionExpired();
         return;
       }
-      console.log('fetchTopRatedDishes error', err);
       setTopRatedDishes([]);
     } finally {
       setTopRatedLoading(false);
@@ -114,7 +113,6 @@ export default function ExploreScreen() {
         handleSessionExpired();
         return;
       }
-      console.log('fetchTopMenuDishes error', err);
       setTopMenuDishes([]);
     } finally {
       setTopMenuLoading(false);
@@ -154,7 +152,6 @@ export default function ExploreScreen() {
         handleSessionExpired();
         return;
       }
-      console.log('fetchRankingDishes error', err);
       setRankingDishes([]);
     } finally {
       setRankingLoading(false);

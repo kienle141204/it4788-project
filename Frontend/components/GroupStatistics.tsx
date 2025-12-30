@@ -99,14 +99,12 @@ export default function GroupStatistics({ familyId }: GroupStatisticsProps) {
                     });
                 }
             } catch (e) {
-                console.warn('Could not fetch family shopping lists:', e);
                 // Fallback: sử dụng getCheckedItemsCount
                 try {
                     const checkedData = await getCheckedItemsCount(familyId);
                     checkedItems = checkedData?.total || 0;
                     totalItems = checkedItems; // Không có thông tin total, dùng checked làm fallback
                 } catch (e2) {
-                    console.warn('Could not fetch checked items:', e2);
                     // Fallback cuối cùng: dùng purchased_items từ statsResponse
                     checkedItems = statsResponse?.purchased_items?.length || 0;
                     totalItems = checkedItems;
@@ -126,7 +124,6 @@ export default function GroupStatistics({ familyId }: GroupStatisticsProps) {
                 const monthly = await getMonthlyCost(currentYear, familyId);
                 setMonthlyData(monthly || []);
             } catch (e) {
-                console.warn('Could not fetch monthly cost:', e);
                 setMonthlyData([]);
             }
 
@@ -135,11 +132,9 @@ export default function GroupStatistics({ familyId }: GroupStatisticsProps) {
                 const topIng = await getTopIngredientsByQuantity(familyId, 5);
                 setTopIngredients(topIng || []);
             } catch (e) {
-                console.warn('Could not fetch top ingredients:', e);
                 setTopIngredients([]);
             }
         } catch (err: any) {
-            console.error('Error fetching statistics:', err);
             setError('Không thể tải thống kê. Vui lòng thử lại.');
         } finally {
             setLoading(false);

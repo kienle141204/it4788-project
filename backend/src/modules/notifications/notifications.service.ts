@@ -40,10 +40,6 @@ export class NotificationsService {
     title: string,
     body?: string,
   ): Promise<Notification> {
-    console.log(`[NotificationsService] Creating notification for user ${user_id}`);
-    console.log(`[NotificationsService] Title: "${title}"`);
-    console.log(`[NotificationsService] Body: "${body || '(no body)'}"`);
-
     const notificationData: Partial<Notification> = {
       user_id,
       title,
@@ -56,24 +52,25 @@ export class NotificationsService {
 
     const notification = this.notificationRepository.create(notificationData);
     const savedNotification = await this.notificationRepository.save(notification);
-    
-    console.log(`[NotificationsService] ✅ Notification saved to database with ID: ${savedNotification.id}`);
 
     // Emit thông báo mới qua WebSocket đến user
     try {
-      console.log(`[NotificationsService] Attempting to emit notification via WebSocket to user ${user_id}`);
       this.notificationsGateway.emitNotificationToUser(user_id, savedNotification);
       // Cập nhật số lượng thông báo chưa đọc
       await this.notificationsGateway.emitUnreadCountToUser(user_id);
-      console.log(`[NotificationsService] ✅ WebSocket events emitted successfully`);
     } catch (error) {
       // Log lỗi nhưng không throw để không ảnh hưởng đến việc lưu thông báo
-      console.error(`[NotificationsService] ⚠️ Error emitting notification via WebSocket (notification still saved to DB):`, error);
     }
 
     // Gửi push notification đến tất cả devices của user
     try {
-      console.log(`[NotificationsService] Attempting to send push notification to user ${user_id}`);
+      console.log(`[NotificationsService] 📤 Attempting to send push notification to user ${user_id}`);
+      console.log(`[NotificationsService] 📝 Notification details:`, {
+        notificationId: savedNotification.id,
+        title,
+        body: body || '(no body)',
+        userId: user_id,
+      });
       const pushData = {
         notificationId: savedNotification.id.toString(),
         type: 'notification',
@@ -209,7 +206,6 @@ export class NotificationsService {
     try {
       await this.notificationsGateway.emitUnreadCountToUser(userId);
     } catch (error) {
-      console.error('Error emitting unread count update:', error);
     }
 
     return { count: result.affected || 0 };
@@ -234,7 +230,6 @@ export class NotificationsService {
     try {
       await this.notificationsGateway.emitUnreadCountToUser(userId);
     } catch (error) {
-      console.error('Error emitting unread count update:', error);
     }
 
     return savedNotification;
@@ -253,7 +248,6 @@ export class NotificationsService {
     try {
       await this.notificationsGateway.emitUnreadCountToUser(userId);
     } catch (error) {
-      console.error('Error emitting unread count update:', error);
     }
 
     return { count: result.affected || 0 };
@@ -263,11 +257,19 @@ export class NotificationsService {
    * Lấy số lượng thông báo chưa đọc
    */
   async getUnreadCount(userId: number): Promise<{ count: number }> {
-    const count = await this.notificationRepository.count({
-      where: { user_id: userId, is_read: false },
-    });
+    try {
+      const count = await this.notificationRepository.count({
+        where: { 
+          user_id: userId, 
+          is_read: false 
+        },
+      });
 
-    return { count };
+      return { count: count || 0 };
+    } catch (error) {
+      // Trả về 0 nếu có lỗi để không block UI
+      return { count: 0 };
+    }
   }
 
   /**

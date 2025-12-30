@@ -80,7 +80,6 @@ export const getUserProfile = async (): Promise<UserProfile> => {
     // API response có cấu trúc: { success, message, data: { ...userInfo } }
     return res?.data || res;
   } catch (error) {
-    console.error('Error getting user profile:', error);
     throw error;
   }
 }

@@ -43,7 +43,6 @@ export const getChatMessages = async (familyId: number): Promise<ChatMessage[]> 
         }
         return [];
     } catch (error) {
-        console.error('Error getting chat messages:', error);
         throw error;
     }
 };
@@ -60,7 +59,6 @@ export const sendChatMessage = async (dto: SendChatMessageDto): Promise<ChatMess
         }
         return res;
     } catch (error) {
-        console.error('Error sending chat message:', error);
         throw error;
     }
 };
@@ -77,7 +75,6 @@ export const markMessageAsRead = async (messageId: number): Promise<ChatMessage>
         }
         return res;
     } catch (error) {
-        console.error('Error marking message as read:', error);
         throw error;
     }
 };

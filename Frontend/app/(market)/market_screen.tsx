@@ -113,7 +113,6 @@ export default function MarketScreen() {
           setNext(res.pagination?.hasNextPage || false);
         }
       } catch (e: any) {
-        console.error("Error fetching data:", e);
         if (e?.message === 'SESSION_EXPIRED' || e?.response?.status === 401) {
           handleSessionExpired();
         }
@@ -158,7 +157,6 @@ export default function MarketScreen() {
         setNext(res.pagination?.hasNextPage || false);
       }
     } catch (e: any) {
-      console.error(e);
       if (e?.message === 'SESSION_EXPIRED' || e?.response?.status === 401) {
         handleSessionExpired();
       }

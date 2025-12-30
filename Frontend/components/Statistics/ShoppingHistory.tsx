@@ -57,12 +57,9 @@ export default function ShoppingHistory() {
             try {
                 setLoading(true);
                 setError(null);
-                console.log('Fetching my shopping lists...');
                 const lists = await getMyShoppingLists();
-                console.log('My shopping lists:', lists);
                 setShoppingLists(lists || []);
             } catch (err: any) {
-                console.error('Error fetching shopping lists:', err);
                 setError('Không thể tải dữ liệu lịch sử mua sắm');
             } finally {
                 setLoading(false);

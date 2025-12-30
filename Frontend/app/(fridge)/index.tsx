@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/themes';
 import { getMyRefrigerators } from '@/service/fridge';
 import { getAccess } from '@/utils/api';
+import NotificationCard from '@/components/NotificationCard';
 
 interface Refrigerator {
   id: number;
@@ -64,8 +65,6 @@ export default function FridgeListPage() {
 
       const response = await getMyRefrigerators();
 
-      console.log('[Fridge Debug] API Response:', response);
-
       // getMyRefrigerators now returns array directly
       let refrigeratorsData: Refrigerator[] = [];
       if (Array.isArray(response)) {
@@ -76,9 +75,6 @@ export default function FridgeListPage() {
         // Backend returns single refrigerator object, wrap it in array
         refrigeratorsData = [response];
       }
-
-      console.log('[Fridge Debug] Processed data:', refrigeratorsData);
-      console.log('[Fridge Debug] Count:', refrigeratorsData.length);
 
       setRefrigerators(refrigeratorsData);
     } catch (err: any) {
@@ -103,7 +99,6 @@ export default function FridgeListPage() {
         }
       }
 
-      console.error('Error fetching refrigerators:', err);
       setError('Không thể tải danh sách tủ lạnh. Vui lòng thử lại.');
       setRefrigerators([]);
     } finally {
@@ -144,6 +139,64 @@ export default function FridgeListPage() {
     fetchRefrigerators(true);
   };
 
+  // Tính toán các sản phẩm sắp hết hạn hoặc đã hết hạn
+  const getExpiringItems = useCallback(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const threeDaysLater = new Date(today);
+    threeDaysLater.setDate(today.getDate() + 3);
+
+    let expiringDishes = 0;
+    let expiredDishes = 0;
+    let expiringIngredients = 0;
+    let expiredIngredients = 0;
+
+    refrigerators.forEach((fridge) => {
+      // Kiểm tra món ăn
+      const dishes = fridge.fridgeDishes || fridge.dishes || [];
+      dishes.forEach((dish: any) => {
+        // Chỉ tính các món có stock > 0 (chưa dùng)
+        if (dish.stock > 0 && dish.expiration_date) {
+          const expiryDate = new Date(dish.expiration_date);
+          expiryDate.setHours(0, 0, 0, 0);
+
+          if (expiryDate < today) {
+            expiredDishes++;
+          } else if (expiryDate <= threeDaysLater) {
+            expiringDishes++;
+          }
+        }
+      });
+
+      // Kiểm tra nguyên liệu
+      const ingredients = fridge.fridgeIngredients || fridge.ingredients || [];
+      ingredients.forEach((ingredient: any) => {
+        // Chỉ tính các nguyên liệu có stock > 0 (chưa dùng)
+        if (ingredient.stock > 0 && ingredient.expiration_date) {
+          const expiryDate = new Date(ingredient.expiration_date);
+          expiryDate.setHours(0, 0, 0, 0);
+
+          if (expiryDate < today) {
+            expiredIngredients++;
+          } else if (expiryDate <= threeDaysLater) {
+            expiringIngredients++;
+          }
+        }
+      });
+    });
+
+    return {
+      expiringDishes,
+      expiredDishes,
+      expiringIngredients,
+      expiredIngredients,
+      totalExpiring: expiringDishes + expiringIngredients,
+      totalExpired: expiredDishes + expiredIngredients,
+    };
+  }, [refrigerators]);
+
+  const expiringItems = getExpiringItems();
+
   const renderRefrigeratorCard = (refrigerator: Refrigerator) => {
     // Backend returns fridgeDishes and fridgeIngredients, not dishes and ingredients
     const dishCount = refrigerator.fridgeDishes?.length || refrigerator.dishes?.length || 0;
@@ -180,7 +233,7 @@ export default function FridgeListPage() {
               marginRight: 12,
             }}
           >
-            <Ionicons name="snow" size={24} color={COLORS.green} />
+            <Ionicons name="snow" size={24} color={COLORS.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text
@@ -243,7 +296,7 @@ export default function FridgeListPage() {
             <Text style={{ fontSize: 12, color: COLORS.grey }}>Món ăn</Text>
           </View>
           <View style={{ alignItems: 'center' }}>
-            <Ionicons name="leaf" size={20} color="#10B981" />
+            <Ionicons name="leaf" size={20} color={COLORS.primary} />
             <Text
               style={{
                 fontSize: 14,
@@ -293,7 +346,7 @@ export default function FridgeListPage() {
         </Text>
 
         <TouchableOpacity onPress={handleCreateRefrigerator}>
-          <Ionicons name="add" size={24} color={COLORS.green} />
+          <Ionicons name="add" size={24} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
@@ -306,7 +359,7 @@ export default function FridgeListPage() {
             alignItems: 'center',
           }}
         >
-          <ActivityIndicator size="large" color={COLORS.green} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={{ marginTop: 12, color: COLORS.grey }}>Đang tải...</Text>
         </View>
       ) : (
@@ -318,8 +371,8 @@ export default function FridgeListPage() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={[COLORS.green]}
-              tintColor={COLORS.green}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
             />
           }
         >
@@ -340,7 +393,7 @@ export default function FridgeListPage() {
                   marginTop: 16,
                   paddingHorizontal: 24,
                   paddingVertical: 12,
-                  backgroundColor: COLORS.green,
+                  backgroundColor: COLORS.primary,
                   borderRadius: 8,
                 }}
                 onPress={() => fetchRefrigerators()}
@@ -382,7 +435,7 @@ export default function FridgeListPage() {
                   marginTop: 24,
                   paddingHorizontal: 24,
                   paddingVertical: 12,
-                  backgroundColor: COLORS.green,
+                  backgroundColor: COLORS.primary,
                   borderRadius: 8,
                 }}
                 onPress={handleCreateRefrigerator}
@@ -394,6 +447,21 @@ export default function FridgeListPage() {
             </View>
           ) : (
             <>
+              {/* Cảnh báo sản phẩm sắp hết hạn hoặc đã hết hạn */}
+              {(expiringItems.totalExpiring > 0 || expiringItems.totalExpired > 0) && (
+                <View style={{ marginBottom: 16 }}>
+                  <NotificationCard
+                    title="Cảnh báo hết hạn"
+                    message={
+                      expiringItems.totalExpired > 0
+                        ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày). Vui lòng kiểm tra ngay!`
+                        : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn trong vòng 3 ngày tới. Vui lòng kiểm tra!`
+                    }
+                    type="warning"
+                  />
+                </View>
+              )}
+
               {refrigerators.map(renderRefrigeratorCard)}
 
               {/* Floating Action Button */}
@@ -405,7 +473,7 @@ export default function FridgeListPage() {
                   width: 56,
                   height: 56,
                   borderRadius: 28,
-                  backgroundColor: COLORS.green,
+                  backgroundColor: COLORS.primary,
                   justifyContent: 'center',
                   alignItems: 'center',
                   shadowColor: '#000',

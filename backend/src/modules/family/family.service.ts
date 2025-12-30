@@ -8,6 +8,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Family } from '../../entities/family.entity';
 import { FamilyMember } from '../../entities/family-member.entity';
+import { Refrigerator } from '../../entities/refrigerator.entity';
+import { FridgeDish } from '../../entities/fridge-dish.entity';
+import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
+import { ShoppingList } from '../../entities/shopping-list.entity';
+import { ShoppingItem } from '../../entities/shopping-item.entity';
+import { Menu } from '../../entities/menu.entity';
+import { MenuDish } from '../../entities/menu-dish.entity';
+import { FamilyNote } from '../../entities/family-note.entity';
+import { ConsumptionHistory } from '../../entities/consumption-history.entity';
 import { MemberService } from '../member/member.service';
 import { AddMemberDto } from '../member/dto/add-member.dto';
 import type { JwtUser } from 'src/common/types/user.type';
@@ -23,6 +32,33 @@ export class FamilyService {
     @InjectRepository(FamilyMember)
     private readonly familyMemberRepository: Repository<FamilyMember>,
 
+    @InjectRepository(Refrigerator)
+    private readonly refrigeratorRepository: Repository<Refrigerator>,
+
+    @InjectRepository(FridgeDish)
+    private readonly fridgeDishRepository: Repository<FridgeDish>,
+
+    @InjectRepository(FridgeIngredient)
+    private readonly fridgeIngredientRepository: Repository<FridgeIngredient>,
+
+    @InjectRepository(ShoppingList)
+    private readonly shoppingListRepository: Repository<ShoppingList>,
+
+    @InjectRepository(ShoppingItem)
+    private readonly shoppingItemRepository: Repository<ShoppingItem>,
+
+    @InjectRepository(Menu)
+    private readonly menuRepository: Repository<Menu>,
+
+    @InjectRepository(MenuDish)
+    private readonly menuDishRepository: Repository<MenuDish>,
+
+    @InjectRepository(FamilyNote)
+    private readonly familyNoteRepository: Repository<FamilyNote>,
+
+    @InjectRepository(ConsumptionHistory)
+    private readonly consumptionHistoryRepository: Repository<ConsumptionHistory>,
+
     private readonly memberService: MemberService,
   ) { }
 
@@ -37,6 +73,23 @@ export class FamilyService {
 
   private ensureOwnerOrAdmin(family: Family, userId: number, role: string) {
     if (family.owner_id !== userId && role !== 'admin') {
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00191]);
+    }
+  }
+
+  private async ensureOwnerAdminOrManager(family: Family, userId: number, role: string) {
+    const isOwner = family.owner_id === userId;
+    const isAdmin = role === 'admin';
+    
+    // Kiểm tra xem user có phải manager không
+    let isManager = false;
+    if (!isOwner && !isAdmin) {
+      const members = await this.memberService.getMembersByFamily(family.id);
+      const currentMember = members.find(m => m.user_id === userId);
+      isManager = currentMember?.role === 'manager';
+    }
+
+    if (!isOwner && !isAdmin && !isManager) {
       throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00191]);
     }
   }
@@ -184,15 +237,76 @@ export class FamilyService {
 
   async deleteFamily(id: number, userId: number, role: string) {
     const family = await this.findFamilyOrFail(id);
-    this.ensureOwnerOrAdmin(family, userId, role);
+    await this.ensureOwnerAdminOrManager(family, userId, role);
 
-    // Xóa tất cả members trước khi xóa family
+    // Xóa tất cả dữ liệu liên quan đến family theo thứ tự:
+    
+    // 1. Xóa tất cả members
     const members = await this.memberService.getMembersByFamily(id);
     if (members.length > 0) {
       await this.memberService.deleteAllMembersByFamily(id);
     }
 
-    // Xóa family
+    // 2. Xóa tất cả dữ liệu liên quan đến refrigerators
+    // Lấy tất cả refrigerators của family
+    const refrigerators = await this.refrigeratorRepository.find({
+      where: { family_id: id },
+    });
+    
+    if (refrigerators.length > 0) {
+      const refrigeratorIds = refrigerators.map(r => r.id);
+      
+      // Xóa tất cả fridge_dishes của các refrigerators
+      await this.fridgeDishRepository.delete({ refrigerator_id: In(refrigeratorIds) });
+      
+      // Xóa tất cả fridge_ingredients của các refrigerators
+      await this.fridgeIngredientRepository.delete({ refrigerator_id: In(refrigeratorIds) });
+      
+      // Sau đó mới xóa refrigerators
+      await this.refrigeratorRepository.delete({ family_id: id });
+    }
+
+    // 3. Xóa tất cả dữ liệu liên quan đến shopping lists
+    // Lấy tất cả shopping lists của family
+    const shoppingLists = await this.shoppingListRepository.find({
+      where: { family_id: id },
+    });
+    
+    if (shoppingLists.length > 0) {
+      const shoppingListIds = shoppingLists.map(list => list.id);
+      
+      // Xóa tất cả shopping_items của các shopping lists
+      await this.shoppingItemRepository.delete({ list_id: In(shoppingListIds) });
+      
+      // Sau đó mới xóa shopping lists
+      await this.shoppingListRepository.delete({ family_id: id });
+    }
+
+    // 4. Xóa tất cả dữ liệu liên quan đến menus
+    // Lấy tất cả menus của family
+    const menus = await this.menuRepository.find({
+      where: { family_id: id },
+    });
+    
+    if (menus.length > 0) {
+      const menuIds = menus.map(menu => menu.id);
+      
+      // Xóa tất cả menu_dishes của các menus
+      await this.menuDishRepository.delete({ menu_id: In(menuIds) });
+      
+      // Sau đó mới xóa menus
+      await this.menuRepository.delete({ family_id: id });
+    }
+
+    // 5. Xóa tất cả family notes
+    await this.familyNoteRepository.delete({ family_id: id });
+
+    // 6. Xóa tất cả consumption history
+    await this.consumptionHistoryRepository.delete({ family_id: id });
+
+    // 7. Chat sẽ tự động xóa do có onDelete: 'CASCADE'
+
+    // Cuối cùng, xóa family
     await this.familyRepository.delete(id);
   }
 

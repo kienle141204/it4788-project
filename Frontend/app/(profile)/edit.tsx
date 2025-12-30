@@ -42,7 +42,6 @@ export default function EditProfileScreen() {
           setAddress(profile.address || '');
         }
       } catch (error) {
-        console.warn('Không thể tải thông tin profile để prefill form', error);
       }
     };
 
@@ -70,7 +69,6 @@ export default function EditProfileScreen() {
         await uploadImage(imageUri);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
       Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
     }
   };
@@ -96,7 +94,6 @@ export default function EditProfileScreen() {
         await uploadImage(imageUri);
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
       Alert.alert('Lỗi', 'Không thể chụp ảnh. Vui lòng thử lại.');
     }
   };
@@ -117,7 +114,6 @@ export default function EditProfileScreen() {
   const uploadImage = async (imageUri: string) => {
     setUploadingImage(true);
     try {
-      console.log('📷 Image URI:', imageUri);
       
       // Keep URI as-is for React Native (expo-image-picker returns correct format)
       // Don't modify file:// or content:// URIs
@@ -150,7 +146,6 @@ export default function EditProfileScreen() {
         mimeType = 'image/webp';
       }
       
-      console.log('📷 File type:', fileType, 'MIME type:', mimeType);
       
       // Create FormData with proper React Native file object structure
       const formData = new FormData();
@@ -161,32 +156,16 @@ export default function EditProfileScreen() {
         name: `avatar.${fileType}`,
         type: mimeType,
       } as any);
-      
-      console.log('📷 FormData created with file:', {
-        uri: normalizedUri.substring(0, 50) + '...',
-        name: `avatar.${fileType}`,
-        type: mimeType,
-      });
 
-      console.log('📤 Starting upload...');
       const response = await uploadFileAccess(formData, 'avatars');
       
       if (response && response.success && response.data) {
         const imageUrl = response.data.url || response.data.secure_url || response.data;
         setAvatarUrl(imageUrl);
-        console.log('✅ Avatar uploaded successfully:', imageUrl);
       } else {
         throw new Error(response?.message || 'Upload failed');
       }
     } catch (error: any) {
-      console.error('Error uploading image:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        code: error?.code,
-        response: error?.response?.data,
-        status: error?.response?.status,
-      });
-      
       let errorMessage = 'Không thể upload ảnh. Vui lòng thử lại.';
       const errorData = error?.response?.data;
       
@@ -237,7 +216,6 @@ export default function EditProfileScreen() {
         router.replace('/(tabs)/home' as any);
       }
     } catch (error) {
-      console.error(error);
       Alert.alert('Lỗi', 'Không thể cập nhật thông tin. Vui lòng thử lại.');
     } finally {
       setLoading(false);

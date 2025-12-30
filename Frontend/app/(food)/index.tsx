@@ -45,7 +45,6 @@ export default function FoodPage() {
 
   const handleNotificationPress = () => {
     // Handle notification press
-    console.log('Notification pressed');
   };
 
   const handleSessionExpired = useCallback(() => {
@@ -93,7 +92,6 @@ export default function FoodPage() {
         handleSessionExpired();
         return;
       }
-      console.log(err);
       setError('Không thể tải danh sách món ăn. Vui lòng thử lại.');
       if (reset) {
         setDishes([]);
@@ -170,7 +168,6 @@ export default function FoodPage() {
         handleSessionExpired();
         return;
       }
-      console.log('fetchFavoriteDishes error', err);
       setFavoriteError('Không thể tải danh sách món ăn yêu thích. Vui lòng thử lại.');
       setFavoriteDishes([]);
     } finally {

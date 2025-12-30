@@ -20,7 +20,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getFamilyById, getFamilyInvitationCode } from '../../service/family';
+import { getFamilyById, getFamilyInvitationCode, leaveFamily, deleteFamily } from '../../service/family';
 import {
   getShoppingListsByFamily,
   createShoppingList,
@@ -38,6 +38,8 @@ import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import GroupStatistics from '../../components/GroupStatistics';
 import { getChatMessages, sendChatMessage, type ChatMessage } from '../../service/chat';
+
+const defaultAvatar = require('../../assets/images/avatar.png');
 
 // InfoRow component for member profile
 const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
@@ -134,20 +136,16 @@ const getCurrentUserId = async (): Promise<number | null> => {
   try {
     const token = await AsyncStorage.getItem('access_token');
     if (!token) {
-      console.log('[Manager Check] No token found');
       return null;
     }
     const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
     const decoded = decodeJWT(cleanToken);
     if (decoded && decoded.sub) {
       const userId = parseInt(decoded.sub, 10);
-      console.log('[Manager Check] Decoded user ID from token:', { sub: decoded.sub, userId, decoded });
       return userId;
     }
-    console.log('[Manager Check] No sub in decoded token:', decoded);
     return null;
   } catch (error) {
-    console.error('[Manager Check] Error getting current user ID:', error);
     return null;
   }
 };
@@ -199,6 +197,12 @@ export default function GroupDetailPage() {
   const [memberProfile, setMemberProfile] = useState<any>(null);
   const [loadingMemberProfile, setLoadingMemberProfile] = useState(false);
 
+  // Leave family state
+  const [leavingFamily, setLeavingFamily] = useState<boolean>(false);
+
+  // Delete family state
+  const [deletingFamily, setDeletingFamily] = useState<boolean>(false);
+
   // Chat states
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -245,13 +249,6 @@ export default function GroupDetailPage() {
 
       // Extract members from family object and transform to Member[] format
       let membersData: Member[] = [];
-      console.log('[Members] Family data:', {
-        hasMembers: !!familyData.members,
-        membersType: Array.isArray(familyData.members),
-        membersLength: familyData.members?.length,
-        ownerId: familyData.owner_id,
-        hasOwner: !!familyData.owner,
-      });
 
       if (familyData.members && Array.isArray(familyData.members)) {
         membersData = familyData.members.map((member: any) => ({
@@ -266,7 +263,6 @@ export default function GroupDetailPage() {
             avatar_url: member.user?.avatar_url || null,
           },
         }));
-        console.log('[Members] Mapped members:', membersData.length, membersData);
       }
 
       // Đảm bảo owner có role đúng và được hiển thị
@@ -275,7 +271,6 @@ export default function GroupDetailPage() {
         if (ownerMemberIndex >= 0) {
           // Owner đã có trong members, đảm bảo role là 'owner'
           membersData[ownerMemberIndex].role = 'owner';
-          console.log('[Members] Owner found in members, set role to owner');
         } else if (familyData.owner) {
           // Owner chưa có trong members, thêm vào đầu danh sách
           const ownerMember: Member = {
@@ -291,20 +286,16 @@ export default function GroupDetailPage() {
             },
           };
           membersData.unshift(ownerMember);
-          console.log('[Members] Owner added to members list');
         } else {
-          console.warn('[Members] Owner ID exists but owner data not found in response');
         }
       }
 
-      console.log('[Members] Final members data:', membersData.length, membersData);
 
       // Fetch shopping lists (handle error gracefully)
       let shoppingListsData: ShoppingList[] = [];
       try {
         shoppingListsData = await getShoppingListsByFamily(familyId);
       } catch (shoppingError: any) {
-        console.warn('Could not fetch shopping lists:', shoppingError);
         // Continue without shopping lists if endpoint fails
       }
 
@@ -315,7 +306,6 @@ export default function GroupDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching family data:', err);
       setError('Không thể tải thông tin gia đình. Vui lòng thử lại.');
     } finally {
       setLoading(false);
@@ -323,11 +313,20 @@ export default function GroupDetailPage() {
     }
   }, [familyId, handleSessionExpired]);
 
+  // Fetch only shopping lists (optimized for faster updates)
+  const fetchShoppingLists = useCallback(async () => {
+    try {
+      const shoppingListsData = await getShoppingListsByFamily(familyId);
+      setShoppingLists(shoppingListsData);
+    } catch (error) {
+      // Don't show error to user, just log it
+    }
+  }, [familyId]);
+
   // Get current user ID from JWT token
   useEffect(() => {
     const loadCurrentUserId = async () => {
       const userId = await getCurrentUserId();
-      console.log('[Manager Check] Loaded currentUserId:', userId);
       setCurrentUserId(userId);
     };
     loadCurrentUserId();
@@ -347,28 +346,17 @@ export default function GroupDetailPage() {
   // Find current member and check if they are a manager
   const currentMember = useMemo(() => {
     if (!currentUserId || !members.length) {
-      console.log('[Manager Check] Missing data:', { currentUserId, membersCount: members.length });
       return null;
     }
 
     // Convert both to numbers for comparison to avoid type mismatch
     const foundMember = members.find(member => Number(member.user_id) === Number(currentUserId)) || null;
 
-    console.log('[Manager Check] Current member found:', {
-      currentUserId,
-      foundMember: foundMember ? { id: foundMember.id, user_id: foundMember.user_id, role: foundMember.role } : null,
-      allMembers: members.map(m => ({ id: m.id, user_id: m.user_id, role: m.role }))
-    });
-
     return foundMember;
   }, [currentUserId, members]);
 
   const isManager = useMemo(() => {
     const result = currentMember?.role === 'manager';
-    console.log('[Manager Check] isManager:', {
-      currentMemberRole: currentMember?.role,
-      isManager: result
-    });
     return result;
   }, [currentMember]);
 
@@ -384,8 +372,133 @@ export default function GroupDetailPage() {
     setShowFamilyMenu(true);
   };
 
+  const handleLeaveFamily = useCallback(async () => {
+    if (!family) return;
+
+    setLeavingFamily(true);
+    try {
+      await leaveFamily(family.id);
+      Alert.alert(
+        'Thành công',
+        'Bạn đã rời khỏi nhóm thành công',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/(group)' as any);
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      try {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Extract error message from backend response
+        // Backend returns: { statusCode, message, resultMessage: { vn, en } }
+        const errorData = err?.response?.data || {};
+        let errorMessage = 'Không thể rời khỏi nhóm. Vui lòng thử lại.';
+        
+        if (errorData && Object.keys(errorData).length > 0) {
+          // Try resultMessage.vn first (Vietnamese message), then message, then resultMessage.en
+          errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        // Check if it's an owner error (400 Bad Request from backend)
+        const resultCode = errorData.resultCode || errorData.code;
+        const statusCode = err?.response?.status;
+        const isOwnerError = statusCode === 400 && (
+          errorMessage.includes('chuyển quyền') || 
+          errorMessage.includes('owner') ||
+          errorMessage.includes('chủ nhóm') ||
+          resultCode === '00196' || // ResponseCode for owner must transfer ownership
+          resultCode === '00195' || // ResponseCode for owner cannot leave if alone
+          resultCode === 'C00196' ||
+          resultCode === 'C00195'
+        );
+        
+        if (isOwnerError) {
+          // Show specific message based on resultCode
+          if (resultCode === '00195' || resultCode === 'C00195') {
+            // Only owner - can delete group or transfer ownership
+            Alert.alert(
+              'Không thể rời nhóm',
+              'Bạn là chủ nhóm duy nhất. Vui lòng xóa nhóm hoặc chuyển quyền chủ nhóm trước khi rời.',
+            );
+          } else {
+            // Has other members - must transfer ownership
+            Alert.alert(
+              'Không thể rời nhóm',
+              'Bạn là chủ nhóm. Vui lòng chuyển quyền chủ nhóm cho thành viên khác trước khi rời nhóm.',
+            );
+          }
+        } else {
+          Alert.alert('Lỗi', errorMessage);
+        }
+      } catch (alertError) {
+        // Fallback if Alert fails
+      }
+    } finally {
+      setLeavingFamily(false);
+    }
+  }, [family, router, handleSessionExpired]);
+
+  const handleDeleteFamily = useCallback(async () => {
+    if (!family) return;
+
+    setDeletingFamily(true);
+    try {
+      await deleteFamily(family.id);
+      Alert.alert(
+        'Thành công',
+        'Nhóm đã được xóa thành công',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/(group)' as any);
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      try {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Extract error message from backend response
+        const errorData = err?.response?.data || {};
+        let errorMessage = 'Không thể xóa nhóm. Vui lòng thử lại.';
+        
+        if (errorData && Object.keys(errorData).length > 0) {
+          errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        Alert.alert('Lỗi', errorMessage);
+      } catch (alertError) {
+      }
+    } finally {
+      setDeletingFamily(false);
+    }
+  }, [family, router, handleSessionExpired]);
+
   const getFamilyMenuOptions = () => {
     if (!family) return [];
+
+    // Kiểm tra xem user có phải owner không
+    const isOwner = currentUserId && family.owner_id && Number(currentUserId) === Number(family.owner_id);
+    
+    // isManager đã được tính từ useMemo ở trên
+    const canDelete = isOwner || isManager;
 
     return [
       {
@@ -396,19 +509,39 @@ export default function GroupDetailPage() {
         },
       },
       // Chỉ hiển thị nút "Mã mời" nếu user là owner hoặc manager của family
-      ...(currentUserId && family && (currentUserId === family.owner_id || isManager) ? [{
+      ...(canDelete ? [{
         label: 'Mã mời',
         icon: 'qr-code-outline' as const,
         onPress: () => {
           setShowInvitationModal(true);
         },
       }] : []),
+      // Chỉ hiển thị nút "Xóa nhóm" nếu user là owner hoặc manager của family
+      ...(canDelete ? [{
+        label: deletingFamily ? 'Đang xóa nhóm...' : 'Xóa nhóm',
+        icon: 'trash-outline' as const,
+        onPress: () => {
+          if (deletingFamily) return;
+          Alert.alert(
+            'Xác nhận xóa nhóm',
+            'Bạn có chắc chắn muốn xóa nhóm này? Hành động này không thể hoàn tác và tất cả dữ liệu của nhóm sẽ bị xóa vĩnh viễn.',
+            [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Xóa nhóm',
+                style: 'destructive',
+                onPress: handleDeleteFamily,
+              },
+            ]
+          );
+        },
+        destructive: true,
+      }] : []),
       {
         label: 'Chỉnh sửa thông tin',
         icon: 'create-outline' as const,
         onPress: () => {
           // TODO: Navigate to edit family
-          console.log('Edit family');
         },
       },
       {
@@ -416,13 +549,13 @@ export default function GroupDetailPage() {
         icon: 'settings-outline' as const,
         onPress: () => {
           // TODO: Navigate to settings
-          console.log('Navigate to settings');
         },
       },
       {
-        label: 'Rời khỏi nhóm',
+        label: leavingFamily ? 'Đang rời nhóm...' : 'Rời khỏi nhóm',
         icon: 'log-out-outline' as const,
         onPress: () => {
+          if (leavingFamily) return;
           Alert.alert(
             'Xác nhận',
             'Bạn có chắc chắn muốn rời khỏi nhóm này?',
@@ -431,15 +564,13 @@ export default function GroupDetailPage() {
               {
                 text: 'Rời nhóm',
                 style: 'destructive',
-                onPress: () => {
-                  // TODO: Implement leave family
-                  console.log('Leave family:', family.id);
-                },
+                onPress: handleLeaveFamily,
               },
             ]
           );
         },
         destructive: true,
+        disabled: leavingFamily,
       },
     ];
   };
@@ -464,7 +595,6 @@ export default function GroupDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.error('fetchMemberProfile error', err);
       const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin thành viên';
       Alert.alert('Lỗi', errorMessage);
     } finally {
@@ -503,7 +633,6 @@ export default function GroupDetailPage() {
                   text: 'Xác nhận',
                   onPress: () => {
                     // TODO: Remove manager role
-                    console.log('Remove manager role:', selectedMember.id);
                   },
                 },
               ]
@@ -524,7 +653,6 @@ export default function GroupDetailPage() {
                   text: 'Xác nhận',
                   onPress: () => {
                     // TODO: Grant manager role
-                    console.log('Grant manager role:', selectedMember.id);
                   },
                 },
               ]
@@ -547,7 +675,6 @@ export default function GroupDetailPage() {
                 style: 'destructive',
                 onPress: () => {
                   // TODO: Remove member
-                  console.log('Remove member:', selectedMember.id);
                 },
               },
             ]
@@ -578,7 +705,6 @@ export default function GroupDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching chat messages:', err);
     } finally {
       setChatLoading(false);
     }
@@ -617,7 +743,6 @@ export default function GroupDetailPage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error sending message:', err);
       Alert.alert('Lỗi', 'Không thể gửi tin nhắn. Vui lòng thử lại.');
     } finally {
       setSendingMessage(false);
@@ -861,7 +986,7 @@ export default function GroupDetailPage() {
     });
   }, [shoppingLists, selectedDate]);
 
-  // Handle create shopping list
+  // Handle create shopping list (optimized)
   const handleCreateShoppingList = async () => {
     try {
       // Format date in local timezone (YYYY-MM-DD)
@@ -873,21 +998,24 @@ export default function GroupDetailPage() {
       // Ensure owner_id is number or undefined (not null or string)
       const ownerId = assignedOwner ? Number(assignedOwner.user_id) : undefined;
 
-      console.log('Creating shopping list with:', { familyId, dateStr, ownerId });
 
-      await createShoppingList(familyId, dateStr, ownerId);
-      await fetchFamilyData(true);
+      const newList = await createShoppingList(familyId, dateStr, ownerId);
+      
+      // Close modal immediately
       setShowAddListModal(false);
       setAssignedOwner(null);
       setShowAssignMemberDropdown(false);
+      
+      // Only fetch shopping lists (much faster)
+      await fetchShoppingLists();
+      
       Alert.alert('Thành công', 'Đã tạo danh sách mua sắm mới');
     } catch (error) {
-      console.error('Error creating shopping list:', error);
       Alert.alert('Lỗi', 'Không thể tạo danh sách mua sắm');
     }
   };
 
-  // Handle delete shopping list
+  // Handle delete shopping list (optimized with optimistic update)
   const handleDeleteShoppingList = async (listId: number) => {
     Alert.alert(
       'Xác nhận xóa',
@@ -898,12 +1026,29 @@ export default function GroupDetailPage() {
           text: 'Xóa',
           style: 'destructive',
           onPress: async () => {
+            // Store deleted list for rollback
+            let deletedList: ShoppingList | null = null;
+            
+            // Optimistic update: Remove list immediately
+            setShoppingLists(prevLists => {
+              const listToDelete = prevLists.find(l => l.id === listId);
+              if (listToDelete) {
+                deletedList = { ...listToDelete };
+              }
+              return prevLists.filter(l => l.id !== listId);
+            });
+
             try {
               await deleteShoppingList(listId);
-              await fetchFamilyData(true);
+              // Only fetch shopping lists (much faster)
+              await fetchShoppingLists();
               Alert.alert('Thành công', 'Đã xóa danh sách mua sắm');
             } catch (error) {
-              console.error('Error deleting shopping list:', error);
+              // Rollback on error
+              if (deletedList) {
+                setShoppingLists(prevLists => [...prevLists, deletedList!]);
+              }
+              await fetchShoppingLists();
               Alert.alert('Lỗi', 'Không thể xóa danh sách mua sắm');
             }
           },
@@ -934,7 +1079,6 @@ export default function GroupDetailPage() {
         setSearchedIngredients([]);
       }
     } catch (error) {
-      console.error('Error searching ingredients:', error);
       setSearchedIngredients([]);
     } finally {
       setLoadingIngredients(false);
@@ -968,33 +1112,31 @@ export default function GroupDetailPage() {
     }
   }, [newItemStock, selectedIngredient]);
 
-  // Handle add item to list
+  // Handle add item to list (optimized with optimistic update)
   const handleAddItem = async () => {
     if (!selectedListId || !newItemIngredientId || !newItemStock) {
       Alert.alert('Lỗi', 'Vui lòng chọn nguyên liệu và nhập số lượng');
       return;
     }
 
-    try {
-      // Ensure all values are correct types
-      const listId = Number(selectedListId);
-      const ingredientId = Number(newItemIngredientId);
-      const stock = parseInt(newItemStock);
-      const price = newItemPrice ? parseFloat(newItemPrice) : undefined;
+    // Ensure all values are correct types
+    const listId = Number(selectedListId);
+    const ingredientId = Number(newItemIngredientId);
+    const stock = parseInt(newItemStock);
+    // Backend expects price per kg, not total price
+    const price = selectedIngredient?.price ? Number(selectedIngredient.price) : undefined;
 
-      // Validate numbers
-      if (isNaN(listId) || isNaN(ingredientId) || isNaN(stock)) {
-        Alert.alert('Lỗi', 'Dữ liệu không hợp lệ');
-        return;
-      }
+    // Validate numbers
+    if (isNaN(listId) || isNaN(ingredientId) || isNaN(stock)) {
+      Alert.alert('Lỗi', 'Dữ liệu không hợp lệ');
+      return;
+    }
 
-      console.log('Adding item with:', { listId, ingredientId, stock, price });
-
-      await addItemToList(listId, ingredientId, stock, price);
-      await fetchFamilyData(true);
-
-      // Reset form
-      setShowAddItemModal(false);
+    // Close modal immediately for better UX
+    setShowAddItemModal(false);
+    
+    // Reset form immediately
+    const resetForm = () => {
       setSelectedListId(null);
       setNewItemIngredientId(null);
       setSelectedIngredient(null);
@@ -1002,26 +1144,85 @@ export default function GroupDetailPage() {
       setNewItemPrice('');
       setIngredientSearchTerm('');
       setSearchedIngredients([]);
+    };
 
-      Alert.alert('Thành công', 'Đã thêm mặt hàng vào danh sách');
+    // Optimistic update: Add item to state immediately
+    const optimisticItem: ShoppingItem = {
+      id: Date.now(), // Temporary ID
+      list_id: listId,
+      ingredient_id: ingredientId,
+      stock: stock,
+      price: price || selectedIngredient?.price || 0,
+      is_checked: false,
+      created_at: new Date().toISOString(),
+      ingredient: {
+        id: selectedIngredient.id,
+        name: selectedIngredient.name,
+        image_url: selectedIngredient.image_url || null,
+        price: selectedIngredient.price || null,
+        description: selectedIngredient.description || null,
+      },
+    };
+
+    // Update local state immediately
+    setShoppingLists(prevLists => 
+      prevLists.map(list => 
+        list.id === listId
+          ? {
+              ...list,
+              items: [...(list.items || []), optimisticItem],
+              cost: list.cost + ((optimisticItem.price || 0) * stock / 1000),
+            }
+          : list
+      )
+    );
+
+    resetForm();
+
+    // Call API in background
+    try {
+      const newItem = await addItemToList(listId, ingredientId, stock, price);
+      
+      // Only fetch shopping lists (much faster than fetchFamilyData)
+      await fetchShoppingLists();
     } catch (error) {
-      console.error('Error adding item:', error);
-      Alert.alert('Lỗi', 'Không thể thêm mặt hàng');
+      
+      // Rollback optimistic update on error
+      await fetchShoppingLists();
+      
+      Alert.alert('Lỗi', 'Không thể thêm mặt hàng. Vui lòng thử lại.');
     }
   };
 
-  // Handle toggle item checked
+  // Handle toggle item checked (optimized with optimistic update)
   const handleToggleItem = async (itemId: number) => {
+    // Optimistic update: Toggle immediately
+    let previousState: boolean = false;
+    setShoppingLists(prevLists => 
+      prevLists.map(list => ({
+        ...list,
+        items: list.items?.map(item => {
+          if (item.id === itemId) {
+            previousState = item.is_checked;
+            return { ...item, is_checked: !item.is_checked };
+          }
+          return item;
+        }) || [],
+      }))
+    );
+
     try {
       await toggleItemChecked(itemId);
-      await fetchFamilyData(true);
+      // Only fetch shopping lists (much faster)
+      await fetchShoppingLists();
     } catch (error) {
-      console.error('Error toggling item:', error);
+      // Rollback on error
+      await fetchShoppingLists();
       Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
     }
   };
 
-  // Handle delete item
+  // Handle delete item (optimized with optimistic update)
   const handleDeleteItem = async (itemId: number) => {
     Alert.alert(
       'Xác nhận',
@@ -1032,12 +1233,47 @@ export default function GroupDetailPage() {
           text: 'Xóa',
           style: 'destructive',
           onPress: async () => {
+            // Find the item to delete for rollback
+            let deletedItem: ShoppingItem | null = null;
+            let listId: number | null = null;
+            
+            // Optimistic update: Remove item immediately
+            setShoppingLists(prevLists => 
+              prevLists.map(list => {
+                const item = list.items?.find(i => i.id === itemId);
+                if (item) {
+                  deletedItem = item;
+                  listId = list.id;
+                  return {
+                    ...list,
+                    items: list.items?.filter(i => i.id !== itemId) || [],
+                    cost: list.cost - ((item.price || 0) * item.stock / 1000),
+                  };
+                }
+                return list;
+              })
+            );
+
             try {
               await deleteShoppingItem(itemId);
-              await fetchFamilyData(true);
-              Alert.alert('Thành công', 'Đã xóa mặt hàng');
+              // Only fetch shopping lists (much faster)
+              await fetchShoppingLists();
             } catch (error) {
-              console.error('Error deleting item:', error);
+              // Rollback on error
+              if (deletedItem && listId) {
+                setShoppingLists(prevLists => 
+                  prevLists.map(list => 
+                    list.id === listId
+                      ? {
+                          ...list,
+                          items: [...(list.items || []), deletedItem!],
+                          cost: list.cost + ((deletedItem!.price || 0) * deletedItem!.stock / 1000),
+                        }
+                      : list
+                  )
+                );
+              }
+              await fetchShoppingLists();
               Alert.alert('Lỗi', 'Không thể xóa mặt hàng');
             }
           },
@@ -1060,12 +1296,6 @@ export default function GroupDetailPage() {
   }, [members, searchTerm]);
 
   const renderMembersList = () => {
-    console.log('[Members] Rendering list:', {
-      membersCount: members.length,
-      filteredCount: filteredMembers.length,
-      searchTerm,
-    });
-
     if (!members || members.length === 0) {
       return (
         <View style={groupStyles.emptyState}>
@@ -1091,7 +1321,6 @@ export default function GroupDetailPage() {
     return (
       <View style={groupStyles.membersList}>
         {filteredMembers.map((member, index) => {
-          console.log('[Members] Rendering member:', member.id, member.user?.full_name, member.role);
           // Sử dụng unique key - nếu member.id = 0 (owner), dùng user_id
           const memberKey = member.id === 0 ? `owner-${member.user_id}-${index}` : `member-${member.id}`;
           return (
@@ -1283,7 +1512,19 @@ export default function GroupDetailPage() {
                     </Text>
                     {list.owner && (
                       <View style={groupStyles.ownerInfo}>
-                        <View style={groupStyles.ownerAvatar} />
+                        <View style={groupStyles.ownerAvatar}>
+                          {list.owner.avatar_url ? (
+                            <Image
+                              source={{ uri: list.owner.avatar_url }}
+                              style={groupStyles.ownerAvatarImage}
+                            />
+                          ) : (
+                            <Image
+                              source={defaultAvatar}
+                              style={groupStyles.ownerAvatarImage}
+                            />
+                          )}
+                        </View>
                         <Text style={groupStyles.ownerName}>
                           {list.owner.full_name}
                         </Text>
@@ -1462,13 +1703,6 @@ export default function GroupDetailPage() {
         <TouchableOpacity
           style={groupStyles.fabButton}
           onPress={() => {
-            console.log('[Manager Check] FAB button pressed - Opening modal');
-            console.log('[Manager Check] Current state:', {
-              currentUserId,
-              membersCount: members.length,
-              currentMember: currentMember ? { id: currentMember.id, user_id: currentMember.user_id, role: currentMember.role } : null,
-              isManager
-            });
             setShowAddListModal(true);
           }}
         >
@@ -1819,15 +2053,6 @@ export default function GroupDetailPage() {
               </Text>
 
               {/* Assign Owner - Only for managers */}
-              {(() => {
-                console.log('[Manager Check] Modal render - Checking manager status:', {
-                  hasFamily: !!family,
-                  isManager,
-                  currentUserId,
-                  currentMember: currentMember ? { id: currentMember.id, user_id: currentMember.user_id, role: currentMember.role } : null
-                });
-                return null;
-              })()}
               {family && isManager ? (
                 <View style={groupStyles.assignMemberContainer}>
                   <Text style={groupStyles.assignMemberLabel}>

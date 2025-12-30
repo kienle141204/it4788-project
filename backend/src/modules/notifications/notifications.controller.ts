@@ -114,13 +114,29 @@ export class NotificationsController {
   })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
   async getUnreadCount(@User() user: JwtUser) {
-    const result = await this.notificationsService.getUnreadCount(user.id);
+    try {
+      if (!user || !user.id) {
+        return {
+          success: false,
+          message: 'User không hợp lệ',
+          data: { count: 0 },
+        };
+      }
 
-    return {
-      success: true,
-      message: 'Lấy số lượng thông báo chưa đọc thành công',
-      data: result,
-    };
+      const result = await this.notificationsService.getUnreadCount(user.id);
+
+      return {
+        success: true,
+        message: 'Lấy số lượng thông báo chưa đọc thành công',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Lỗi khi lấy số lượng thông báo chưa đọc',
+        data: { count: 0 },
+      };
+    }
   }
 
   /**

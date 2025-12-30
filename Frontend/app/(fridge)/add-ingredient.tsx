@@ -10,10 +10,12 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '@/constants/themes';
 import { addIngredientToRefrigerator } from '@/service/fridge';
 import { searchIngredients } from '@/service/market';
@@ -39,6 +41,8 @@ export default function AddIngredientPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stock, setStock] = useState('');
   const [price, setPrice] = useState('');
+  const [expirationDate, setExpirationDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingIngredients, setLoadingIngredients] = useState(false);
 
@@ -81,7 +85,6 @@ export default function AddIngredientPage() {
           handleSessionExpired();
           return;
         }
-        console.error('fetchIngredients error', err);
         setIngredients([]);
       } finally {
         setLoadingIngredients(false);
@@ -152,6 +155,10 @@ export default function AddIngredientPage() {
         }
       }
 
+      if (expirationDate) {
+        data.expiration_date = expirationDate.toISOString().split('T')[0];
+      }
+
       await addIngredientToRefrigerator(fridgeId, data);
 
       Alert.alert('Thành công', 'Đã thêm nguyên liệu vào tủ lạnh!', [
@@ -163,7 +170,6 @@ export default function AddIngredientPage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error adding ingredient:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||
@@ -183,7 +189,7 @@ export default function AddIngredientPage() {
         marginBottom: 12,
         flexDirection: 'row',
         borderWidth: 2,
-        borderColor: selectedIngredient?.id === item.id ? COLORS.green : 'transparent',
+        borderColor: selectedIngredient?.id === item.id ? COLORS.primary : 'transparent',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
@@ -223,7 +229,7 @@ export default function AddIngredientPage() {
         )}
       </View>
       {selectedIngredient?.id === item.id && (
-        <Ionicons name="checkmark-circle" size={24} color={COLORS.green} />
+        <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
       )}
     </TouchableOpacity>
   );
@@ -288,7 +294,7 @@ export default function AddIngredientPage() {
         {/* Ingredient List */}
         {loadingIngredients ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-            <ActivityIndicator size="large" color={COLORS.green} />
+            <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
         ) : searchQuery.trim() && ingredients.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
@@ -339,7 +345,7 @@ export default function AddIngredientPage() {
               style={{
                 fontSize: 14,
                 fontWeight: '600',
-                color: COLORS.green,
+                color: COLORS.primary,
                 marginBottom: 8,
               }}
             >
@@ -414,10 +420,75 @@ export default function AddIngredientPage() {
           />
         </View>
 
+        {/* Expiration Date Input (Optional) */}
+        <View style={{ marginBottom: 24 }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: '600',
+              color: COLORS.darkGrey,
+              marginBottom: 8,
+            }}
+          >
+            Ngày hết hạn (tùy chọn)
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: COLORS.white,
+              borderRadius: 12,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: COLORS.background || '#E5E5E5',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                color: expirationDate ? COLORS.darkGrey : COLORS.grey,
+              }}
+            >
+              {expirationDate
+                ? expirationDate.toLocaleDateString('vi-VN')
+                : 'Chọn ngày hết hạn'}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color={COLORS.grey} />
+          </TouchableOpacity>
+          {expirationDate && (
+            <TouchableOpacity
+              onPress={() => setExpirationDate(null)}
+              style={{ marginTop: 8, alignSelf: 'flex-start' }}
+            >
+              <Text style={{ color: COLORS.red || '#EF4444', fontSize: 14 }}>
+                Xóa ngày hết hạn
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Date Picker */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={expirationDate || new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            minimumDate={new Date()}
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(Platform.OS === 'ios');
+              if (event.type === 'set' && selectedDate) {
+                setExpirationDate(selectedDate);
+              }
+            }}
+          />
+        )}
+
         {/* Submit Button */}
         <TouchableOpacity
           style={{
-            backgroundColor: COLORS.green,
+            backgroundColor: COLORS.primary,
             borderRadius: 12,
             padding: 16,
             alignItems: 'center',

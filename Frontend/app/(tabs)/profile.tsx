@@ -90,7 +90,6 @@ export default function ProfileScreen() {
               await logoutUser();
               router.replace('/(auth)' as any);
             } catch (error) {
-              console.error('Lỗi khi đăng xuất:', error);
               Alert.alert('Lỗi', 'Không thể đăng xuất, vui lòng thử lại.');
             }
           },

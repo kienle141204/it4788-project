@@ -53,7 +53,6 @@ export default function CreateFridgePage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching user profile:', err);
     }
   }, [handleSessionExpired]);
 
@@ -87,7 +86,6 @@ export default function CreateFridgePage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching families:', err);
     } finally {
       setLoadingFamilies(false);
     }
@@ -150,7 +148,6 @@ export default function CreateFridgePage() {
         data.family_id = familyId;
       }
 
-      console.log('[Create Fridge] Request data:', JSON.stringify(data, null, 2));
       await createRefrigerator(data);
 
       Alert.alert('Thành công', 'Đã tạo tủ lạnh thành công!', [
@@ -162,7 +159,6 @@ export default function CreateFridgePage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error creating refrigerator:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||
@@ -236,7 +232,7 @@ export default function CreateFridgePage() {
                   refrigeratorType === 'personal' ? COLORS.greenLight : COLORS.white,
                 borderWidth: 2,
                 borderColor:
-                  refrigeratorType === 'personal' ? COLORS.green : '#E5E5E5',
+                  refrigeratorType === 'personal' ? COLORS.primary : '#E5E5E5',
                 alignItems: 'center',
               }}
               onPress={() => handleTypeChange('personal')}
@@ -244,7 +240,7 @@ export default function CreateFridgePage() {
               <Ionicons
                 name="person"
                 size={24}
-                color={refrigeratorType === 'personal' ? COLORS.green : COLORS.grey}
+                color={refrigeratorType === 'personal' ? COLORS.primary : COLORS.grey}
               />
               <Text
                 style={{
@@ -252,7 +248,7 @@ export default function CreateFridgePage() {
                   fontSize: 14,
                   fontWeight: '600',
                   color:
-                    refrigeratorType === 'personal' ? COLORS.green : COLORS.grey,
+                    refrigeratorType === 'personal' ? COLORS.primary : COLORS.grey,
                 }}
               >
                 Cá nhân
@@ -268,7 +264,7 @@ export default function CreateFridgePage() {
                   refrigeratorType === 'family' ? COLORS.greenLight : COLORS.white,
                 borderWidth: 2,
                 borderColor:
-                  refrigeratorType === 'family' ? COLORS.green : '#E5E5E5',
+                  refrigeratorType === 'family' ? COLORS.primary : '#E5E5E5',
                 alignItems: 'center',
               }}
               onPress={() => handleTypeChange('family')}
@@ -276,7 +272,7 @@ export default function CreateFridgePage() {
               <Ionicons
                 name="people"
                 size={24}
-                color={refrigeratorType === 'family' ? COLORS.green : COLORS.grey}
+                color={refrigeratorType === 'family' ? COLORS.primary : COLORS.grey}
               />
               <Text
                 style={{
@@ -284,7 +280,7 @@ export default function CreateFridgePage() {
                   fontSize: 14,
                   fontWeight: '600',
                   color:
-                    refrigeratorType === 'family' ? COLORS.green : COLORS.grey,
+                    refrigeratorType === 'family' ? COLORS.primary : COLORS.grey,
                 }}
               >
                 Gia đình
@@ -335,7 +331,7 @@ export default function CreateFridgePage() {
         {/* Create Button */}
         <TouchableOpacity
           style={{
-            backgroundColor: COLORS.green,
+            backgroundColor: COLORS.primary,
             borderRadius: 12,
             padding: 16,
             alignItems: 'center',
@@ -409,7 +405,7 @@ export default function CreateFridgePage() {
             <ScrollView style={{ maxHeight: 400 }}>
               {loadingFamilies ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color={COLORS.green} />
+                  <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
               ) : families.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
@@ -442,7 +438,7 @@ export default function CreateFridgePage() {
                       <Ionicons
                         name="checkmark-circle"
                         size={24}
-                        color={COLORS.green}
+                        color={COLORS.primary}
                       />
                     )}
                   </TouchableOpacity>

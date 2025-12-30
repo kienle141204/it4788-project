@@ -53,10 +53,6 @@ export default function TaskPage() {
     try {
       setLoading(true);
       const lists = await getMyShoppingLists();
-      console.log('Loaded shopping lists:', lists);
-      console.log('First list:', lists?.[0]);
-      console.log('First list items:', lists?.[0]?.items);
-      console.log('First list family:', lists?.[0]?.family);
       
       // Ensure items are properly typed
       const typedLists: ShoppingList[] = (lists || []).map((list: any) => ({
@@ -68,7 +64,6 @@ export default function TaskPage() {
       // Reset loaded list IDs when reloading all lists
       setLoadedListIds(new Set());
     } catch (error: any) {
-      console.error('Error loading shopping lists:', error);
       if (error.message === 'SESSION_EXPIRED' || error.response?.status === 401) {
         Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
         router.push('/(auth)/login');
@@ -112,7 +107,6 @@ export default function TaskPage() {
   const loadShoppingListItems = async (listId: number) => {
     try {
       const list = await getShoppingListById(listId);
-      console.log('Loaded list items:', list);
       if (list && list.items) {
         // Update the list in shoppingLists with items
         setShoppingLists(prevLists => 
@@ -125,7 +119,6 @@ export default function TaskPage() {
         );
       }
     } catch (error: any) {
-      console.error('Error loading shopping list items:', error);
       // Remove from loaded set on error so it can be retried
       setLoadedListIds(prev => {
         const newSet = new Set(prev);
@@ -157,34 +150,58 @@ export default function TaskPage() {
 
 
   const handleToggleItem = async (itemId: number, listId: number) => {
+    // Find the list containing this item
+    const targetList = shoppingLists.find(l => l.id === listId);
+    if (!targetList) return;
+
+    // Store previous state for rollback
+    let previousCheckedState: boolean | undefined = undefined;
+    const itemToToggle = targetList.items?.find(item => item.id === itemId);
+    if (itemToToggle) {
+      previousCheckedState = itemToToggle.is_checked;
+    }
+
+    // Optimistic update: Toggle immediately
+    setShoppingLists(prevLists => 
+      prevLists.map(l => 
+        l.id === listId 
+          ? {
+              ...l,
+              items: l.items?.map(item =>
+                item.id === itemId ? { ...item, is_checked: !item.is_checked } : item
+              ) || [],
+            }
+          : l
+      )
+    );
+
     try {
-      // Find the list containing this item
-      const targetList = shoppingLists.find(l => l.id === listId);
-      if (!targetList) return;
-
-      // Optimistic update
-      const updatedItems = targetList.items?.map(item =>
-        item.id === itemId ? { ...item, is_checked: !item.is_checked } : item
-      ) || [];
-
       // Call API
       await toggleItemChecked(itemId);
       
-      // Update shoppingLists without reloading all lists
-      setShoppingLists(prevLists => 
-        prevLists.map(l => 
-          l.id === listId 
-            ? { ...l, items: updatedItems }
-            : l
-        )
-      );
+      // Reload only this list's items to sync with server (faster than reloading all)
+      await loadShoppingListItems(listId);
     } catch (error: any) {
-      console.error('Error toggling item:', error);
-      // Revert on error by reloading the list
-      const targetList = shoppingLists.find(l => l.id === listId);
-      if (targetList) {
+      
+      // Rollback optimistic update on error
+      if (previousCheckedState !== undefined) {
+        setShoppingLists(prevLists => 
+          prevLists.map(l => 
+            l.id === listId 
+              ? {
+                  ...l,
+                  items: l.items?.map(item =>
+                    item.id === itemId ? { ...item, is_checked: previousCheckedState! } : item
+                  ) || [],
+                }
+              : l
+          )
+        );
+      } else {
+        // If we don't have previous state, reload the list
         await loadShoppingListItems(listId);
       }
+      
       if (error.message === 'SESSION_EXPIRED' || error.response?.status === 401) {
         Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
         router.push('/(auth)/login');

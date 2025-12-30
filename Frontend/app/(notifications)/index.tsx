@@ -87,7 +87,6 @@ export default function NotificationsPage() {
           await handleRefresh();
         }
       } catch (error) {
-        console.error('Error deleting notification:', error);
       }
     },
     [filter, handleRefresh, refreshNotifications],
@@ -99,13 +98,20 @@ export default function NotificationsPage() {
       setDisplayed([]);
       await refreshNotifications();
     } catch (error) {
-      console.error('Error deleting all notifications:', error);
     }
   }, [refreshNotifications]);
 
   // Hàm lấy icon dựa trên title của thông báo
-  const getNotificationIcon = useCallback((title: string, isUnread: boolean) => {
+  const getNotificationIcon = useCallback((title: string, body: string, isUnread: boolean) => {
     const titleLower = title.toLowerCase();
+    const bodyLower = (body || '').toLowerCase();
+    
+    // Kiểm tra thông báo về hết hạn
+    if (titleLower.includes('hết hạn') || titleLower.includes('hạn') || 
+        bodyLower.includes('hết hạn') || bodyLower.includes('🚨') || bodyLower.includes('⚠️')) {
+      return isUnread ? 'warning' : 'warning-outline';
+    }
+    
     if (titleLower.includes('nhóm') || titleLower.includes('group')) {
       return isUnread ? 'people' : 'people-outline';
     }
@@ -121,7 +127,23 @@ export default function NotificationsPage() {
   const renderItem = useCallback(
     ({ item }: any) => {
       const isUnread = !item.is_read;
-      const iconName = getNotificationIcon(item.title, isUnread);
+      const iconName = getNotificationIcon(item.title, item.body || '', isUnread);
+      
+      // Xác định màu cho thông báo hết hạn
+      const isExpiringNotification = 
+        item.title?.toLowerCase().includes('hết hạn') || 
+        item.title?.toLowerCase().includes('hạn') ||
+        item.body?.toLowerCase().includes('hết hạn') ||
+        item.body?.includes('🚨') ||
+        item.body?.includes('⚠️');
+      
+      const iconColor = isExpiringNotification 
+        ? (isUnread ? COLORS.orange : COLORS.grey)
+        : (isUnread ? COLORS.white : COLORS.grey);
+      
+      const iconBgColor = isExpiringNotification
+        ? (isUnread ? '#FFF4E6' : '#F3F4F6')
+        : (isUnread ? COLORS.purple : '#F3F4F6');
       // Màu nền xanh lá nhạt cho thông báo chưa đọc (giống thiết kế)
       const cardBgColor = isUnread ? '#ECFDF5' : COLORS.white;
       
@@ -155,11 +177,11 @@ export default function NotificationsPage() {
               width: 40,
               height: 40,
               borderRadius: 20,
-              backgroundColor: isUnread ? COLORS.purple : '#F3F4F6',
+              backgroundColor: iconBgColor,
               justifyContent: 'center',
               alignItems: 'center',
               marginRight: 16,
-              shadowColor: COLORS.purple,
+              shadowColor: isExpiringNotification ? COLORS.orange : COLORS.purple,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: isUnread ? 0.2 : 0,
               shadowRadius: 4,
@@ -169,7 +191,7 @@ export default function NotificationsPage() {
             <Ionicons
               name={iconName as any}
               size={20}
-              color={isUnread ? COLORS.white : COLORS.grey}
+              color={iconColor}
             />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>

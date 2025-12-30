@@ -54,7 +54,6 @@ export default function IngredientDetailScreen() {
           setError("Phản hồi không hợp lệ từ máy chủ");
         }
       } catch (e: any) {
-        console.error("Error fetching ingredient:", e);
         if (e?.message === 'SESSION_EXPIRED' || e?.response?.status === 401) {
           handleSessionExpired();
           return;

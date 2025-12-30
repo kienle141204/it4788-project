@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
-import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, createFamily, type Family } from '../../service/family';
+import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, createFamily, leaveFamily, deleteFamily, type Family } from '../../service/family';
 import { getFamilySharedLists } from '../../service/shopping';
 import { getAccess } from '../../utils/api';
 import ActionMenu from '../../components/ActionMenu';
@@ -56,20 +56,16 @@ const getCurrentUserId = async (): Promise<number | null> => {
   try {
     const token = await AsyncStorage.getItem('access_token');
     if (!token) {
-      console.log('[Group Page] No token found');
       return null;
     }
     const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
     const decoded = decodeJWT(cleanToken);
     if (decoded && decoded.sub) {
       const userId = parseInt(decoded.sub, 10);
-      console.log('[Group Page] Decoded user ID from token:', { sub: decoded.sub, userId });
       return userId;
     }
-    console.log('[Group Page] No sub in decoded token:', decoded);
     return null;
   } catch (error) {
-    console.error('[Group Page] Error getting current user ID:', error);
     return null;
   }
 };
@@ -89,6 +85,8 @@ export default function GroupPage() {
   const [newFamilyName, setNewFamilyName] = useState('');
   const [creatingFamily, setCreatingFamily] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [leavingFamilyId, setLeavingFamilyId] = useState<number | null>(null);
+  const [deletingFamilyId, setDeletingFamilyId] = useState<number | null>(null);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -158,7 +156,6 @@ export default function GroupPage() {
               totalItems: allItems,
             };
           } catch (error) {
-            console.error(`Error fetching shopping stats for family ${family.id}:`, error);
           }
           
           return {
@@ -175,7 +172,6 @@ export default function GroupPage() {
         handleSessionExpired();
         return;
       }
-      console.error('Error fetching families:', err);
       setError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
       setFamilies([]);
     } finally {
@@ -239,19 +235,138 @@ export default function GroupPage() {
     setShowFamilyMenu(true);
   };
 
+  const handleLeaveFamily = useCallback(async (familyId: number) => {
+    setLeavingFamilyId(familyId);
+    try {
+      await leaveFamily(familyId);
+      Alert.alert(
+        'Thành công',
+        'Bạn đã rời khỏi nhóm thành công',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowFamilyMenu(false);
+              fetchFamilies();
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      try {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Extract error message from backend response
+        // Backend returns: { statusCode, message, resultMessage: { vn, en } }
+        const errorData = err?.response?.data || {};
+        let errorMessage = 'Không thể rời khỏi nhóm. Vui lòng thử lại.';
+        
+        if (errorData && Object.keys(errorData).length > 0) {
+          // Try resultMessage.vn first (Vietnamese message), then message, then resultMessage.en
+          errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        // Check if it's an owner error (400 Bad Request from backend)
+        const resultCode = errorData.resultCode || errorData.code;
+        const statusCode = err?.response?.status;
+        const isOwnerError = statusCode === 400 && (
+          errorMessage.includes('chuyển quyền') || 
+          errorMessage.includes('owner') ||
+          errorMessage.includes('chủ nhóm') ||
+          resultCode === '00196' || // ResponseCode for owner must transfer ownership
+          resultCode === '00195' || // ResponseCode for owner cannot leave if alone
+          resultCode === 'C00196' ||
+          resultCode === 'C00195'
+        );
+        
+        if (isOwnerError) {
+          // Show specific message based on resultCode
+          if (resultCode === '00195' || resultCode === 'C00195') {
+            // Only owner - can delete group or transfer ownership
+            Alert.alert(
+              'Không thể rời nhóm',
+              'Bạn là chủ nhóm duy nhất. Vui lòng xóa nhóm hoặc chuyển quyền chủ nhóm trước khi rời.',
+            );
+          } else {
+            // Has other members - must transfer ownership
+            Alert.alert(
+              'Không thể rời nhóm',
+              'Bạn là chủ nhóm. Vui lòng chuyển quyền chủ nhóm cho thành viên khác trước khi rời nhóm.',
+            );
+          }
+        } else {
+          Alert.alert('Lỗi', errorMessage);
+        }
+      } catch (alertError) {
+        // Fallback if Alert fails
+      }
+    } finally {
+      setLeavingFamilyId(null);
+    }
+  }, [handleSessionExpired, fetchFamilies]);
+
+  const handleDeleteFamily = useCallback(async (familyId: number) => {
+    setDeletingFamilyId(familyId);
+    try {
+      await deleteFamily(familyId);
+      Alert.alert(
+        'Thành công',
+        'Nhóm đã được xóa thành công',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowFamilyMenu(false);
+              fetchFamilies();
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      try {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Extract error message from backend response
+        const errorData = err?.response?.data || {};
+        let errorMessage = 'Không thể xóa nhóm. Vui lòng thử lại.';
+        
+        if (errorData && Object.keys(errorData).length > 0) {
+          errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        Alert.alert('Lỗi', errorMessage);
+      } catch (alertError) {
+      }
+    } finally {
+      setDeletingFamilyId(null);
+    }
+  }, [handleSessionExpired, fetchFamilies]);
+
   const getFamilyMenuOptions = () => {
     if (!selectedFamily) return [];
     
     // Kiểm tra xem user có phải owner không
-    const isOwner = currentUserId && selectedFamily.owner_id && currentUserId === selectedFamily.owner_id;
+    const isOwner = currentUserId && selectedFamily.owner_id && Number(currentUserId) === Number(selectedFamily.owner_id);
     
     // Kiểm tra xem user có phải manager không
-    const isManager = currentUserId && selectedFamily.members && 
-      selectedFamily.members.some((member: any) => 
-        member.user_id === currentUserId && member.role === 'manager'
+    let isManager = false;
+    if (currentUserId && selectedFamily.members && Array.isArray(selectedFamily.members)) {
+      isManager = selectedFamily.members.some((member: any) => 
+        member && Number(member.user_id) === Number(currentUserId) && member.role === 'manager'
       );
+    }
     
-    // Cho phép cả owner và manager xem mã mời
+    // Cho phép cả owner và manager xem mã mời và xóa nhóm
     const canViewInvitation = isOwner || isManager;
     
     return [
@@ -268,10 +383,32 @@ export default function GroupPage() {
           setShowInvitationModal(true);
         },
       }] : []),
+      // Chỉ hiển thị nút "Xóa nhóm" nếu user là owner hoặc manager
+      ...(canViewInvitation ? [{
+        label: deletingFamilyId === selectedFamily.id ? 'Đang xóa nhóm...' : 'Xóa nhóm',
+        icon: 'trash-outline' as const,
+        onPress: () => {
+          if (deletingFamilyId === selectedFamily.id) return;
+          Alert.alert(
+            'Xác nhận xóa nhóm',
+            'Bạn có chắc chắn muốn xóa nhóm này? Hành động này không thể hoàn tác và tất cả dữ liệu của nhóm sẽ bị xóa vĩnh viễn.',
+            [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Xóa nhóm',
+                style: 'destructive',
+                onPress: () => handleDeleteFamily(selectedFamily.id),
+              },
+            ]
+          );
+        },
+        destructive: true,
+      }] : []),
       {
-        label: 'Rời nhóm',
+        label: leavingFamilyId === selectedFamily.id ? 'Đang rời nhóm...' : 'Rời nhóm',
         icon: 'log-out-outline' as const,
         onPress: () => {
+          if (leavingFamilyId === selectedFamily.id) return;
           Alert.alert(
             'Xác nhận',
             'Bạn có chắc chắn muốn rời khỏi nhóm này?',
@@ -280,15 +417,13 @@ export default function GroupPage() {
               {
                 text: 'Rời nhóm',
                 style: 'destructive',
-                onPress: () => {
-                  // TODO: Implement leave family
-                  console.log('Leave family:', selectedFamily.id);
-                },
+                onPress: () => handleLeaveFamily(selectedFamily.id),
               },
             ]
           );
         },
         destructive: true,
+        disabled: leavingFamilyId === selectedFamily.id,
       },
     ];
   };
@@ -338,7 +473,6 @@ export default function GroupPage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error creating family:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||
@@ -381,7 +515,6 @@ export default function GroupPage() {
         ]);
       }
     } catch (error: any) {
-      console.error('Error joining family:', error);
       
       let errorMessage = 'Không thể tham gia nhóm. Vui lòng thử lại.';
       
