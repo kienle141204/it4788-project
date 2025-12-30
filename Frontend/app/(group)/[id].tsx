@@ -37,7 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import GroupStatistics from '../../components/GroupStatistics';
-import { getChatMessages, sendChatMessage, type ChatMessage } from '../../service/chat';
+import { getChatMessages, sendChatMessage, type ChatMessage, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage } from '../../service/chat';
 
 const defaultAvatar = require('../../assets/images/avatar.png');
 
@@ -396,24 +396,24 @@ export default function GroupDetailPage() {
           handleSessionExpired();
           return;
         }
-        
+
         // Extract error message from backend response
         // Backend returns: { statusCode, message, resultMessage: { vn, en } }
         const errorData = err?.response?.data || {};
         let errorMessage = 'Không thể rời khỏi nhóm. Vui lòng thử lại.';
-        
+
         if (errorData && Object.keys(errorData).length > 0) {
           // Try resultMessage.vn first (Vietnamese message), then message, then resultMessage.en
           errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
         } else if (err?.message) {
           errorMessage = err.message;
         }
-        
+
         // Check if it's an owner error (400 Bad Request from backend)
         const resultCode = errorData.resultCode || errorData.code;
         const statusCode = err?.response?.status;
         const isOwnerError = statusCode === 400 && (
-          errorMessage.includes('chuyển quyền') || 
+          errorMessage.includes('chuyển quyền') ||
           errorMessage.includes('owner') ||
           errorMessage.includes('chủ nhóm') ||
           resultCode === '00196' || // ResponseCode for owner must transfer ownership
@@ -421,7 +421,7 @@ export default function GroupDetailPage() {
           resultCode === 'C00196' ||
           resultCode === 'C00195'
         );
-        
+
         if (isOwnerError) {
           // Show specific message based on resultCode
           if (resultCode === '00195' || resultCode === 'C00195') {
@@ -472,17 +472,17 @@ export default function GroupDetailPage() {
           handleSessionExpired();
           return;
         }
-        
+
         // Extract error message from backend response
         const errorData = err?.response?.data || {};
         let errorMessage = 'Không thể xóa nhóm. Vui lòng thử lại.';
-        
+
         if (errorData && Object.keys(errorData).length > 0) {
           errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
         } else if (err?.message) {
           errorMessage = err.message;
         }
-        
+
         Alert.alert('Lỗi', errorMessage);
       } catch (alertError) {
       }
@@ -496,7 +496,7 @@ export default function GroupDetailPage() {
 
     // Kiểm tra xem user có phải owner không
     const isOwner = currentUserId && family.owner_id && Number(currentUserId) === Number(family.owner_id);
-    
+
     // isManager đã được tính từ useMemo ở trên
     const canDelete = isOwner || isManager;
 
@@ -710,12 +710,67 @@ export default function GroupDetailPage() {
     }
   }, [familyId, handleSessionExpired]);
 
-  // Load chat messages when chat tab is active
+  // WebSocket connection and chat real-time
+  useEffect(() => {
+    let unsubscribeNewMessage: (() => void) | null = null;
+
+    const setupSocket = async () => {
+      try {
+        await connectChatSocket();
+        console.log('[Chat] Socket connected');
+
+        // Listen for new messages
+        unsubscribeNewMessage = onNewMessage((message) => {
+          console.log('[Chat] New message received:', message);
+          setChatMessages((prev) => {
+            // Avoid duplicates
+            if (prev.some((m) => m.id === message.id)) {
+              return prev;
+            }
+            return [...prev, {
+              id: message.id,
+              userId: message.userId,
+              title: message.title,
+              message: message.message,
+              data: message.data,
+              isRead: false,
+              familyId: message.familyId,
+              createdAt: message.createdAt,
+            }];
+          });
+        });
+
+        // Join room if chat tab is active
+        if (activeTab === 'chat') {
+          await joinChatRoom(familyId);
+          console.log('[Chat] Joined room for family:', familyId);
+        }
+      } catch (err) {
+        console.error('[Chat] Socket connection error:', err);
+      }
+    };
+
+    setupSocket();
+
+    return () => {
+      if (unsubscribeNewMessage) {
+        unsubscribeNewMessage();
+      }
+      leaveChatRoom(familyId);
+      disconnectChatSocket();
+      console.log('[Chat] Socket cleanup completed');
+    };
+  }, [familyId]);
+
+  // Join/leave room when tab changes
   useEffect(() => {
     if (activeTab === 'chat') {
       fetchChatMessages();
+      joinChatRoom(familyId);
+    } else {
+      leaveChatRoom(familyId);
     }
-  }, [activeTab, fetchChatMessages]);
+  }, [activeTab, familyId, fetchChatMessages]);
 
   // Auto-scroll to bottom when chat messages are loaded
   useEffect(() => {
@@ -731,13 +786,26 @@ export default function GroupDetailPage() {
 
     setSendingMessage(true);
     try {
-      await sendChatMessage({
+      // Use WebSocket to send message (real-time)
+      const result = await sendMessageWS({
         familyId,
         title: 'Tin nhắn',
         message: newMessage.trim(),
       });
-      setNewMessage('');
-      await fetchChatMessages();
+
+      if (result.success) {
+        setNewMessage('');
+        // Message will be received via onNewMessage listener, no need to fetch
+      } else {
+        // Fallback to REST API if WebSocket fails
+        await sendChatMessage({
+          familyId,
+          title: 'Tin nhắn',
+          message: newMessage.trim(),
+        });
+        setNewMessage('');
+        await fetchChatMessages();
+      }
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -1000,15 +1068,15 @@ export default function GroupDetailPage() {
 
 
       const newList = await createShoppingList(familyId, dateStr, ownerId);
-      
+
       // Close modal immediately
       setShowAddListModal(false);
       setAssignedOwner(null);
       setShowAssignMemberDropdown(false);
-      
+
       // Only fetch shopping lists (much faster)
       await fetchShoppingLists();
-      
+
       Alert.alert('Thành công', 'Đã tạo danh sách mua sắm mới');
     } catch (error) {
       Alert.alert('Lỗi', 'Không thể tạo danh sách mua sắm');
@@ -1028,7 +1096,7 @@ export default function GroupDetailPage() {
           onPress: async () => {
             // Store deleted list for rollback
             let deletedList: ShoppingList | null = null;
-            
+
             // Optimistic update: Remove list immediately
             setShoppingLists(prevLists => {
               const listToDelete = prevLists.find(l => l.id === listId);
@@ -1134,7 +1202,7 @@ export default function GroupDetailPage() {
 
     // Close modal immediately for better UX
     setShowAddItemModal(false);
-    
+
     // Reset form immediately
     const resetForm = () => {
       setSelectedListId(null);
@@ -1165,14 +1233,14 @@ export default function GroupDetailPage() {
     };
 
     // Update local state immediately
-    setShoppingLists(prevLists => 
-      prevLists.map(list => 
+    setShoppingLists(prevLists =>
+      prevLists.map(list =>
         list.id === listId
           ? {
-              ...list,
-              items: [...(list.items || []), optimisticItem],
-              cost: list.cost + ((optimisticItem.price || 0) * stock / 1000),
-            }
+            ...list,
+            items: [...(list.items || []), optimisticItem],
+            cost: list.cost + ((optimisticItem.price || 0) * stock / 1000),
+          }
           : list
       )
     );
@@ -1182,14 +1250,14 @@ export default function GroupDetailPage() {
     // Call API in background
     try {
       const newItem = await addItemToList(listId, ingredientId, stock, price);
-      
+
       // Only fetch shopping lists (much faster than fetchFamilyData)
       await fetchShoppingLists();
     } catch (error) {
-      
+
       // Rollback optimistic update on error
       await fetchShoppingLists();
-      
+
       Alert.alert('Lỗi', 'Không thể thêm mặt hàng. Vui lòng thử lại.');
     }
   };
@@ -1198,7 +1266,7 @@ export default function GroupDetailPage() {
   const handleToggleItem = async (itemId: number) => {
     // Optimistic update: Toggle immediately
     let previousState: boolean = false;
-    setShoppingLists(prevLists => 
+    setShoppingLists(prevLists =>
       prevLists.map(list => ({
         ...list,
         items: list.items?.map(item => {
@@ -1236,9 +1304,9 @@ export default function GroupDetailPage() {
             // Find the item to delete for rollback
             let deletedItem: ShoppingItem | null = null;
             let listId: number | null = null;
-            
+
             // Optimistic update: Remove item immediately
-            setShoppingLists(prevLists => 
+            setShoppingLists(prevLists =>
               prevLists.map(list => {
                 const item = list.items?.find(i => i.id === itemId);
                 if (item) {
@@ -1261,14 +1329,14 @@ export default function GroupDetailPage() {
             } catch (error) {
               // Rollback on error
               if (deletedItem && listId) {
-                setShoppingLists(prevLists => 
-                  prevLists.map(list => 
+                setShoppingLists(prevLists =>
+                  prevLists.map(list =>
                     list.id === listId
                       ? {
-                          ...list,
-                          items: [...(list.items || []), deletedItem!],
-                          cost: list.cost + ((deletedItem!.price || 0) * deletedItem!.stock / 1000),
-                        }
+                        ...list,
+                        items: [...(list.items || []), deletedItem!],
+                        cost: list.cost + ((deletedItem!.price || 0) * deletedItem!.stock / 1000),
+                      }
                       : list
                   )
                 );

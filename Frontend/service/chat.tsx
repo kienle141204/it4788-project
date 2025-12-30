@@ -78,3 +78,16 @@ export const markMessageAsRead = async (messageId: number): Promise<ChatMessage>
         throw error;
     }
 };
+
+// Re-export WebSocket functions for convenient imports
+export {
+    connectChatSocket,
+    disconnectChatSocket,
+    getChatSocket,
+    joinChatRoom,
+    leaveChatRoom,
+    sendMessageWS,
+    onNewMessage,
+    onUserTyping,
+    sendTyping,
+} from '../utils/socket';
