@@ -87,7 +87,6 @@ export default function NotificationsPage() {
           await handleRefresh();
         }
       } catch (error) {
-        console.error('Error deleting notification:', error);
       }
     },
     [filter, handleRefresh, refreshNotifications],
@@ -99,7 +98,6 @@ export default function NotificationsPage() {
       setDisplayed([]);
       await refreshNotifications();
     } catch (error) {
-      console.error('Error deleting all notifications:', error);
     }
   }, [refreshNotifications]);
 

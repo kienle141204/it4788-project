@@ -53,7 +53,6 @@ export default function Verify() {
       await AsyncStorage.setItem('access_key', access as any)
       await AsyncStorage.setItem('refresh_key', refresh as any)
       const key = await AsyncStorage.getAllKeys()
-      console.log(key)
       route.push('/(auth)/updata_profile')
 
     } catch (e) {
@@ -67,7 +66,6 @@ export default function Verify() {
     setLoading(true)
     try {
       await resendEmail({ email: email })
-      console.log('Gửi lại OTP');
     } catch (e) {
       throw e
     } finally {

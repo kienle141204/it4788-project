@@ -49,7 +49,6 @@ export default function JoinFamilyModal({
       onClose();
     } catch (error: any) {
       // Error handling is done in parent component
-      console.error('Error joining family:', error);
     } finally {
       setLoading(false);
     }

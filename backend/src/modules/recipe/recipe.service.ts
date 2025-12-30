@@ -285,11 +285,6 @@ export class RecipeService {
     // Tìm steps cần xóa (không có trong danh sách update)
     const stepIdsToDelete = existingStepIds.filter(id => !stepIdsToKeep.includes(id));
 
-    console.log('Existing steps:', existingStepIds);
-    console.log('Steps to keep:', stepIdsToKeep);
-    console.log('Steps to delete:', stepIdsToDelete);
-    console.log('Steps to create:', stepsToCreate.length);
-
     // Xóa images của các steps sẽ bị xóa
     if (stepIdsToDelete.length > 0) {
       await this.imageRepository.delete({ recipe_steps_id: In(stepIdsToDelete) });

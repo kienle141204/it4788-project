@@ -41,7 +41,6 @@
 //                     sharedLists,
 //                 });
 //             } catch (error) {
-//                 console.error('Error fetching my shopping lists:', error);
 //                 setMyLists([]);
 //             } finally {
 //                 setLoading(false);

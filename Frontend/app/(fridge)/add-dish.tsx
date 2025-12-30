@@ -86,7 +86,6 @@ export default function AddDishPage() {
           handleSessionExpired();
           return;
         }
-        console.error('fetchDishes error', err);
       } finally {
         setLoadingDishes(false);
       }
@@ -161,7 +160,6 @@ export default function AddDishPage() {
       }
 
       const response = await addDishToRefrigerator(fridgeId, data);
-      console.log('[AddDish] Response after adding:', response);
 
       Alert.alert('Thành công', 'Đã thêm món ăn vào tủ lạnh!', [
         {
@@ -172,7 +170,6 @@ export default function AddDishPage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error adding dish:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||

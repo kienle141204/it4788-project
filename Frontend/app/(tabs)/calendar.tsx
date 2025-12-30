@@ -53,10 +53,6 @@ export default function TaskPage() {
     try {
       setLoading(true);
       const lists = await getMyShoppingLists();
-      console.log('Loaded shopping lists:', lists);
-      console.log('First list:', lists?.[0]);
-      console.log('First list items:', lists?.[0]?.items);
-      console.log('First list family:', lists?.[0]?.family);
       
       // Ensure items are properly typed
       const typedLists: ShoppingList[] = (lists || []).map((list: any) => ({
@@ -68,7 +64,6 @@ export default function TaskPage() {
       // Reset loaded list IDs when reloading all lists
       setLoadedListIds(new Set());
     } catch (error: any) {
-      console.error('Error loading shopping lists:', error);
       if (error.message === 'SESSION_EXPIRED' || error.response?.status === 401) {
         Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
         router.push('/(auth)/login');
@@ -112,7 +107,6 @@ export default function TaskPage() {
   const loadShoppingListItems = async (listId: number) => {
     try {
       const list = await getShoppingListById(listId);
-      console.log('Loaded list items:', list);
       if (list && list.items) {
         // Update the list in shoppingLists with items
         setShoppingLists(prevLists => 
@@ -125,7 +119,6 @@ export default function TaskPage() {
         );
       }
     } catch (error: any) {
-      console.error('Error loading shopping list items:', error);
       // Remove from loaded set on error so it can be retried
       setLoadedListIds(prev => {
         const newSet = new Set(prev);
@@ -189,7 +182,6 @@ export default function TaskPage() {
       // Reload only this list's items to sync with server (faster than reloading all)
       await loadShoppingListItems(listId);
     } catch (error: any) {
-      console.error('Error toggling item:', error);
       
       // Rollback optimistic update on error
       if (previousCheckedState !== undefined) {

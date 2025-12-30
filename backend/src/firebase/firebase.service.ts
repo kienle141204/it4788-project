@@ -90,16 +90,11 @@ export class FirebaseService implements OnModuleInit {
      */
     private async handleTokenError(error: any, token: string): Promise<void> {
         if (this.isInvalidTokenError(error)) {
-            console.warn(`⚠️ Invalid token detected: ${token.substring(0, 20)}...`);
             if (this.deviceTokenService) {
                 try {
                     await this.deviceTokenService.removeInvalidToken(token);
-                    console.log(`✅ Removed invalid token from database`);
                 } catch (removeError) {
-                    console.error(`❌ Error removing invalid token:`, removeError);
                 }
-            } else {
-                console.warn(`⚠️ DeviceTokenService not available, cannot remove invalid token`);
             }
         }
     }
@@ -116,11 +111,9 @@ export class FirebaseService implements OnModuleInit {
 
         try {
             const response = await getMessaging().send(message);
-            console.log('✅ Notification sent:', response);
             return response;
         } catch (error) {
             await this.handleTokenError(error, token);
-            console.error('❌ Error sending notification:', error);
             throw error;
         }
     }
@@ -135,21 +128,22 @@ export class FirebaseService implements OnModuleInit {
         data?: Record<string, string>,
     ): Promise<{ success: number; failed: number; errors: string[] }> {
         if (!this.deviceTokenService) {
-            console.warn(`⚠️ DeviceTokenService not available, cannot send to user ${userId}`);
+            console.warn(`[FirebaseService] ⚠️ DeviceTokenService not available for user ${userId}`);
             return { success: 0, failed: 0, errors: ['DeviceTokenService not available'] };
         }
 
         try {
             const deviceTokens = await this.deviceTokenService.getUserTokens(userId);
+            console.log(`[FirebaseService] 📱 Found ${deviceTokens.length} device token(s) for user ${userId}`);
             if (deviceTokens.length === 0) {
-                console.log(`ℹ️ No device tokens found for user ${userId}`);
+                console.log(`[FirebaseService] ℹ️ No device tokens found for user ${userId}`);
                 return { success: 0, failed: 0, errors: [] };
             }
 
             const tokens = deviceTokens.map((dt) => dt.deviceToken);
+            console.log(`[FirebaseService] 📤 Sending to ${tokens.length} device(s) for user ${userId}`);
             return await this.sendToMultipleTokens(tokens, title, body, data);
         } catch (error) {
-            console.error(`❌ Error getting tokens for user ${userId}:`, error);
             return { success: 0, failed: 0, errors: [error.message || 'Unknown error'] };
         }
     }
@@ -189,8 +183,11 @@ export class FirebaseService implements OnModuleInit {
         await Promise.allSettled(promises);
 
         console.log(
-            `📊 Push notification results: ${results.success} success, ${results.failed} failed`,
+            `[FirebaseService] 📊 Push notification results: ${results.success} success, ${results.failed} failed`,
         );
+        if (results.errors.length > 0) {
+            console.warn(`[FirebaseService] ⚠️ Push notification errors:`, results.errors);
+        }
         return results;
     }
 
@@ -204,7 +201,6 @@ export class FirebaseService implements OnModuleInit {
         data?: Record<string, string>,
     ): Promise<{ success: number; failed: number; errors: string[] }> {
         if (!this.deviceTokenService) {
-            console.warn(`⚠️ DeviceTokenService not available, cannot send to multiple users`);
             return { success: 0, failed: 0, errors: ['DeviceTokenService not available'] };
         }
 
@@ -222,7 +218,6 @@ export class FirebaseService implements OnModuleInit {
         }
 
         if (allTokens.length === 0) {
-            console.log(`ℹ️ No device tokens found for any of the ${userIds.length} users`);
             return { success: 0, failed: 0, errors };
         }
 

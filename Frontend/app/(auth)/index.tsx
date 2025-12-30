@@ -11,7 +11,6 @@ import { checkAsyncStorage } from '@/utils/checkAsyncStorage'
 
 export default function login() {
     const route = useRouter()
-    console.log('📍 Đang ở AUTH');
     const nextPage = () => {
         route.push('/(auth)/login')
     }
@@ -19,9 +18,7 @@ export default function login() {
     useEffect(() => {
       const checkToken = async () => {
         const key = await AsyncStorage.getItem('access_token')
-        console.log(key)
         const token = await checkAsyncStorage();
-        console.log(token)
         if (token) {
           route.replace('/(market)/market_screen');
         }

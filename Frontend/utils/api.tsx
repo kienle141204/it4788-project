@@ -16,7 +16,6 @@ const getApiDomain = () => {
 };
 
 const API_DOMAIN = getApiDomain();
-// console.log(`🌐 API Domain: ${API_DOMAIN} (Platform: ${Platform.OS})`);
 // const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
@@ -32,13 +31,11 @@ export const get = async (path: string) => {
     return result;
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
-      console.log('API Error:', error.response?.data || error.message);
       return error.response?.data || {
         statusCode: error.response?.status || 500,
         message: error.message || 'Network Error'
       };
     } else {
-      console.error('Unknown error:', error);
       return {
         statusCode: 500,
         message: error?.message || 'Network connect failed'
@@ -53,14 +50,12 @@ export const post = async (path: string, data: object) => {
     return res.data;
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
-      console.log('API Error:', error.response?.data || error.message);
       // Return error response data or structured error object
       return error.response?.data || {
         statusCode: error.response?.status || 500,
         message: error.message || 'Network Error'
       };
     } else {
-      console.error('Unknown error:', error);
       // Return structured error instead of throwing
       return {
         statusCode: 500,
@@ -76,13 +71,11 @@ export const patch = async (path: string, data: object) => {
     return res
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
-      console.log('API Error:', error.response?.data || error.message);
       return error.response?.data || {
         statusCode: error.response?.status || 500,
         message: error.message || 'Network Error'
       };
     } else {
-      console.error('Unknown error:', error);
       return {
         statusCode: 500,
         message: error?.message || 'Unknown error occurred'
@@ -97,13 +90,11 @@ export const deleteData = async (path: String) => {
     return res
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
-      console.log('API Error:', error.response?.data || error.message);
       return error.response?.data || {
         statusCode: error.response?.status || 500,
         message: error.message || 'Network Error'
       };
     } else {
-      console.error('Unknown error:', error);
       return {
         statusCode: 500,
         message: error?.message || 'Unknown error occurred'
@@ -118,13 +109,11 @@ export const upImage = async (path: string, data: object) => {
     return response
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
-      console.log('API Error:', error.response?.data || error.message);
       return error.response?.data || {
         statusCode: error.response?.status || 500,
         message: error.message || 'Network Error'
       };
     } else {
-      console.error('Unknown error:', error);
       return {
         statusCode: 500,
         message: error?.message || 'Unknown error occurred'
@@ -145,9 +134,6 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
     }
 
     const uploadUrl = API_DOMAIN + 'upload/file';
-    console.log('📤 Uploading file to:', uploadUrl, 'with folder:', folder);
-    console.log('📤 API_DOMAIN:', API_DOMAIN);
-    console.log('📤 Token header:', tokenHeader);
 
     // Use React Native's fetch API instead of axios for FormData uploads
     // React Native's fetch handles FormData better than axios
@@ -161,8 +147,6 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
     }
 
     // Don't set Content-Type - fetch will set it automatically with boundary for FormData
-    console.log('📤 Upload headers:', headers);
-    console.log('📤 FormData type:', formData.constructor.name);
 
     try {
       // Use fetch API with timeout
@@ -193,7 +177,6 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
 
         // Handle 401 Unauthorized
         if (response.status === 401 && retryCount === 0) {
-          console.log('🔄 Token expired, attempting to refresh...');
           await refreshAccessToken();
           return uploadFileAccess(formData, folder, retryCount + 1);
         }
@@ -209,7 +192,6 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
       }
 
       const data = await response.json();
-      console.log('✅ Upload successful:', data);
       return data;
     } catch (fetchError: any) {
       // Handle timeout
@@ -250,25 +232,6 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
 
     // Handle 401 errors
     if (error.response?.status === 401) {
-      console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
-      console.error('Token header:', tokenHeader);
-      console.error('Request URL:', API_DOMAIN + 'upload/file');
-    }
-
-    // Log detailed error information
-    const errorData = error.response?.data;
-    console.error('❌ Upload error:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      message: errorData?.message || error.message,
-      error: errorData?.error,
-      data: errorData,
-      code: error.code,
-    });
-
-    // If error message mentions api_key, it's likely a backend Cloudinary config issue
-    if (errorData?.message?.includes('api_key') || errorData?.error?.includes('api_key')) {
-      console.error('⚠️ Cloudinary configuration error detected. Backend may need to configure Cloudinary credentials.');
     }
 
     throw error;
@@ -301,7 +264,6 @@ export const logoutUser = async () => {
 const getTokenHeader = async () => {
   const token = await AsyncStorage.getItem('access_token');
   if (!token) {
-    console.warn('⚠️ No access token found in AsyncStorage');
     return {};
   }
 
@@ -317,21 +279,8 @@ const getTokenHeader = async () => {
     const isExpired = exp && exp < now;
     const timeUntilExpiry = exp ? exp - now : null;
 
-    console.log('🔑 Token header created:', {
-      hasToken: !!token,
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 20) + '...',
-      headerFormat: authHeader.Authorization.substring(0, 25) + '...',
-      isExpired,
-      expiresIn: timeUntilExpiry ? `${Math.floor(timeUntilExpiry / 60)} minutes` : 'unknown',
-      payload: { sub: decoded.sub, email: decoded.email }
-    });
-
     if (isExpired) {
-      console.error('⚠️ Token has expired! Need to refresh or re-login.');
     }
-  } else {
-    console.warn('⚠️ Could not decode token - may be invalid format');
   }
 
   return authHeader;
@@ -341,13 +290,11 @@ const getTokenHeader = async () => {
 const refreshAccessToken = async (): Promise<boolean> => {
   const refresh_token = await AsyncStorage.getItem('refresh_token');
   if (!refresh_token) {
-    console.error('⚠️ No refresh token found');
     await logoutUser();
     throw new Error('SESSION_EXPIRED');
   }
 
   try {
-    console.log('🔄 Attempting to refresh token...');
     const response = await axios.post(API_DOMAIN + 'auth/refresh-token', {
       refresh_token: refresh_token.startsWith('Bearer ') ? refresh_token.substring(7) : refresh_token
     }, config);
@@ -355,15 +302,12 @@ const refreshAccessToken = async (): Promise<boolean> => {
     if (response.data && response.data.access_token && response.data.refresh_token) {
       await AsyncStorage.setItem('access_token', response.data.access_token);
       await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
-      console.log('✅ Token refreshed successfully');
       return true;
     }
 
-    console.error('❌ Refresh token response is invalid');
     await logoutUser();
     throw new Error('SESSION_EXPIRED');
   } catch (error: any) {
-    console.error('❌ Failed to refresh token:', error.response?.data || error.message);
     await logoutUser();
     throw new Error('SESSION_EXPIRED');
   }
@@ -372,7 +316,6 @@ const refreshAccessToken = async (): Promise<boolean> => {
 const ensureTokenValid = async (): Promise<boolean> => {
   const token = await AsyncStorage.getItem('access_token');
   if (!token) {
-    console.warn('⚠️ No access token found when validating');
     await logoutUser();
     throw new Error('SESSION_EXPIRED');
   }
@@ -380,7 +323,6 @@ const ensureTokenValid = async (): Promise<boolean> => {
   const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
   const decoded = decodeJWT(cleanToken);
   if (!decoded || !decoded.exp) {
-    console.warn('⚠️ Invalid token payload, forcing logout');
     await logoutUser();
     throw new Error('SESSION_EXPIRED');
   }
@@ -389,13 +331,11 @@ const ensureTokenValid = async (): Promise<boolean> => {
   const timeUntilExpiry = decoded.exp - now;
 
   if (timeUntilExpiry <= 0) {
-    console.warn('⚠️ Token already expired, refreshing...');
     await refreshAccessToken();
     return true;
   }
 
   if (timeUntilExpiry < REFRESH_THRESHOLD_SECONDS) {
-    console.log(`🔄 Token expires in ${timeUntilExpiry}s, refreshing early...`);
     await refreshAccessToken();
   }
 
@@ -403,18 +343,15 @@ const ensureTokenValid = async (): Promise<boolean> => {
 };
 
 export const getAccess = async (path: string, params: object = {}, retryCount = 0): Promise<any> => {
-  console.log('getAccess called:', { path, params, retryCount });
   let tokenHeader = {};
   try {
     await ensureTokenValid();
     tokenHeader = await getTokenHeader();
-    console.log('Making API request to:', API_DOMAIN + path, 'with params:', params, 'and headers:', tokenHeader);
     const result = await axios.get(API_DOMAIN + path, {
       ...config,
       headers: { ...config.headers, ...tokenHeader },
       params,
     });
-    console.log('API response received:', result.data);
     return result.data;
   } catch (error: any) {
     if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
@@ -429,26 +366,14 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
           errorMessage.includes('Không tìm thấy món ăn trong tủ lạnh') ||
           errorMessage.includes('Không tìm thấy nguyên liệu trong tủ lạnh'));
 
-      if (!is404Expected) {
-        console.error('getAccess error:', error?.response?.data || error?.message || error);
-      }
-
       if (error.response?.status === 401 && retryCount === 0) {
-        console.log('🔄 Token expired, attempting to refresh...');
         await refreshAccessToken();
         return getAccess(path, params, retryCount + 1);
       }
       if (error.response?.status === 401) {
-        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
-        console.error('Token header:', tokenHeader);
-        console.error('Request URL:', API_DOMAIN + path);
-      }
-      if (!is404Expected) {
-        console.log('API Error:', error.response?.data || error.message);
       }
       throw error;
     } else {
-      console.error('Unknown error:', error);
       throw error;
     }
   }
@@ -467,19 +392,13 @@ export const postAccess = async (path: string, data: object, retryCount = 0): Pr
     }
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401 && retryCount === 0) {
-        console.log('🔄 Token expired, attempting to refresh...');
         await refreshAccessToken();
         return postAccess(path, data, retryCount + 1);
       }
       if (error.response?.status === 401) {
-        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
-        console.error('Token header:', tokenHeader);
-        console.error('Request URL:', API_DOMAIN + path);
       }
-      console.log('API Error:', error.response?.data || error.message);
       throw error;
     } else {
-      console.error('Unknown error:', error);
       throw error;
     }
   }
@@ -498,19 +417,13 @@ export const patchAccess = async (path: string, data: object, retryCount = 0): P
     }
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401 && retryCount === 0) {
-        console.log('🔄 Token expired, attempting to refresh...');
         await refreshAccessToken();
         return patchAccess(path, data, retryCount + 1);
       }
       if (error.response?.status === 401) {
-        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
-        console.error('Token header:', tokenHeader);
-        console.error('Request URL:', API_DOMAIN + path);
       }
-      console.log('API Error:', error.response?.data || error.message);
       throw error;
     } else {
-      console.error('Unknown error:', error);
       throw error;
     }
   }
@@ -529,19 +442,13 @@ export const deleteAccess = async (path: string, retryCount = 0): Promise<any> =
     }
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401 && retryCount === 0) {
-        console.log('🔄 Token expired, attempting to refresh...');
         await refreshAccessToken();
         return deleteAccess(path, retryCount + 1);
       }
       if (error.response?.status === 401) {
-        console.error('Unauthorized - Token may be invalid or expired:', error.response?.data);
-        console.error('Token header:', tokenHeader);
-        console.error('Request URL:', API_DOMAIN + path);
       }
-      console.log('API Error:', error.response?.data || error.message);
       throw error;
     } else {
-      console.error('Unknown error:', error);
       throw error;
     }
   }

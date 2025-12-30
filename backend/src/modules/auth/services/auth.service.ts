@@ -74,14 +74,6 @@ export class AuthService {
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
 
-    console.log('OTP Created:', {
-      email: savedTempUser.email,
-      otpCode: savedTempUser.otp_code,
-      tpSentAt: savedTempUser.otp_sent_at,
-      tpSentAtLocal: new Date(savedTempUser.otp_sent_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
-      status: savedTempUser.status
-    });
-
     // Gửi email OTP
     await this.emailService.sendOtpEmail(email, otpCode);
 
@@ -114,17 +106,6 @@ export class AuthService {
     const currentTime = new Date(); // Sử dụng thời gian hiện tại
     const otpSentTime = new Date(tempUser.otp_sent_at);
     const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000);
-
-    console.log('OTP Debug Info:', {
-      currentTime: currentTime.toISOString(),
-      currentTimeLocal: currentTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
-      otpSentTime: otpSentTime.toISOString(),
-      otpSentTimeLocal: otpSentTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
-      otpExpiryTime: otpExpiryTime.toISOString(),
-      otpExpiryTimeLocal: otpExpiryTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
-      timeDiff: (currentTime.getTime() - otpSentTime.getTime()) / 1000 / 60, // phút
-      isExpired: currentTime > otpExpiryTime
-    });
 
     if (currentTime > otpExpiryTime) {
       await this.tempUserRepository.update(tempUser.temp_user_id, { status: 'EXPIRED' });
@@ -189,15 +170,6 @@ export class AuthService {
     await this.tempUserRepository.update(tempUser.temp_user_id, {
       otp_code: newOtpCode,
       otp_sent_at: newSentTime,
-    });
-
-    console.log('OTP Resent:', {
-      email: email,
-      newOtpCode: newOtpCode,
-      newSentTime: newSentTime.toISOString(),
-      newSentTimeLocal: newSentTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
-      expiryTime: new Date(newSentTime.getTime() + 3 * 60 * 1000).toISOString(),
-      expiryTimeLocal: new Date(newSentTime.getTime() + 3 * 60 * 1000).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
     });
 
     // Gửi email OTP mới

@@ -89,7 +89,6 @@ export const useExpiringItems = () => {
         totalExpired: expiredDishes + expiredIngredients,
       });
     } catch (error) {
-      console.error('[useExpiringItems] Error calculating expiring items:', error);
       // Set to zero on error
       setExpiringCount({
         expiringDishes: 0,

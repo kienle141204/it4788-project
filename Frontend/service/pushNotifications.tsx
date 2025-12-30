@@ -65,7 +65,8 @@ class PushNotificationService {
       const tokenData = await Notifications.getExpoPushTokenAsync();
       
       this.expoPushToken = tokenData.data;
-      console.log('[PushNotifications] Expo Push Token:', this.expoPushToken);
+      console.log('[PushNotifications] ✅ Expo Push Token obtained:', this.expoPushToken);
+      console.log('[PushNotifications] 📱 Platform:', Platform.OS);
       
       return this.expoPushToken;
     } catch (error) {
@@ -103,10 +104,11 @@ class PushNotificationService {
 
       if (response?.success) {
         this.isRegistered = true;
-        console.log('[PushNotifications] Token registered successfully with backend');
+        console.log('[PushNotifications] ✅ Token registered successfully with backend');
+        console.log('[PushNotifications] 📝 Registration response:', response);
         return true;
       } else {
-        console.error('[PushNotifications] Failed to register token:', response);
+        console.error('[PushNotifications] ❌ Failed to register token:', response);
         return false;
       }
     } catch (error) {
@@ -147,7 +149,11 @@ class PushNotificationService {
   ) {
     // Listener cho notification khi app đang foreground
     const receivedListener = Notifications.addNotificationReceivedListener((notification: any) => {
-      console.log('[PushNotifications] Notification received (foreground):', notification);
+      console.log('[PushNotifications] 📬 Notification received (foreground):', {
+        title: notification.request.content.title,
+        body: notification.request.content.body,
+        data: notification.request.content.data,
+      });
       if (onNotificationReceived) {
         onNotificationReceived(notification);
       }
@@ -155,7 +161,11 @@ class PushNotificationService {
 
     // Listener cho khi user tap vào notification
     const responseListener = Notifications.addNotificationResponseReceivedListener((response: any) => {
-      console.log('[PushNotifications] Notification tapped:', response);
+      console.log('[PushNotifications] 👆 Notification tapped:', {
+        title: response.notification.request.content.title,
+        body: response.notification.request.content.body,
+        data: response.notification.request.content.data,
+      });
       if (onNotificationTapped) {
         onNotificationTapped(response);
       }

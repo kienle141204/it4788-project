@@ -50,7 +50,6 @@ export const getMyFamilies = async (): Promise<Family[]> => {
 
     throw new Error('Invalid families response');
   } catch (error) {
-    console.error('Error getting my families:', error);
     throw error;
   }
 };
@@ -60,7 +59,6 @@ export const getMyFamily = async (): Promise<Family[]> => {
     const res: GetMyFamilyResponse = await getAccess('families/my-family');
     return res.data;
   } catch (error) {
-    console.error('Error getting my family:', error);
     throw error;
   }
 };
@@ -74,7 +72,6 @@ export const getFamilyById = async (id: number): Promise<Family> => {
     }
     return res;
   } catch (error) {
-    console.error(`Error getting family ${id}:`, error);
     throw error;
   }
 };
@@ -91,7 +88,6 @@ export const createFamily = async (data: {
     const res = await postAccess('families', data);
     return res;
   } catch (error) {
-    console.error('Error creating family:', error);
     throw error;
   }
 };
@@ -111,7 +107,6 @@ export const updateFamily = async (
     const res = await patchAccess(`families/${id}`, data);
     return res;
   } catch (error) {
-    console.error(`Error updating family ${id}:`, error);
     throw error;
   }
 };
@@ -125,7 +120,6 @@ export const deleteFamily = async (id: number) => {
     const res = await deleteAccess(`families/${id}`);
     return res;
   } catch (error) {
-    console.error(`Error deleting family ${id}:`, error);
     throw error;
   }
 };
@@ -143,7 +137,6 @@ export const addFamilyMember = async (data: {
     const res = await postAccess('families/add-member', data);
     return res;
   } catch (error) {
-    console.error('Error adding family member:', error);
     throw error;
   }
 };
@@ -157,7 +150,6 @@ export const getFamilyInvitationCode = async (familyId: number) => {
     const res = await getAccess(`families/${familyId}/invitation`);
     return res;
   } catch (error) {
-    console.error(`Error getting invitation code for family ${familyId}:`, error);
     throw error;
   }
 };
@@ -171,7 +163,6 @@ export const joinFamilyByCode = async (invitationCode: string) => {
     const res = await postAccess('families/join', { invitation_code: invitationCode });
     return res;
   } catch (error) {
-    console.error('Error joining family by code:', error);
     throw error;
   }
 };
@@ -194,7 +185,6 @@ export const getAllFamilies = async () => {
     const res = await getAccess('families');
     return res;
   } catch (error) {
-    console.error('Error getting all families:', error);
     throw error;
   }
 };
@@ -212,7 +202,6 @@ export const getFamilyMembers = async (familyId: number) => {
     }
     return res;
   } catch (error) {
-    console.error(`Error getting members for family ${familyId}:`, error);
     throw error;
   }
 };

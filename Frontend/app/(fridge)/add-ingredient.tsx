@@ -85,7 +85,6 @@ export default function AddIngredientPage() {
           handleSessionExpired();
           return;
         }
-        console.error('fetchIngredients error', err);
         setIngredients([]);
       } finally {
         setLoadingIngredients(false);
@@ -171,7 +170,6 @@ export default function AddIngredientPage() {
         },
       ]);
     } catch (err: any) {
-      console.error('Error adding ingredient:', err);
       const errorMessage =
         err?.response?.data?.message ||
         err?.message ||
