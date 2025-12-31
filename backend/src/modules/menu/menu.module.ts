@@ -7,9 +7,14 @@ import { MenuDish } from '../../entities/menu-dish.entity';
 import { Family } from '../../entities/family.entity';
 import { Dish } from '../../entities/dish.entity';
 import { FamilyMember } from '../../entities/family-member.entity';
+import { User } from '../../entities/user.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Menu, MenuDish, Family, Dish, FamilyMember])],
+  imports: [
+    TypeOrmModule.forFeature([Menu, MenuDish, Family, Dish, FamilyMember, User]),
+    NotificationsModule,
+  ],
   controllers: [MenuController],
   providers: [MenuService],
   exports: [MenuService],
