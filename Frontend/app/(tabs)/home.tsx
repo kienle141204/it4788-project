@@ -14,6 +14,7 @@ import { COLORS } from '@/constants/themes';
 import { getAccess } from '@/utils/api';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getMyShoppingLists } from '@/service/shopping';
+import { LogViewer } from '@/utils/logger';
 
 type UserProfile = {
   id: number;
@@ -202,6 +203,7 @@ export default function HomePage() {
         </View>
 
       </ScrollView>
+      <LogViewer />
     </View>
   );
 }

@@ -19,8 +19,15 @@ export default function Index() {
         // Nếu đã đăng nhập, đăng ký push notification token
         if (token) {
           try {
-            await pushNotificationService.registerTokenWithBackend();
+            console.log('[Index] 🔔 Attempting to register push notification token...');
+            const registered = await pushNotificationService.registerTokenWithBackend();
+            if (registered) {
+              console.log('[Index] ✅ Push notification token registered successfully');
+            } else {
+              console.warn('[Index] ⚠️ Push notification token registration failed (check logs above)');
+            }
           } catch (error) {
+            console.error('[Index] ❌ Error registering push notification token:', error);
             // Không block app flow nếu đăng ký token fail
           }
         }

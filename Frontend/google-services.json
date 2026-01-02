@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "34214463713",
+    "project_id": "push-notification-it4788",
+    "storage_bucket": "push-notification-it4788.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34214463713:android:0341b75abd3ab94a3ecfa0",
+        "android_client_info": {
+          "package_name": "com.siuvippro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyv3i9NVPgEnjG_pwIXJKytCOCqFsUDUM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

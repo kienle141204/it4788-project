@@ -5,7 +5,7 @@ import { API_DOMAIN } from './api';
 
 const getSocketUrl = () => {
     // Kiểm tra xem API_DOMAIN có phải Render URL không
-    const isProduction = API_DOMAIN.includes('render.com') || API_DOMAIN.includes('onrender.com');
+    const isProduction = API_DOMAIN && (API_DOMAIN.includes('render.com') || API_DOMAIN.includes('onrender.com'));
 
     if (isProduction) {
         return 'wss://it4788-project-ttac.onrender.com';
