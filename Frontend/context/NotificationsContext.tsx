@@ -116,9 +116,28 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       // Khi user tap vào notification
       (response) => {
         console.log('[Notifications] Push notification tapped:', response);
-        const data = response.notification.request.content.data;
+        
+        // Extract data from notification - handle both expo-notifications and FCM formats
+        let data: any = {};
+        if (response?.notification?.request?.content?.data) {
+          // Expo notifications format
+          data = response.notification.request.content.data;
+        } else if (response?.data) {
+          // FCM format
+          data = response.data;
+        }
 
-        // Navigate đến màn hình notifications
+        // Kiểm tra nếu là chat notification
+        if (data?.type === 'chat_message' && data?.familyId) {
+          console.log('[Notifications] Chat notification tapped, navigating to group chat:', data.familyId);
+          // Navigate đến màn hình chat của nhóm
+          router.push(`/(group)/${data.familyId}?tab=chat` as any);
+          // Refresh notifications list
+          refreshNotifications();
+          return;
+        }
+
+        // Default: Navigate đến màn hình notifications
         router.push('/(notifications)');
 
         // Refresh notifications list
@@ -135,6 +154,19 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     pushNotificationService.checkInitialNotification().then((notification) => {
       if (notification) {
         console.log('[Notifications] App opened from notification:', notification);
+        
+        // Extract data from notification
+        const data = notification?.request?.content?.data || {};
+        
+        // Kiểm tra nếu là chat notification
+        if (data?.type === 'chat_message' && data?.familyId) {
+          console.log('[Notifications] App opened from chat notification, navigating to group chat:', data.familyId);
+          router.push(`/(group)/${data.familyId}?tab=chat` as any);
+          refreshNotifications();
+          return;
+        }
+        
+        // Default: Navigate đến màn hình notifications
         router.push('/(notifications)');
         refreshNotifications();
       }
