@@ -33,6 +33,8 @@ if (Device.isDevice && Platform.OS !== 'web') {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
       }),
     });
   } catch (error) {
@@ -555,14 +557,14 @@ class PushNotificationService {
       }
       if (receivedListener) {
         try {
-          Notifications.removeNotificationSubscription(receivedListener);
+          receivedListener.remove();
         } catch (error) {
           console.warn('[PushNotifications] Error removing received listener:', error);
         }
       }
       if (responseListener) {
         try {
-          Notifications.removeNotificationSubscription(responseListener);
+          responseListener.remove();
         } catch (error) {
           console.warn('[PushNotifications] Error removing response listener:', error);
         }
