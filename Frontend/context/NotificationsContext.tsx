@@ -156,10 +156,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
 
         // Dùng cùng host với REST API nhưng namespace /notifications
-        const baseUrl =
-          Platform.OS === 'android'
-            ? 'http://10.0.2.2:8090'
-            : 'http://localhost:8090';
+        const baseUrl = 'https://it4788-project-ttac.onrender.com';
 
         const s = io(`${baseUrl}/notifications`, {
           transports: ['websocket'],

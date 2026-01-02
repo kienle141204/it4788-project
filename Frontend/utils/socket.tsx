@@ -4,14 +4,15 @@ import { Platform } from 'react-native';
 
 // Tự động phát hiện môi trường để chọn WebSocket URL phù hợp
 const getSocketUrl = () => {
-    if (Platform.OS === 'web') {
-        return 'http://localhost:8090';
-    } else if (Platform.OS === 'android') {
-        return 'http://10.0.2.2:8090';
-    } else {
-        // iOS simulator hoặc các platform khác
-        return 'http://localhost:8090';
-    }
+    // if (Platform.OS === 'web') {
+    //     return 'http://localhost:8090';
+    // } else if (Platform.OS === 'android') {
+    //     return 'http://10.0.2.2:8090';
+    // } else {
+    //     // iOS simulator hoặc các platform khác
+    //     return 'http://localhost:8090';
+    // }
+    return 'https://it4788-project-ttac.onrender.com';
 };
 
 const SOCKET_URL = getSocketUrl();
