@@ -80,7 +80,7 @@ export class FamilyService {
   private async ensureOwnerAdminOrManager(family: Family, userId: number, role: string) {
     const isOwner = family.owner_id === userId;
     const isAdmin = role === 'admin';
-    
+
     // Kiểm tra xem user có phải manager không
     let isManager = false;
     if (!isOwner && !isAdmin) {
@@ -135,6 +135,13 @@ export class FamilyService {
       { family_id: saved.id, user_id: ownerId, role: 'manager' },
       user
     );
+
+    // Tự động tạo tủ lạnh cho family mới
+    const refrigerator = this.refrigeratorRepository.create({
+      family_id: saved.id,
+      owner_id: ownerId,
+    });
+    await this.refrigeratorRepository.save(refrigerator);
 
     return saved;
   }
@@ -240,7 +247,7 @@ export class FamilyService {
     await this.ensureOwnerAdminOrManager(family, userId, role);
 
     // Xóa tất cả dữ liệu liên quan đến family theo thứ tự:
-    
+
     // 1. Xóa tất cả members
     const members = await this.memberService.getMembersByFamily(id);
     if (members.length > 0) {
@@ -252,16 +259,16 @@ export class FamilyService {
     const refrigerators = await this.refrigeratorRepository.find({
       where: { family_id: id },
     });
-    
+
     if (refrigerators.length > 0) {
       const refrigeratorIds = refrigerators.map(r => r.id);
-      
+
       // Xóa tất cả fridge_dishes của các refrigerators
       await this.fridgeDishRepository.delete({ refrigerator_id: In(refrigeratorIds) });
-      
+
       // Xóa tất cả fridge_ingredients của các refrigerators
       await this.fridgeIngredientRepository.delete({ refrigerator_id: In(refrigeratorIds) });
-      
+
       // Sau đó mới xóa refrigerators
       await this.refrigeratorRepository.delete({ family_id: id });
     }
@@ -271,13 +278,13 @@ export class FamilyService {
     const shoppingLists = await this.shoppingListRepository.find({
       where: { family_id: id },
     });
-    
+
     if (shoppingLists.length > 0) {
       const shoppingListIds = shoppingLists.map(list => list.id);
-      
+
       // Xóa tất cả shopping_items của các shopping lists
       await this.shoppingItemRepository.delete({ list_id: In(shoppingListIds) });
-      
+
       // Sau đó mới xóa shopping lists
       await this.shoppingListRepository.delete({ family_id: id });
     }
@@ -287,13 +294,13 @@ export class FamilyService {
     const menus = await this.menuRepository.find({
       where: { family_id: id },
     });
-    
+
     if (menus.length > 0) {
       const menuIds = menus.map(menu => menu.id);
-      
+
       // Xóa tất cả menu_dishes của các menus
       await this.menuDishRepository.delete({ menu_id: In(menuIds) });
-      
+
       // Sau đó mới xóa menus
       await this.menuRepository.delete({ family_id: id });
     }
@@ -319,7 +326,7 @@ export class FamilyService {
     // Kiểm tra quyền: owner, admin hoặc manager
     const isOwner = family.owner_id === userId;
     const isAdmin = role === 'admin';
-    
+
     // Kiểm tra xem user có phải manager không
     let isManager = false;
     if (!isOwner && !isAdmin) {
