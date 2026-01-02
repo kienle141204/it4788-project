@@ -16,7 +16,7 @@ import { Platform } from 'react-native';
 // };
 
 // const API_DOMAIN = getApiDomain();
-const API_DOMAIN = 'https://it4788-project-ttac.onrender.com/api/';
+export const API_DOMAIN = 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {

@@ -6,21 +6,37 @@ import { Platform } from 'react-native';
 import { postAccess, deleteAccess } from '@/utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { inAppLogger } from '@/utils/logger';
+
 // Firebase Messaging - sử dụng FCM tokens trực tiếp
-import messaging from '@react-native-firebase/messaging';
+// Bỏ qua khi chạy trên emulator/simulator
+let messaging: any = null;
+try {
+  if (Device.isDevice) {
+    messaging = require('@react-native-firebase/messaging').default;
+  }
+} catch (error) {
+  console.warn('[PushNotifications] Firebase Messaging not available (likely running on emulator):', error);
+}
 
 // Firebase Configuration
 // Backend sử dụng Firebase project: push-notification-it4788
 // Sử dụng FCM tokens trực tiếp từ Firebase Messaging
 
 // Cấu hình cách hiển thị notification khi app đang foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Chỉ setup khi có device thật
+if (Device.isDevice) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (error) {
+    console.warn('[PushNotifications] Failed to set notification handler:', error);
+  }
+}
 
 export interface PushNotificationData {
   notificationId?: string;
@@ -40,6 +56,14 @@ class PushNotificationService {
       // Kiểm tra xem có phải device thật không (không phải simulator)
       if (!Device.isDevice) {
         console.warn('[PushNotifications] Must use physical device for Push Notifications');
+        inAppLogger.log('⚠️ Running on emulator/simulator - Push notifications disabled', 'PushNotifications');
+        return null;
+      }
+
+      // Kiểm tra xem Firebase Messaging có sẵn không
+      if (!messaging) {
+        console.warn('[PushNotifications] Firebase Messaging not available');
+        inAppLogger.log('⚠️ Firebase Messaging not available - Push notifications disabled', 'PushNotifications');
         return null;
       }
 
@@ -62,6 +86,11 @@ class PushNotificationService {
         permissionStatus = finalStatus;
       } else {
         // Android: Request permission từ Firebase Messaging
+        if (!messaging) {
+          console.warn('[PushNotifications] Firebase Messaging not available for Android');
+          return null;
+        }
+        
         const authStatus = await messaging().requestPermission();
         const enabled =
           authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -81,6 +110,11 @@ class PushNotificationService {
       console.log('[PushNotifications] 🔄 Requesting FCM Token from Firebase...');
       console.log('[PushNotifications] 📋 Firebase project: push-notification-it4788');
       
+      if (!messaging) {
+        console.warn('[PushNotifications] Firebase Messaging not available');
+        return null;
+      }
+      
       const token = await messaging().getToken();
       
       if (!token) {
@@ -97,12 +131,14 @@ class PushNotificationService {
       inAppLogger.log(`📱 Platform: ${Platform.OS}`, 'PushNotifications');
       
       // Lắng nghe khi token được refresh
-      messaging().onTokenRefresh((newToken) => {
-        console.log('[PushNotifications] 🔄 FCM Token refreshed:', newToken);
-        this.fcmToken = newToken;
-        // Tự động đăng ký lại token mới với backend
-        this.registerTokenWithBackend();
-      });
+      if (messaging) {
+        messaging().onTokenRefresh((newToken: string) => {
+          console.log('[PushNotifications] 🔄 FCM Token refreshed:', newToken);
+          this.fcmToken = newToken;
+          // Tự động đăng ký lại token mới với backend
+          this.registerTokenWithBackend();
+        });
+      }
       
       return this.fcmToken;
     } catch (error: any) {
@@ -248,6 +284,12 @@ class PushNotificationService {
     onNotificationReceived?: (notification: any) => void,
     onNotificationTapped?: (response: any) => void,
   ) {
+    // Bỏ qua nếu không phải device thật hoặc không có Firebase Messaging
+    if (!Device.isDevice || !messaging) {
+      console.warn('[PushNotifications] Skipping notification listeners setup (emulator/simulator or Firebase not available)');
+      return () => {}; // Return empty cleanup function
+    }
+
     // Listener cho notification khi app đang foreground (FCM)
     const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
       console.log('[PushNotifications] 📬 FCM Notification received (foreground):', {
@@ -274,58 +316,81 @@ class PushNotificationService {
     });
 
     // Listener cho khi app được mở từ notification (khi app đang background/quit)
-    messaging().onNotificationOpenedApp((remoteMessage) => {
-      console.log('[PushNotifications] 👆 FCM Notification opened app:', {
-        title: remoteMessage.notification?.title,
-        body: remoteMessage.notification?.body,
-        data: remoteMessage.data,
-      });
-      if (onNotificationTapped) {
-        onNotificationTapped(remoteMessage);
-      }
-    });
-
-    // Kiểm tra notification khi app được mở từ trạng thái quit
-    messaging()
-      .getInitialNotification()
-      .then((remoteMessage) => {
-        if (remoteMessage) {
-          console.log('[PushNotifications] 👆 FCM Notification opened app (from quit state):', {
-            title: remoteMessage.notification?.title,
-            body: remoteMessage.notification?.body,
-            data: remoteMessage.data,
-          });
-          if (onNotificationTapped) {
-            onNotificationTapped(remoteMessage);
-          }
+    if (messaging) {
+      messaging().onNotificationOpenedApp((remoteMessage: any) => {
+        console.log('[PushNotifications] 👆 FCM Notification opened app:', {
+          title: remoteMessage.notification?.title,
+          body: remoteMessage.notification?.body,
+          data: remoteMessage.data,
+        });
+        if (onNotificationTapped) {
+          onNotificationTapped(remoteMessage);
         }
       });
 
-    // Listener cho expo-notifications (backup)
-    const receivedListener = Notifications.addNotificationReceivedListener((notification: any) => {
-      console.log('[PushNotifications] 📬 Expo Notification received:', {
-        title: notification.request.content.title,
-        body: notification.request.content.body,
-        data: notification.request.content.data,
-      });
-    });
+      // Kiểm tra notification khi app được mở từ trạng thái quit
+      messaging()
+        .getInitialNotification()
+        .then((remoteMessage: any) => {
+          if (remoteMessage) {
+            console.log('[PushNotifications] 👆 FCM Notification opened app (from quit state):', {
+              title: remoteMessage.notification?.title,
+              body: remoteMessage.notification?.body,
+              data: remoteMessage.data,
+            });
+            if (onNotificationTapped) {
+              onNotificationTapped(remoteMessage);
+            }
+          }
+        });
+    }
 
-    const responseListener = Notifications.addNotificationResponseReceivedListener((response: any) => {
-      console.log('[PushNotifications] 👆 Expo Notification tapped:', {
-        title: response.notification.request.content.title,
-        body: response.notification.request.content.body,
-        data: response.notification.request.content.data,
+    // Listener cho expo-notifications (backup)
+    let receivedListener: any = null;
+    let responseListener: any = null;
+    
+    try {
+      receivedListener = Notifications.addNotificationReceivedListener((notification: any) => {
+        console.log('[PushNotifications] 📬 Expo Notification received:', {
+          title: notification.request.content.title,
+          body: notification.request.content.body,
+          data: notification.request.content.data,
+        });
       });
-      if (onNotificationTapped) {
-        onNotificationTapped(response);
-      }
-    });
+
+      responseListener = Notifications.addNotificationResponseReceivedListener((response: any) => {
+        console.log('[PushNotifications] 👆 Expo Notification tapped:', {
+          title: response.notification.request.content.title,
+          body: response.notification.request.content.body,
+          data: response.notification.request.content.data,
+        });
+        if (onNotificationTapped) {
+          onNotificationTapped(response);
+        }
+      });
+    } catch (error) {
+      console.warn('[PushNotifications] Failed to setup expo-notifications listeners:', error);
+    }
 
     // Return cleanup function
     return () => {
-      unsubscribeForeground();
-      Notifications.removeNotificationSubscription(receivedListener);
-      Notifications.removeNotificationSubscription(responseListener);
+      if (unsubscribeForeground) {
+        unsubscribeForeground();
+      }
+      if (receivedListener) {
+        try {
+          Notifications.removeNotificationSubscription(receivedListener);
+        } catch (error) {
+          console.warn('[PushNotifications] Error removing received listener:', error);
+        }
+      }
+      if (responseListener) {
+        try {
+          Notifications.removeNotificationSubscription(responseListener);
+        } catch (error) {
+          console.warn('[PushNotifications] Error removing response listener:', error);
+        }
+      }
     };
   }
 
