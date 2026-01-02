@@ -71,7 +71,7 @@ export default function MarketScreen() {
       setDebouncedSearchQuery(searchQuery);
       setCurrentPage(1);
       setInitialLoad(true);
-    }, 500); 
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -130,7 +130,7 @@ export default function MarketScreen() {
     setCurrentPage(1);
     try {
       let res;
-      
+
       if (debouncedSearchQuery.trim() || selectedCategory) {
         const searchParams: any = {
           page: 1,
@@ -166,12 +166,12 @@ export default function MarketScreen() {
   };
 
   return (
-    <View style={marketStyles.safeArea}>
+    <SafeAreaView style={marketStyles.safeArea}>
       <View style={marketStyles.container}>
-    
+
         {/* Header */}
         <View style={marketStyles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={marketStyles.backButton}
             onPress={() => {
               if (router.canGoBack()) {
@@ -187,11 +187,11 @@ export default function MarketScreen() {
           <View style={{ width: 32 }} />
         </View>
 
-   
+
         <View style={marketStyles.searchContainer}>
           <Ionicons name="search" size={20} color={COLORS.grey} style={marketStyles.searchIcon} />
-          <TextInput 
-            placeholder="Tìm kiếm sản phẩm..." 
+          <TextInput
+            placeholder="Tìm kiếm sản phẩm..."
             placeholderTextColor={COLORS.grey}
             style={marketStyles.searchInput}
             value={searchQuery}
@@ -211,38 +211,38 @@ export default function MarketScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={marketStyles.categoriesContainer}
           >
-          <TouchableOpacity 
-            key="all"
-            style={[
-              marketStyles.categoryBtn,
-              selectedCategory === null && marketStyles.categoryBtnActive
-            ]}
-            onPress={() => setSelectedCategory(null)}
-          >
-            <Text style={[
-              marketStyles.categoryText,
-              selectedCategory === null && marketStyles.categoryTextActive
-            ]}>Tất cả</Text>
-          </TouchableOpacity>
-          {categories.map((cat, index) => (
-            <TouchableOpacity 
-              key={index} 
+            <TouchableOpacity
+              key="all"
               style={[
                 marketStyles.categoryBtn,
-                selectedCategory === cat && marketStyles.categoryBtnActive
+                selectedCategory === null && marketStyles.categoryBtnActive
               ]}
-              onPress={() => setSelectedCategory(cat)}
+              onPress={() => setSelectedCategory(null)}
             >
               <Text style={[
                 marketStyles.categoryText,
-                selectedCategory === cat && marketStyles.categoryTextActive
-              ]}>{cat}</Text>
+                selectedCategory === null && marketStyles.categoryTextActive
+              ]}>Tất cả</Text>
             </TouchableOpacity>
-          ))}
+            {categories.map((cat, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  marketStyles.categoryBtn,
+                  selectedCategory === cat && marketStyles.categoryBtnActive
+                ]}
+                onPress={() => setSelectedCategory(cat)}
+              >
+                <Text style={[
+                  marketStyles.categoryText,
+                  selectedCategory === cat && marketStyles.categoryTextActive
+                ]}>{cat}</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
 
-  
+
         {initialLoad && loading && data.length === 0 ? (
           <View style={marketStyles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
@@ -259,18 +259,18 @@ export default function MarketScreen() {
               data={data}
               numColumns={2}
               keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                style={marketStyles.card} 
-                activeOpacity={0.8}
-                onPress={() => router.push({
-                  pathname: '/(market)/ingredient-detail',
-                  params: { id: item.id.toString() }
-                })}
-              >
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={marketStyles.card}
+                  activeOpacity={0.8}
+                  onPress={() => router.push({
+                    pathname: '/(market)/ingredient-detail',
+                    params: { id: item.id.toString() }
+                  })}
+                >
                   <View style={marketStyles.imageContainer}>
-                    <Image 
-                      source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} 
+                    <Image
+                      source={{ uri: item.image_url || 'https://via.placeholder.com/150' }}
                       style={marketStyles.image}
                       defaultSource={require('../../assets/images/logo.png')}
                     />
@@ -283,7 +283,7 @@ export default function MarketScreen() {
                     <Text style={marketStyles.price}>
                       {item.price ? parseInt(item.price).toLocaleString('vi-VN') : '0'} ₫
                     </Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={marketStyles.addBtn}
                       activeOpacity={0.7}
                     >
@@ -307,7 +307,7 @@ export default function MarketScreen() {
                 ) : null
               }
             />
-            
+
 
             {totalPages > 1 && (
               <View style={marketStyles.paginationContainerFixed}>
@@ -320,10 +320,10 @@ export default function MarketScreen() {
                     (!prev || loading) && marketStyles.pageButtonDisabled,
                   ]}
                 >
-                  <Ionicons 
-                    name="chevron-back" 
-                    size={18} 
-                    color={prev && !loading ? COLORS.darkGrey : COLORS.grey} 
+                  <Ionicons
+                    name="chevron-back"
+                    size={18}
+                    color={prev && !loading ? COLORS.darkGrey : COLORS.grey}
                   />
                 </TouchableOpacity>
 
@@ -383,10 +383,10 @@ export default function MarketScreen() {
                     (!next || loading) && marketStyles.pageButtonDisabled,
                   ]}
                 >
-                  <Ionicons 
-                    name="chevron-forward" 
-                    size={18} 
-                    color={next && !loading ? COLORS.darkGrey : COLORS.grey} 
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={next && !loading ? COLORS.darkGrey : COLORS.grey}
                   />
                 </TouchableOpacity>
               </View>
@@ -394,6 +394,6 @@ export default function MarketScreen() {
           </View>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }

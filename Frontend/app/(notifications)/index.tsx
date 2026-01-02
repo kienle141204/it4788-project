@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -57,8 +58,8 @@ export default function NotificationsPage() {
           const items = Array.isArray(res?.data)
             ? res.data
             : Array.isArray((res as any)?.data?.data)
-            ? (res as any).data.data
-            : [];
+              ? (res as any).data.data
+              : [];
           setDisplayed(items);
         } finally {
           setLocalLoading(false);
@@ -105,13 +106,13 @@ export default function NotificationsPage() {
   const getNotificationIcon = useCallback((title: string, body: string, isUnread: boolean) => {
     const titleLower = title.toLowerCase();
     const bodyLower = (body || '').toLowerCase();
-    
+
     // Kiểm tra thông báo về hết hạn
-    if (titleLower.includes('hết hạn') || titleLower.includes('hạn') || 
-        bodyLower.includes('hết hạn') || bodyLower.includes('🚨') || bodyLower.includes('⚠️')) {
+    if (titleLower.includes('hết hạn') || titleLower.includes('hạn') ||
+      bodyLower.includes('hết hạn') || bodyLower.includes('🚨') || bodyLower.includes('⚠️')) {
       return isUnread ? 'warning' : 'warning-outline';
     }
-    
+
     if (titleLower.includes('nhóm') || titleLower.includes('group')) {
       return isUnread ? 'people' : 'people-outline';
     }
@@ -128,25 +129,25 @@ export default function NotificationsPage() {
     ({ item }: any) => {
       const isUnread = !item.is_read;
       const iconName = getNotificationIcon(item.title, item.body || '', isUnread);
-      
+
       // Xác định màu cho thông báo hết hạn
-      const isExpiringNotification = 
-        item.title?.toLowerCase().includes('hết hạn') || 
+      const isExpiringNotification =
+        item.title?.toLowerCase().includes('hết hạn') ||
         item.title?.toLowerCase().includes('hạn') ||
         item.body?.toLowerCase().includes('hết hạn') ||
         item.body?.includes('🚨') ||
         item.body?.includes('⚠️');
-      
-      const iconColor = isExpiringNotification 
+
+      const iconColor = isExpiringNotification
         ? (isUnread ? COLORS.orange : COLORS.grey)
         : (isUnread ? COLORS.white : COLORS.grey);
-      
+
       const iconBgColor = isExpiringNotification
         ? (isUnread ? '#FFF4E6' : '#F3F4F6')
         : (isUnread ? COLORS.purple : '#F3F4F6');
       // Màu nền xanh lá nhạt cho thông báo chưa đọc (giống thiết kế)
       const cardBgColor = isUnread ? '#ECFDF5' : COLORS.white;
-      
+
       return (
         <TouchableOpacity
           style={{
@@ -220,18 +221,18 @@ export default function NotificationsPage() {
                 }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons 
-                  name="trash-outline" 
-                  size={20} 
-                  color={isUnread ? '#9CA3AF' : '#D1D5DB'} 
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color={isUnread ? '#9CA3AF' : '#D1D5DB'}
                 />
               </TouchableOpacity>
             </View>
             {!!item.body && (
-              <Text 
-                style={{ 
-                  fontSize: 12, 
-                  color: isUnread ? '#6B7280' : '#9CA3AF', 
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: isUnread ? '#6B7280' : '#9CA3AF',
                   marginBottom: 8,
                   lineHeight: 16,
                 }}
@@ -260,7 +261,7 @@ export default function NotificationsPage() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }} edges={['top']}>
       {/* Header */}
       <View
         style={{
@@ -274,9 +275,9 @@ export default function NotificationsPage() {
           borderBottomColor: '#F3F4F6',
         }}
       >
-        <TouchableOpacity 
-          onPress={handleBack} 
-          style={{ 
+        <TouchableOpacity
+          onPress={handleBack}
+          style={{
             padding: 8,
             marginLeft: -8,
             borderRadius: 20,
@@ -290,27 +291,7 @@ export default function NotificationsPage() {
             Thông báo
           </Text>
         </View>
-        <View style={{ width: 100, alignItems: 'flex-end' }}>
-          {data.length > 0 && (
-            <TouchableOpacity
-              onPress={handleDeleteAll}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 20,
-                backgroundColor: '#FEE2E2',
-              }}
-            >
-              <Ionicons name="trash-outline" size={16} color={COLORS.red || '#EF4444'} />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: COLORS.red || '#EF4444' }}>
-                Xóa tất cả
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Filter tabs */}
@@ -379,9 +360,32 @@ export default function NotificationsPage() {
         </TouchableOpacity>
       </View>
 
+      {/* Delete All Button */}
+      {data.length > 0 && (
+        <View style={{ marginHorizontal: 16, marginBottom: 16, alignItems: 'flex-end' }}>
+          <TouchableOpacity
+            onPress={handleDeleteAll}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: '#FEE2E2',
+            }}
+          >
+            <Ionicons name="trash-outline" size={16} color={COLORS.red || '#EF4444'} />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: COLORS.red || '#EF4444' }}>
+              Xóa tất cả
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {localLoading || (loading && data.length === 0) ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={COLORS.purple} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={{ marginTop: 12, color: COLORS.grey }}>Đang tải thông báo...</Text>
         </View>
       ) : data.length === 0 ? (
@@ -443,7 +447,7 @@ export default function NotificationsPage() {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

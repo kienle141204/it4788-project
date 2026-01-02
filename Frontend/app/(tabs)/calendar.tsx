@@ -53,13 +53,13 @@ export default function TaskPage() {
     try {
       setLoading(true);
       const lists = await getMyShoppingLists();
-      
+
       // Ensure items are properly typed
       const typedLists: ShoppingList[] = (lists || []).map((list: any) => ({
         ...list,
         items: list.items || [],
       }));
-      
+
       setShoppingLists(typedLists);
       // Reset loaded list IDs when reloading all lists
       setLoadedListIds(new Set());
@@ -94,7 +94,7 @@ export default function TaskPage() {
       filteredShoppingLists.forEach(list => {
         const hasItems = list.items && list.items.length > 0;
         const alreadyLoaded = loadedListIds.has(list.id);
-        
+
         if (!hasItems && !alreadyLoaded) {
           setLoadedListIds(prev => new Set(prev).add(list.id));
           loadShoppingListItems(list.id);
@@ -109,7 +109,7 @@ export default function TaskPage() {
       const list = await getShoppingListById(listId);
       if (list && list.items) {
         // Update the list in shoppingLists with items
-        setShoppingLists(prevLists => 
+        setShoppingLists(prevLists =>
           prevLists.map(l => {
             if (l.id === listId) {
               return { ...l, items: list.items || [] };
@@ -162,15 +162,15 @@ export default function TaskPage() {
     }
 
     // Optimistic update: Toggle immediately
-    setShoppingLists(prevLists => 
-      prevLists.map(l => 
-        l.id === listId 
+    setShoppingLists(prevLists =>
+      prevLists.map(l =>
+        l.id === listId
           ? {
-              ...l,
-              items: l.items?.map(item =>
-                item.id === itemId ? { ...item, is_checked: !item.is_checked } : item
-              ) || [],
-            }
+            ...l,
+            items: l.items?.map(item =>
+              item.id === itemId ? { ...item, is_checked: !item.is_checked } : item
+            ) || [],
+          }
           : l
       )
     );
@@ -178,22 +178,22 @@ export default function TaskPage() {
     try {
       // Call API
       await toggleItemChecked(itemId);
-      
+
       // Reload only this list's items to sync with server (faster than reloading all)
       await loadShoppingListItems(listId);
     } catch (error: any) {
-      
+
       // Rollback optimistic update on error
       if (previousCheckedState !== undefined) {
-        setShoppingLists(prevLists => 
-          prevLists.map(l => 
-            l.id === listId 
+        setShoppingLists(prevLists =>
+          prevLists.map(l =>
+            l.id === listId
               ? {
-                  ...l,
-                  items: l.items?.map(item =>
-                    item.id === itemId ? { ...item, is_checked: previousCheckedState! } : item
-                  ) || [],
-                }
+                ...l,
+                items: l.items?.map(item =>
+                  item.id === itemId ? { ...item, is_checked: previousCheckedState! } : item
+                ) || [],
+              }
               : l
           )
         );
@@ -201,7 +201,7 @@ export default function TaskPage() {
         // If we don't have previous state, reload the list
         await loadShoppingListItems(listId);
       }
-      
+
       if (error.message === 'SESSION_EXPIRED' || error.response?.status === 401) {
         Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại');
         router.push('/(auth)/login');
@@ -264,26 +264,26 @@ export default function TaskPage() {
   return (
     <View style={taskStyles.container}>
       {/* Content */}
-      <ScrollView 
-        style={taskStyles.content} 
+      <ScrollView
+        style={taskStyles.content}
         showsVerticalScrollIndicator={false}
       >
         {/* Page Header */}
         <View style={styles.pageHeader}>
           <Text style={styles.pageTitle}>Nhiệm vụ của tôi</Text>
         </View>
-        
+
         {/* Date Selector */}
-        <DateSelector 
-          selectedDate={selectedDate} 
-          onSelectDate={handleDateSelect} 
+        <DateSelector
+          selectedDate={selectedDate}
+          onSelectDate={handleDateSelect}
         />
-        
+
         {/* Shopping Lists */}
         <View style={taskStyles.taskList}>
           {loading ? (
             <View style={taskStyles.emptyState}>
-              <ActivityIndicator size="large" color="#8B5CF6" />
+              <ActivityIndicator size="large" color={COLORS.primary} />
               <Text style={[taskStyles.emptyStateText, { marginTop: 16 }]}>
                 Đang tải danh sách...
               </Text>

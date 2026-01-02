@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
@@ -186,8 +187,8 @@ export default function FoodPage() {
   }, [activeTab, fetchFavoriteDishes]);
 
   return (
-    <View style={foodStyles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={foodStyles.container} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.darkGrey} />
 
       {/* Header */}
       <View style={foodStyles.header}>
@@ -201,8 +202,8 @@ export default function FoodPage() {
           onPress={handleNotificationPress}
           style={foodStyles.notificationButton}
         >
-          <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
-          <View style={foodStyles.notificationDot} />
+          {/* <Ionicons name="notifications-outline" size={24} color={COLORS.darkGrey} />
+          <View style={foodStyles.notificationDot} /> */}
         </TouchableOpacity>
       </View>
 
@@ -350,7 +351,7 @@ export default function FoodPage() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

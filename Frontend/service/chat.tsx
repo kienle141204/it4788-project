@@ -27,21 +27,52 @@ export interface SendChatMessageDto {
     data?: Record<string, any>;
 }
 
+export interface ChatPagination {
+    limit: number;
+    lastId: number | null;
+    hasMore: boolean;
+}
+
+export interface ChatMessagesResponse {
+    data: ChatMessage[];
+    pagination: ChatPagination;
+}
+
 /**
- * Lấy danh sách tin nhắn của nhóm
- * GET /chat/family/:familyId
+ * Lấy danh sách tin nhắn của nhóm (có pagination)
+ * GET /chat/family/:familyId?limit=30&lastId=xxx
  */
-export const getChatMessages = async (familyId: number): Promise<ChatMessage[]> => {
+export const getChatMessages = async (
+    familyId: number,
+    limit: number = 30,
+    lastId?: number
+): Promise<ChatMessagesResponse> => {
     try {
-        const res = await getAccess(`chat/family/${familyId}`);
-        // API may return array directly or wrapped in { data }
-        if (Array.isArray(res)) {
+        let url = `chat/family/${familyId}?limit=${limit}`;
+        if (lastId) {
+            url += `&lastId=${lastId}`;
+        }
+        const res = await getAccess(url);
+
+        // Handle new paginated response format
+        if (res?.data && res?.pagination) {
             return res;
         }
-        if (Array.isArray(res?.data)) {
-            return res.data;
+
+        // Fallback for old format (array response)
+        if (Array.isArray(res)) {
+            return {
+                data: res,
+                pagination: { limit, lastId: null, hasMore: false },
+            };
         }
-        return [];
+        if (Array.isArray(res?.data)) {
+            return {
+                data: res.data,
+                pagination: res.pagination || { limit, lastId: null, hasMore: false },
+            };
+        }
+        return { data: [], pagination: { limit, lastId: null, hasMore: false } };
     } catch (error) {
         throw error;
     }

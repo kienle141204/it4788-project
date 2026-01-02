@@ -1,4 +1,4 @@
-import { COLORS } from "@/constants/themes";
+import { COLORS } from "../constants/themes";
 import { StyleSheet, Dimensions, Platform } from "react-native";
 
 const { width, height } = Dimensions.get("window");
@@ -17,7 +17,8 @@ export const marketStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
     backgroundColor: COLORS.white,
   },
   backButton: {
@@ -52,8 +53,8 @@ export const marketStyles = StyleSheet.create({
   searchIcon: {
     marginRight: 8,
   },
-  searchInput: { 
-    flex: 1, 
+  searchInput: {
+    flex: 1,
     fontSize: 16,
     color: COLORS.darkGrey,
     padding: 0,
@@ -135,9 +136,9 @@ export const marketStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  image: { 
-    width: "100%", 
-    height: "100%", 
+  image: {
+    width: "100%",
+    height: "100%",
     resizeMode: "cover",
   },
   favoriteButton: {
@@ -165,16 +166,16 @@ export const marketStyles = StyleSheet.create({
   cardContent: {
     padding: 12,
   },
-  name: { 
-    fontSize: 14, 
+  name: {
+    fontSize: 14,
     fontWeight: "600",
     color: COLORS.darkGrey,
     marginBottom: 6,
     minHeight: 40,
   },
-  price: { 
+  price: {
     fontSize: 16,
-    fontWeight: "700", 
+    fontWeight: "700",
     color: COLORS.primary || "#298d4eff",
     marginBottom: 10,
   },
@@ -188,9 +189,9 @@ export const marketStyles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  addText: { 
-    color: COLORS.white, 
-    fontWeight: "600", 
+  addText: {
+    color: COLORS.white,
+    fontWeight: "600",
     fontSize: 13,
   },
   loadingContainer: {
