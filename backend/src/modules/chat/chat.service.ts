@@ -29,13 +29,32 @@ export class ChatService {
     return await this.chatRepo.save(chat);
   }
 
-  async findByFamily(familyId: number, user: JwtUser) {
+  async findByFamily(familyId: number, user: JwtUser, limit: number = 30, lastId?: number) {
     await this.checkPermission(familyId, user);
 
-    return await this.chatRepo.find({
-      where: { familyId },
-      order: { createdAt: 'DESC' },
-    });
+    const queryBuilder = this.chatRepo.createQueryBuilder('chat')
+      .where('chat.familyId = :familyId', { familyId })
+      .orderBy('chat.createdAt', 'DESC')
+      .take(limit);
+
+    // Cursor-based pagination: load messages older than lastId
+    if (lastId) {
+      queryBuilder.andWhere('chat.id < :lastId', { lastId });
+    }
+
+    const messages = await queryBuilder.getMany();
+
+    // Check if there are more messages
+    const hasMore = messages.length === limit;
+
+    return {
+      data: messages,
+      pagination: {
+        limit,
+        lastId: messages.length > 0 ? messages[messages.length - 1].id : null,
+        hasMore,
+      },
+    };
   }
 
   async markAsRead(id: number, user: JwtUser) {

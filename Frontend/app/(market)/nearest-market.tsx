@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Linking, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -93,15 +94,15 @@ export default function NearestMarketScreen() {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => {
-                  if (router.canGoBack()) {
-                    router.back();
-                  } else {
-                    router.replace('/(tabs)/home' as any);
-                  }
+                    if (router.canGoBack()) {
+                        router.back();
+                    } else {
+                        router.replace('/(tabs)/home' as any);
+                    }
                 }}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
@@ -151,7 +152,7 @@ export default function NearestMarketScreen() {
                     }
                 />
             )}
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -165,7 +166,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
-        paddingTop: 50,
         backgroundColor: COLORS.white,
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',

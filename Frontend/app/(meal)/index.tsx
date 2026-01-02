@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { mealStyles } from '../../styles/meal.styles';
@@ -231,16 +232,16 @@ export default function MealPage() {
           onPress: async () => {
             try {
               setShowMenuOptionsModal(false);
-              
+
               // Đảm bảo ID là số
               const menuId = typeof selectedMenu.id === 'string' ? parseInt(selectedMenu.id, 10) : selectedMenu.id;
-              
+
               if (isNaN(menuId)) {
                 throw new Error('ID thực đơn không hợp lệ');
               }
-              
+
               const payload = await deleteAccess(`menus/${menuId}`);
-    
+
               // Kiểm tra response - backend trả về { success: true, message: '...' }
               if (payload?.success === true) {
                 Alert.alert('Thành công', payload?.message || 'Đã xóa thực đơn thành công');
@@ -255,9 +256,9 @@ export default function MealPage() {
                 handleSessionExpired();
                 return;
               }
-              
+
               let errorMessage = 'Không thể xóa thực đơn. Vui lòng thử lại.';
-              
+
               if (err?.response?.status === 500) {
                 errorMessage = 'Lỗi server. Vui lòng thử lại sau.';
               } else if (err?.response?.status === 403) {
@@ -269,7 +270,7 @@ export default function MealPage() {
               } else if (err?.message) {
                 errorMessage = err.message;
               }
-              
+
               Alert.alert('Lỗi', errorMessage);
             }
           },
@@ -295,7 +296,7 @@ export default function MealPage() {
     const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     const today = new Date();
     const isToday = isSameDay(date, today);
-    
+
     return {
       day: date.getDate(),
       weekday: days[date.getDay()],
@@ -331,7 +332,7 @@ export default function MealPage() {
   const renderDateCarousel = () => {
     return (
       <View style={mealStyles.dateCarouselContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={mealStyles.dateNavButton}
           onPress={handlePreviousDate}
         >
@@ -346,7 +347,7 @@ export default function MealPage() {
           {dateRange.map((date, index) => {
             const { day, weekday, isToday } = formatDateForCarousel(date);
             const isActive = isSameDay(date, selectedDate);
-            
+
             return (
               <TouchableOpacity
                 key={index}
@@ -373,7 +374,7 @@ export default function MealPage() {
           })}
         </ScrollView>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={mealStyles.dateNavButton}
           onPress={handleNextDate}
         >
@@ -388,12 +389,12 @@ export default function MealPage() {
 
     return (
       <View key={menu.id} style={mealStyles.menuCard}>
-        <TouchableOpacity
-          onPress={() => handleMenuPress(menu.id)}
-          onLongPress={() => handleMenuLongPress(menu)}
-          activeOpacity={0.7}
-        >
-          <View style={mealStyles.menuHeader}>
+        <View style={mealStyles.menuHeader}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => handleMenuPress(menu.id)}
+            activeOpacity={0.7}
+          >
             <View style={mealStyles.menuInfo}>
               {/* <Text style={mealStyles.sectionLabel}>Gia đình</Text> */}
               <Text style={mealStyles.menuTitle}>{menu.family?.name || 'Không xác định'}</Text>
@@ -410,8 +411,15 @@ export default function MealPage() {
                 style={{ marginLeft: 8 }}
               />
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ padding: 8 }}
+            onPress={() => handleMenuLongPress(menu)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.darkGrey} />
+          </TouchableOpacity>
+        </View>
 
         {!menu.description && (
           <Text style={mealStyles.menuDescription}>Chưa có mô tả cho thực đơn này.</Text>
@@ -472,7 +480,7 @@ export default function MealPage() {
   };
 
   return (
-    <View style={mealStyles.container}>
+    <SafeAreaView style={mealStyles.container} edges={['top']}>
       <StatusBar barStyle='dark-content' backgroundColor='#FFFFFF' />
 
       <View style={mealStyles.header}>
@@ -490,9 +498,11 @@ export default function MealPage() {
       {/* Date Carousel */}
       {renderDateCarousel()}
 
+
+
       {loading && menus.length === 0 ? (
         <View style={mealStyles.loaderContainer}>
-          <ActivityIndicator size='large' color={COLORS.purple} />
+          <ActivityIndicator size='large' color={COLORS.primary} />
           <Text style={mealStyles.loaderText}>Đang tải thực đơn...</Text>
         </View>
       ) : (
@@ -579,7 +589,7 @@ export default function MealPage() {
                 borderBottomColor: '#F0F0F0',
               }}
             >
-              <Ionicons name="create-outline" size={24} color={COLORS.purple} />
+              <Ionicons name="create-outline" size={24} color={COLORS.primary} />
               <Text style={{ fontSize: 16, color: COLORS.darkGrey, marginLeft: 12 }}>Sửa thực đơn</Text>
             </TouchableOpacity>
 
@@ -611,7 +621,7 @@ export default function MealPage() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

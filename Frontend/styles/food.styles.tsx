@@ -4,7 +4,7 @@ import { COLORS } from '../constants/themes';
 export const foodStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -37,36 +37,36 @@ export const foodStyles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 12,
+    padding: 16,
+    backgroundColor: COLORS.white,
   },
   tab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#DCFCE7', // Light green for inactive
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: COLORS.purple,
+    borderBottomColor: COLORS.purple,
   },
   tabInactive: {
-    backgroundColor: '#DCFCE7',
+    borderBottomColor: 'transparent',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.purple,
+    color: COLORS.grey,
   },
   tabTextActive: {
     fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
+    fontWeight: 'bold',
+    color: COLORS.purple,
   },
   tabTextInactive: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.purple,
+    color: COLORS.grey,
   },
   searchContainer: {
     paddingHorizontal: 20,

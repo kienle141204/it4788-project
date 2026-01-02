@@ -4,7 +4,7 @@ import { COLORS } from '../constants/themes';
 export const mealStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -30,6 +30,7 @@ export const mealStyles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
+    paddingTop: 32,
     paddingBottom: 32,
     gap: 16,
   },
