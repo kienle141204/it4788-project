@@ -22,40 +22,73 @@ export class FirebaseService implements OnModuleInit {
     }
 
     onModuleInit() {
-        const serviceAccountB64 = process.env.FIREBASE_ACCOUNT_B64;
-        const serviceAccountJsonEnv = process.env.FIREBASE_ACCOUNT_JSON;
-        const serviceAccountKeyPath = process.env.FIREBASE_ACCOUNT_KEY;
-
-        // Ưu tiên: B64 -> JSON env -> đọc file path (giữ backward-compatible)
-        let serviceAccountJson: string | undefined;
-        if (serviceAccountB64) {
-            serviceAccountJson = Buffer.from(serviceAccountB64, 'base64').toString('utf8');
-        } else if (serviceAccountJsonEnv) {
-            serviceAccountJson = serviceAccountJsonEnv;
-        } else if (serviceAccountKeyPath) {
-            // Cho phép dùng đường dẫn (relative hoặc absolute)
-            const absolutePath = serviceAccountKeyPath.startsWith('/')
-                ? serviceAccountKeyPath
-                : join(process.cwd(), serviceAccountKeyPath);
-            serviceAccountJson = readFileSync(absolutePath, 'utf8');
-        }
-
-        if (!serviceAccountJson) {
-            throw new Error('❌ FIREBASE_ACCOUNT_JSON/FIREBASE_ACCOUNT_B64/FIREBASE_ACCOUNT_KEY not found');
-        }
-
-        let serviceAccount: admin.ServiceAccount;
         try {
-            serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
-        } catch (err) {
-            throw new Error(
-                '❌ Invalid Firebase service account JSON. Kiểm tra giá trị env (nếu dùng base64 phải decode đúng, JSON phải đầy đủ ngoặc kép).',
-            );
-        }
+            const serviceAccountB64 = process.env.FIREBASE_ACCOUNT_B64;
+            const serviceAccountJsonEnv = process.env.FIREBASE_ACCOUNT_JSON;
+            const serviceAccountKeyPath = process.env.FIREBASE_ACCOUNT_KEY;
 
-        // Khởi tạo Firebase app nếu chưa có
-        if (!admin.apps.length) {
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+            // Ưu tiên: B64 -> JSON env -> đọc file path (giữ backward-compatible)
+            let serviceAccountJson: string | undefined;
+            if (serviceAccountB64) {
+                console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_B64');
+                serviceAccountJson = Buffer.from(serviceAccountB64, 'base64').toString('utf8');
+            } else if (serviceAccountJsonEnv) {
+                console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_JSON');
+                serviceAccountJson = serviceAccountJsonEnv;
+            } else if (serviceAccountKeyPath) {
+                console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_KEY:', serviceAccountKeyPath);
+                // Cho phép dùng đường dẫn (relative hoặc absolute)
+                const absolutePath = serviceAccountKeyPath.startsWith('/')
+                    ? serviceAccountKeyPath
+                    : join(process.cwd(), serviceAccountKeyPath);
+                try {
+                    serviceAccountJson = readFileSync(absolutePath, 'utf8');
+                } catch (fileError: any) {
+                    throw new Error(`❌ Cannot read Firebase service account file: ${fileError.message}`);
+                }
+            }
+
+            if (!serviceAccountJson) {
+                throw new Error('❌ FIREBASE_ACCOUNT_JSON/FIREBASE_ACCOUNT_B64/FIREBASE_ACCOUNT_KEY not found in environment variables');
+            }
+
+            let serviceAccount: admin.ServiceAccount;
+            try {
+                serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
+                
+                // Validate required fields (ServiceAccount uses camelCase in TypeScript, but JSON may use snake_case)
+                const parsedJson = JSON.parse(serviceAccountJson) as any;
+                const projectId = serviceAccount.projectId || parsedJson.project_id;
+                const privateKey = serviceAccount.privateKey || parsedJson.private_key;
+                const clientEmail = serviceAccount.clientEmail || parsedJson.client_email;
+                
+                if (!projectId) {
+                    throw new Error('❌ Firebase service account missing project_id/projectId');
+                }
+                if (!privateKey) {
+                    throw new Error('❌ Firebase service account missing private_key/privateKey');
+                }
+                if (!clientEmail) {
+                    throw new Error('❌ Firebase service account missing client_email/clientEmail');
+                }
+                
+                console.log(`[FirebaseService] ✅ Firebase service account loaded for project: ${projectId}`);
+            } catch (err: any) {
+                throw new Error(
+                    `❌ Invalid Firebase service account JSON: ${err.message}. Kiểm tra giá trị env (nếu dùng base64 phải decode đúng, JSON phải đầy đủ ngoặc kép).`,
+                );
+            }
+
+            // Khởi tạo Firebase app nếu chưa có
+            if (!admin.apps.length) {
+                admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+                console.log('[FirebaseService] ✅ Firebase Admin SDK initialized successfully');
+            } else {
+                console.log('[FirebaseService] ℹ️ Firebase Admin SDK already initialized');
+            }
+        } catch (error: any) {
+            console.error('[FirebaseService] ❌ Failed to initialize Firebase:', error.message);
+            throw error;
         }
     }
 
@@ -147,9 +180,20 @@ export class FirebaseService implements OnModuleInit {
         };
 
         try {
-            const response = await getMessaging().send(message);
+            const messagingInstance = getMessaging();
+            if (!messagingInstance) {
+                throw new Error('Firebase Messaging instance is not available');
+            }
+            
+            console.log(`[FirebaseService] 📤 Sending notification to token: ${token.substring(0, 20)}...`);
+            console.log(`[FirebaseService] 📝 Title: ${title}, Body: ${body.substring(0, 50)}...`);
+            
+            const response = await messagingInstance.send(message);
+            console.log(`[FirebaseService] ✅ Notification sent successfully: ${response}`);
             return response;
-        } catch (error) {
+        } catch (error: any) {
+            console.error(`[FirebaseService] ❌ Error sending notification:`, error.message || error);
+            console.error(`[FirebaseService] ❌ Error code:`, error.code || 'unknown');
             await this.handleTokenError(error, token);
             throw error;
         }

@@ -86,13 +86,23 @@ export class NotificationsService {
       );
       if (pushResult.errors.length > 0) {
         console.warn(`[NotificationsService] ⚠️ Push notification errors:`, pushResult.errors);
+        pushResult.errors.forEach((error, index) => {
+          console.warn(`[NotificationsService] ⚠️ Error ${index + 1}: ${error}`);
+        });
       }
-    } catch (error) {
+      if (pushResult.success === 0 && pushResult.failed > 0) {
+        console.warn(`[NotificationsService] ⚠️ All push notifications failed for user ${user_id}. Possible reasons:
+  - User has no registered device tokens
+  - All tokens are invalid/expired
+  - Firebase configuration issue`);
+      }
+    } catch (error: any) {
       // Log lỗi nhưng không throw để không ảnh hưởng đến việc lưu thông báo
       console.error(
         `[NotificationsService] ⚠️ Error sending push notification (notification still saved to DB):`,
-        error,
+        error?.message || error,
       );
+      console.error(`[NotificationsService] ⚠️ Error stack:`, error?.stack);
     }
 
     return savedNotification;

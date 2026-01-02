@@ -27,10 +27,28 @@ try {
 // Firebase Messaging - sử dụng FCM tokens trực tiếp
 // Bỏ qua khi chạy trên emulator/simulator hoặc web
 let messaging: any = null;
+let firebaseApp: any = null;
+
 try {
   // React Native Firebase chỉ hoạt động trên native platforms (iOS/Android)
   // Trên web, bỏ qua Firebase Messaging
   if (Device.isDevice && Platform.OS !== 'web') {
+    // Khởi tạo Firebase App trước (nếu chưa có)
+    try {
+      const firebaseAppModule = require('@react-native-firebase/app');
+      firebaseApp = firebaseAppModule.default;
+      
+      // Kiểm tra xem Firebase đã được khởi tạo chưa
+      if (!firebaseApp.apps.length) {
+        console.log('[PushNotifications] ⚠️ Firebase app not initialized, it should auto-initialize from google-services.json');
+      } else {
+        console.log('[PushNotifications] ✅ Firebase app initialized');
+      }
+    } catch (firebaseAppError) {
+      console.warn('[PushNotifications] ⚠️ Could not load Firebase App module:', firebaseAppError);
+    }
+    
+    // Load Firebase Messaging
     messaging = require('@react-native-firebase/messaging').default;
     
     // Setup background message handler cho data-only messages
@@ -71,9 +89,12 @@ try {
         }
       }
     });
+    
+    console.log('[PushNotifications] ✅ Firebase Messaging initialized successfully');
   }
-} catch (error) {
-  console.warn('[PushNotifications] Firebase Messaging not available (likely running on emulator or web):', error);
+} catch (error: any) {
+  console.warn('[PushNotifications] ⚠️ Firebase Messaging not available:', error?.message || error);
+  console.warn('[PushNotifications] ⚠️ This is normal if running on emulator/simulator or web');
 }
 
 // Firebase Configuration
@@ -336,36 +357,53 @@ class PushNotificationService {
       console.log('[PushNotifications] 📋 Firebase project: push-notification-it4788');
       
       if (!messaging) {
-        console.warn('[PushNotifications] Firebase Messaging not available');
+        console.warn('[PushNotifications] ❌ Firebase Messaging not available');
+        inAppLogger.log('❌ Firebase Messaging not available - check if running on physical device', 'PushNotifications');
         return null;
       }
       
-      const token = await messaging().getToken();
+      // Đảm bảo Firebase đã sẵn sàng
+      try {
+        const messagingInstance = messaging();
+        if (!messagingInstance) {
+          console.warn('[PushNotifications] ❌ Firebase Messaging instance is null');
+          return null;
+        }
+        
+        const token = await messagingInstance.getToken();
       
-      if (!token) {
-        console.warn('[PushNotifications] No FCM token received');
-        inAppLogger.log('❌ No FCM token received', 'PushNotifications');
+        if (!token) {
+          console.warn('[PushNotifications] ❌ No FCM token received from Firebase');
+          inAppLogger.log('❌ No FCM token received - check Firebase configuration', 'PushNotifications');
+          return null;
+        }
+        
+        this.fcmToken = token;
+        console.log('[PushNotifications] ✅ FCM Token obtained:', this.fcmToken?.substring(0, 50) + '...');
+        console.log('[PushNotifications] 📱 Platform:', Platform.OS);
+        console.log('[PushNotifications] 📱 Token length:', this.fcmToken?.length);
+        inAppLogger.log(`✅ FCM Token obtained: ${this.fcmToken?.substring(0, 30)}...`, 'PushNotifications');
+        inAppLogger.log(`📱 Platform: ${Platform.OS}`, 'PushNotifications');
+        
+        // Lắng nghe khi token được refresh
+        try {
+          messagingInstance.onTokenRefresh((newToken: string) => {
+            console.log('[PushNotifications] 🔄 FCM Token refreshed:', newToken?.substring(0, 50) + '...');
+            this.fcmToken = newToken;
+            // Tự động đăng ký lại token mới với backend
+            this.registerTokenWithBackend();
+          });
+        } catch (refreshError) {
+          console.warn('[PushNotifications] ⚠️ Could not setup token refresh listener:', refreshError);
+        }
+        
+        return this.fcmToken;
+      } catch (tokenError: any) {
+        console.error('[PushNotifications] ❌ Error getting FCM token:', tokenError);
+        console.error('[PushNotifications] ❌ Error details:', tokenError?.message || 'Unknown error');
+        inAppLogger.log(`❌ Error getting token: ${tokenError?.message || 'Unknown error'}`, 'PushNotifications');
         return null;
       }
-      
-      this.fcmToken = token;
-      console.log('[PushNotifications] ✅ FCM Token obtained:', this.fcmToken);
-      console.log('[PushNotifications] 📱 Platform:', Platform.OS);
-      console.log('[PushNotifications] 📱 Token length:', this.fcmToken?.length);
-      inAppLogger.log(`✅ FCM Token obtained: ${this.fcmToken?.substring(0, 30)}...`, 'PushNotifications');
-      inAppLogger.log(`📱 Platform: ${Platform.OS}`, 'PushNotifications');
-      
-      // Lắng nghe khi token được refresh
-      if (messaging) {
-        messaging().onTokenRefresh((newToken: string) => {
-          console.log('[PushNotifications] 🔄 FCM Token refreshed:', newToken);
-          this.fcmToken = newToken;
-          // Tự động đăng ký lại token mới với backend
-          this.registerTokenWithBackend();
-        });
-      }
-      
-      return this.fcmToken;
     } catch (error: any) {
       console.error('[PushNotifications] Error registering for push notifications:', error);
       console.error('[PushNotifications] Error details:', error?.message || error);
@@ -416,29 +454,79 @@ class PushNotificationService {
       inAppLogger.log(`📱 Token: ${this.fcmToken?.substring(0, 30)}...`, 'PushNotifications');
       inAppLogger.log(`📱 Platform: ${Platform.OS}`, 'PushNotifications');
       
-      const response = await postAccess('notifications/device-token', {
-        deviceToken: this.fcmToken,
-        platform: Platform.OS === 'ios' ? 'ios' : 'android',
-      });
+      // Retry logic: thử lại tối đa 2 lần nếu lần đầu fail
+      let lastError: any = null;
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          if (retryCount > 0) {
+            console.log(`[PushNotifications] 🔄 Retry attempt ${retryCount}/${maxRetries}...`);
+            inAppLogger.log(`🔄 Retry attempt ${retryCount}/${maxRetries}`, 'PushNotifications');
+            // Đợi một chút trước khi retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          }
+          
+          const response = await postAccess('notifications/device-token', {
+            deviceToken: this.fcmToken,
+            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+          });
 
-      console.log('[PushNotifications] 📥 Backend response:', JSON.stringify(response, null, 2));
-      inAppLogger.log(`📥 Backend response: ${JSON.stringify(response)}`, 'PushNotifications');
+          console.log('[PushNotifications] 📥 Backend response:', JSON.stringify(response, null, 2));
+          inAppLogger.log(`📥 Backend response: ${JSON.stringify(response)}`, 'PushNotifications');
 
-      if (response?.success) {
-        this.isRegistered = true;
-        console.log('[PushNotifications] ✅ Token registered successfully with backend');
-        console.log('[PushNotifications] 📝 Registration response:', response);
-        inAppLogger.log('✅ Token registered successfully with backend', 'PushNotifications');
-        return true;
-      } else {
-        console.error('[PushNotifications] ❌ Failed to register token. Response:', response);
-        console.error('[PushNotifications] ❌ Response status:', response?.statusCode || 'unknown');
-        console.error('[PushNotifications] ❌ Response message:', response?.message || 'unknown');
-        const errorMsg = response?.message || response?.error || JSON.stringify(response) || 'Unknown error';
-        inAppLogger.log(`❌ Failed: ${errorMsg}`, 'PushNotifications');
-        inAppLogger.log(`❌ Status: ${response?.statusCode || 'unknown'}`, 'PushNotifications');
-        return false;
+          if (response?.success) {
+            this.isRegistered = true;
+            console.log('[PushNotifications] ✅ Token registered successfully with backend');
+            console.log('[PushNotifications] 📝 Registration response:', response);
+            inAppLogger.log('✅ Token registered successfully with backend', 'PushNotifications');
+            return true;
+          } else {
+            const errorMsg = response?.message || response?.error || JSON.stringify(response) || 'Unknown error';
+            lastError = new Error(errorMsg);
+            console.error('[PushNotifications] ❌ Failed to register token. Response:', response);
+            console.error('[PushNotifications] ❌ Response status:', response?.statusCode || 'unknown');
+            console.error('[PushNotifications] ❌ Response message:', errorMsg);
+            
+            // Nếu là lỗi client (4xx), không retry
+            if (response?.statusCode && response.statusCode >= 400 && response.statusCode < 500) {
+              inAppLogger.log(`❌ Client error (${response.statusCode}): ${errorMsg}`, 'PushNotifications');
+              return false;
+            }
+            
+            // Nếu đã retry hết, return false
+            if (retryCount >= maxRetries) {
+              inAppLogger.log(`❌ Failed after ${maxRetries} retries: ${errorMsg}`, 'PushNotifications');
+              return false;
+            }
+            
+            retryCount++;
+          }
+        } catch (requestError: any) {
+          lastError = requestError;
+          console.error(`[PushNotifications] ❌ Error on attempt ${retryCount + 1}:`, requestError?.message);
+          
+          // Nếu là lỗi network và chưa retry hết, thử lại
+          if (retryCount < maxRetries && (
+            requestError?.code === 'NETWORK_ERROR' || 
+            requestError?.message?.includes('network') ||
+            requestError?.message?.includes('timeout')
+          )) {
+            retryCount++;
+            continue;
+          }
+          
+          // Nếu không phải network error hoặc đã retry hết, break
+          break;
+        }
       }
+      
+      // Nếu đến đây, tất cả retry đều fail
+      if (lastError) {
+        throw lastError;
+      }
+      return false;
     } catch (error: any) {
       console.error('[PushNotifications] ❌ Error registering token with backend:', error);
       console.error('[PushNotifications] ❌ Error type:', error?.constructor?.name);
