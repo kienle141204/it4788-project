@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Menu } from '../../entities/menu.entity';
@@ -8,6 +8,8 @@ import { Dish } from '../../entities/dish.entity';
 import { FamilyMember } from '../../entities/family-member.entity';
 import { CreateMenuDto, UpdateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, GetMenusDto, GetMenuDishesByDateDto } from './dto/menu.dto';
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
+import { NotificationsService } from '../notifications/notifications.service';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class MenuService {
@@ -22,6 +24,10 @@ export class MenuService {
     private dishRepository: Repository<Dish>,
     @InjectRepository(FamilyMember)
     private familyMemberRepository: Repository<FamilyMember>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -226,6 +232,40 @@ export class MenuService {
     });
 
     const savedMenu = await this.menuRepository.save(menu);
+
+    // Gửi thông báo cho tất cả thành viên trong gia đình
+    try {
+      const creator = await this.userRepository.findOne({ where: { id: userId } });
+      const creatorName = creator?.full_name || `User ${userId}`;
+
+      // Lấy tất cả thành viên trong gia đình
+      const allMembers = await this.familyMemberRepository.find({
+        where: { family_id: familyId },
+      });
+
+      // Gửi thông báo cho tất cả thành viên
+      for (const member of allMembers) {
+        await this.notificationsService.createNotification(
+          member.user_id,
+          'Thực đơn mới đã được tạo',
+          `${creatorName} đã tạo thực đơn mới cho gia đình ${family.name}`,
+        );
+      }
+
+      // Gửi thông báo cho chủ nhóm nếu chủ nhóm không phải là thành viên
+      const isOwnerMember = allMembers.some(m => m.user_id === family.owner_id);
+      if (!isOwnerMember && family.owner_id !== userId) {
+        await this.notificationsService.createNotification(
+          family.owner_id,
+          'Thực đơn mới đã được tạo',
+          `${creatorName} đã tạo thực đơn mới cho gia đình ${family.name}`,
+        );
+      }
+    } catch (error) {
+      // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo menu
+      console.error('Error sending notification for menu creation:', error);
+    }
+
     return savedMenu;
   }
 

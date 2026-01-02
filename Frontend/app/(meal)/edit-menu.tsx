@@ -348,8 +348,8 @@ export default function EditMenuPage() {
             {[
               { value: 'breakfast', label: 'Bữa sáng' },
               { value: 'lunch', label: 'Bữa trưa' },
-              { value: 'dinner', label: 'Bữa chiều' },
-              { value: 'snack', label: 'Bữa tối' },
+              { value: 'dinner', label: 'Bữa tối' },
+              { value: 'snack', label: 'Bữa phụ' },
             ].map(option => (
               <TouchableOpacity
                 key={option.value}

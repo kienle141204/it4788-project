@@ -6,9 +6,16 @@ import { ShoppingListService } from './shopping-list.service';
 import { ShoppingListController } from './shopping-list.controller';
 import { FamilyModule } from '../family/family.module';
 import { MemberModule } from '../member/member.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { User } from '../../entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ShoppingList, ShoppingItem]), FamilyModule, MemberModule],
+  imports: [
+    TypeOrmModule.forFeature([ShoppingList, ShoppingItem, User]),
+    FamilyModule,
+    MemberModule,
+    NotificationsModule,
+  ],
   controllers: [ShoppingListController],
   providers: [ShoppingListService],
   exports: [ShoppingListService],

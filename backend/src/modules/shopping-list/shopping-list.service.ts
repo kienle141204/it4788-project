@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ShoppingList } from '../../entities/shopping-list.entity';
@@ -9,6 +9,8 @@ import { FamilyService } from '../family/family.service';
 import { MemberService } from '../member/member.service';
 import { JwtUser } from 'src/common/types/user.type';
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
+import { NotificationsService } from '../notifications/notifications.service';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class ShoppingListService {
@@ -19,8 +21,13 @@ export class ShoppingListService {
     @InjectRepository(ShoppingItem)
     private readonly shoppingItemRepo: Repository<ShoppingItem>,
 
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+
     private readonly familyService: FamilyService,
     private readonly memberService: MemberService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notificationsService: NotificationsService,
   ) { }
 
   /** Tạo mới Shopping List */
@@ -32,7 +39,46 @@ export class ShoppingListService {
     if (!data.owner_id) {
       data.owner_id = user.id;
       const list = this.shoppingListRepo.create(data);
-      return this.shoppingListRepo.save(list);
+      const savedList = await this.shoppingListRepo.save(list);
+
+      // Gửi thông báo cho tất cả thành viên trong gia đình (nếu có family_id)
+      if (savedList.family_id) {
+        try {
+          const creator = await this.userRepository.findOne({ where: { id: user.id } });
+          const creatorName = creator?.full_name || `User ${user.id}`;
+
+          const family = await this.familyService.getFamilyById(savedList.family_id);
+          
+          // Lấy tất cả thành viên trong gia đình
+          const allMembers = await this.memberService.getMembersByFamily(savedList.family_id);
+
+          // Gửi thông báo cho tất cả thành viên
+          for (const member of allMembers) {
+            if (member.user_id !== user.id) { // Không gửi cho chính người tạo
+              await this.notificationsService.createNotification(
+                member.user_id,
+                'Danh sách mua sắm mới đã được tạo',
+                `${creatorName} đã tạo danh sách mua sắm mới cho gia đình ${family.name}`,
+              );
+            }
+          }
+
+          // Gửi thông báo cho chủ nhóm nếu chủ nhóm không phải là thành viên
+          const isOwnerMember = allMembers.some(m => m.user_id === family.owner_id);
+          if (!isOwnerMember && family.owner_id !== user.id) {
+            await this.notificationsService.createNotification(
+              family.owner_id,
+              'Danh sách mua sắm mới đã được tạo',
+              `${creatorName} đã tạo danh sách mua sắm mới cho gia đình ${family.name}`,
+            );
+          }
+        } catch (error) {
+          // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo shopping list
+          console.error('Error sending notification for shopping list creation:', error);
+        }
+      }
+
+      return savedList;
     }
 
     // Nếu chỉ định owner khác user
@@ -55,7 +101,72 @@ export class ShoppingListService {
     }
 
     const list = this.shoppingListRepo.create(data);
-    return this.shoppingListRepo.save(data);
+    const savedList = await this.shoppingListRepo.save(data);
+
+    // Gửi thông báo cho tất cả thành viên trong gia đình (nếu có family_id)
+    if (savedList.family_id) {
+      try {
+        const creator = await this.userRepository.findOne({ where: { id: user.id } });
+        const creatorName = creator?.full_name || `User ${user.id}`;
+
+        const family = await this.familyService.getFamilyById(savedList.family_id);
+        
+        // Lấy tất cả thành viên trong gia đình
+        const allMembers = await this.memberService.getMembersByFamily(savedList.family_id);
+
+        // Gửi thông báo cho tất cả thành viên
+        for (const member of allMembers) {
+          await this.notificationsService.createNotification(
+            member.user_id,
+            'Danh sách mua sắm mới đã được tạo',
+            `${creatorName} đã tạo danh sách mua sắm mới cho gia đình ${family.name}`,
+          );
+        }
+
+        // Gửi thông báo cho chủ nhóm nếu chủ nhóm không phải là thành viên
+        const isOwnerMember = allMembers.some(m => m.user_id === family.owner_id);
+        if (!isOwnerMember && family.owner_id !== user.id) {
+          await this.notificationsService.createNotification(
+            family.owner_id,
+            'Danh sách mua sắm mới đã được tạo',
+            `${creatorName} đã tạo danh sách mua sắm mới cho gia đình ${family.name}`,
+          );
+        }
+
+        // Nếu owner_id khác với người tạo, gửi thông báo cho owner
+        if (savedList.owner_id && savedList.owner_id !== user.id) {
+          const owner = await this.userRepository.findOne({ where: { id: savedList.owner_id } });
+          if (owner) {
+            await this.notificationsService.createNotification(
+              savedList.owner_id,
+              'Bạn có danh sách mua sắm mới',
+              `${creatorName} đã tạo danh sách mua sắm và giao cho bạn`,
+            );
+          }
+        }
+      } catch (error) {
+        // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo shopping list
+        console.error('Error sending notification for shopping list creation:', error);
+      }
+    } else {
+      // Nếu không có family_id nhưng có owner_id khác người tạo, gửi thông báo cho owner
+      if (savedList.owner_id && savedList.owner_id !== user.id) {
+        try {
+          const creator = await this.userRepository.findOne({ where: { id: user.id } });
+          const creatorName = creator?.full_name || `User ${user.id}`;
+
+          await this.notificationsService.createNotification(
+            savedList.owner_id,
+            'Bạn có danh sách mua sắm mới',
+            `${creatorName} đã tạo danh sách mua sắm và giao cho bạn`,
+          );
+        } catch (error) {
+          console.error('Error sending notification for shopping list creation:', error);
+        }
+      }
+    }
+
+    return savedList;
   }
 
   /** Lấy toàn bộ danh sách (kèm owner, family, items) */

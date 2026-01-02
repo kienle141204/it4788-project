@@ -38,25 +38,63 @@ export class ChatGateway extends BaseGateway {
         @ConnectedSocket() client: Socket,
         @MessageBody() data: { familyId: number },
     ) {
-        const user = client.data.user;
+        // Enhanced authentication check with re-authentication if needed
+        let user = client.data.user;
+
+        // Log authentication state
+        this.logger.debug(`[JOIN_ROOM] Socket ${client.id}, User data exists: ${!!user}, FamilyId: ${data.familyId}`);
+
         if (!user) {
-            return { success: false, error: 'Unauthorized' };
+            // Try to re-authenticate if user data is missing
+            try {
+                const context = {
+                    switchToWs: () => ({
+                        getClient: () => client,
+                    }),
+                    getClass: () => this.constructor,
+                    getHandler: () => this.handleJoinRoom,
+                } as any;
+
+                await this.wsJwtGuard.canActivate(context);
+                user = client.data.user;
+
+                if (!user) {
+                    this.logger.error(`[JOIN_ROOM] Re-authentication failed - user data still null for socket ${client.id}`);
+                    return { success: false, error: 'Unauthorized - Authentication failed' };
+                }
+
+                this.logger.log(`[JOIN_ROOM] Re-authenticated user ${user.id} for socket ${client.id}`);
+            } catch (error) {
+                this.logger.error(`[JOIN_ROOM] Re-authentication error for socket ${client.id}: ${error.message}`);
+                return { success: false, error: 'Unauthorized - Invalid token' };
+            }
         }
 
         try {
             // Verify user is member of family
+            this.logger.debug(`[JOIN_ROOM] Checking family membership for user ${user.id} in family ${data.familyId}`);
+
             const family = await this.familyService.getFamilyById(data.familyId);
+
+            if (!family) {
+                this.logger.warn(`[JOIN_ROOM] Family ${data.familyId} not found`);
+                return { success: false, error: 'Nhóm không tồn tại' };
+            }
+
             const isOwner = family.owner_id === user.id;
-            const isMember = family.members?.some(member => member.id === user.id);
+            const isMember = family.members?.some(member => member.user_id === user.id);
+
+            this.logger.debug(`[JOIN_ROOM] User ${user.id} - Owner: ${isOwner}, Member: ${isMember}, Role: ${user.role}`);
 
             if (!isOwner && !isMember && user.role !== 'admin') {
+                this.logger.warn(`[JOIN_ROOM] User ${user.id} has no access to family ${data.familyId}`);
                 return { success: false, error: 'Không có quyền truy cập nhóm này' };
             }
 
             const roomName = `family_${data.familyId}`;
             client.join(roomName);
 
-            this.logger.log(`User ${user.id} joined room ${roomName}`);
+            this.logger.log(`[JOIN_ROOM] ✅ User ${user.id} (${user.email}) joined room ${roomName}`);
 
             // Notify others in room
             client.to(roomName).emit('user_joined', {
@@ -66,7 +104,7 @@ export class ChatGateway extends BaseGateway {
 
             return { success: true, room: roomName };
         } catch (error) {
-            this.logger.error(`Error joining room: ${error.message}`);
+            this.logger.error(`[JOIN_ROOM] Error for user ${user?.id} joining family ${data.familyId}: ${error.message}`, error.stack);
             return { success: false, error: error.message };
         }
     }
