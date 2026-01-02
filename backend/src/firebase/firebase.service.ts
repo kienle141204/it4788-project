@@ -101,6 +101,7 @@ export class FirebaseService implements OnModuleInit {
 
     /**
      * Gửi notification đến 1 thiết bị
+     * Sử dụng data-only message để frontend control UI hoàn toàn bằng Notifee
      */
     async sendNotification(
         token: string,
@@ -110,39 +111,39 @@ export class FirebaseService implements OnModuleInit {
         image?: string,
         icon?: string,
     ) {
-        const notification: any = { title, body };
-        
-        // Thêm image (large icon/avatar) nếu có
+        // Chuẩn bị data payload (bao gồm title, body, image để frontend tự tạo notification)
+        const dataPayload: Record<string, string> = {
+            title,
+            body,
+            ...(data || {}),
+        };
+
+        // Thêm image vào data để frontend có thể lấy
         if (image) {
-            notification.image = image;
-        }
-        
-        // Thêm icon (small icon/logo) nếu có
-        if (icon) {
-            notification.icon = icon;
+            dataPayload.image = image;
         }
 
+        // Data-only message: không có notification payload
+        // Frontend sẽ nhận message và tự tạo notification với Notifee
         const message: any = {
-            notification,
             token,
-            data: data ? this.convertDataToString(data) : undefined,
-        };
-
-        // Thêm Android config để sử dụng notification channel
-        const androidNotification: any = {
-            channelId: 'chat_messages', // Channel ID phải khớp với channel được tạo trong app
-            sound: 'default',
-            priority: 'high' as const,
-        };
-
-        // Thêm image vào Android notification nếu có (để hiển thị BigPicture style)
-        if (image) {
-            androidNotification.imageUrl = image;
-        }
-
-        message.android = {
-            priority: 'high' as const,
-            notification: androidNotification,
+            data: this.convertDataToString(dataPayload),
+            // Android config cho data-only message
+            android: {
+                priority: 'high' as const,
+                // Không có notification config - data-only message
+            },
+            // APNS config cho iOS (data-only với content-available)
+            apns: {
+                payload: {
+                    aps: {
+                        contentAvailable: true,
+                    },
+                },
+                headers: {
+                    'apns-priority': '5',
+                },
+            },
         };
 
         try {

@@ -6,6 +6,23 @@ import { Platform, Alert, Linking } from 'react-native';
 import { postAccess, deleteAccess } from '@/utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { inAppLogger } from '@/utils/logger';
+// @ts-ignore - notifee types - lazy load để tránh lỗi khi native module chưa sẵn sàng
+let notifee: any = null;
+let AndroidImportance: any = null;
+let EventType: any = null;
+let AndroidStyle: any = null;
+
+try {
+  if (Device.isDevice && Platform.OS !== 'web') {
+    const notifeeModule = require('@notifee/react-native');
+    notifee = notifeeModule.default;
+    AndroidImportance = notifeeModule.AndroidImportance;
+    EventType = notifeeModule.EventType;
+    AndroidStyle = notifeeModule.AndroidStyle;
+  }
+} catch (error) {
+  console.warn('[PushNotifications] Notifee not available (native module not found, need rebuild):', error);
+}
 
 // Firebase Messaging - sử dụng FCM tokens trực tiếp
 // Bỏ qua khi chạy trên emulator/simulator hoặc web
@@ -15,6 +32,45 @@ try {
   // Trên web, bỏ qua Firebase Messaging
   if (Device.isDevice && Platform.OS !== 'web') {
     messaging = require('@react-native-firebase/messaging').default;
+    
+    // Setup background message handler cho data-only messages
+    // Handler này chạy khi app ở background/quit
+    messaging().setBackgroundMessageHandler(async (remoteMessage: any) => {
+      console.log('[PushNotifications] 📬 Background message received:', remoteMessage);
+      
+      // Lấy data từ message
+      const title = remoteMessage.data?.title || 'Thông báo mới';
+      const body = remoteMessage.data?.body || '';
+      const imageUrl = remoteMessage.data?.image;
+      
+      // Hiển thị notification bằng Notifee (nếu có) hoặc expo-notifications
+      if (notifee && Platform.OS === 'android') {
+        try {
+          await notifee.displayNotification({
+            title,
+            body,
+            data: remoteMessage.data || {},
+            android: {
+              channelId: 'chat_messages',
+              importance: AndroidImportance.HIGH,
+              style: {
+                type: AndroidStyle.BIGTEXT,
+                text: body,
+              },
+              ...(imageUrl && {
+                largeIcon: imageUrl,
+              }),
+              pressAction: {
+                id: 'default',
+              },
+            },
+          });
+          console.log('[PushNotifications] ✅ Background notification displayed with Notifee');
+        } catch (error) {
+          console.error('[PushNotifications] ❌ Error displaying background notification:', error);
+        }
+      }
+    });
   }
 } catch (error) {
   console.warn('[PushNotifications] Firebase Messaging not available (likely running on emulator or web):', error);
@@ -53,26 +109,48 @@ class PushNotificationService {
   private isRegistered: boolean = false;
 
   /**
-   * Tạo Android notification channel với BigText style để hiển thị đúng xuống dòng
+   * Tạo Android notification channel với Notifee để control UI tốt hơn
    */
   async setupAndroidNotificationChannel() {
     if (Platform.OS !== 'android') {
       return;
     }
 
+    if (!notifee) {
+      console.warn('[PushNotifications] ⚠️ Notifee not available, using expo-notifications channel');
+      // Fallback to expo-notifications
+      try {
+        await Notifications.setNotificationChannelAsync('chat_messages', {
+          name: 'Chat Messages',
+          description: 'Notifications for chat messages',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+        });
+        console.log('[PushNotifications] ✅ Android notification channel created with expo-notifications (fallback)');
+      } catch (error) {
+        console.warn('[PushNotifications] ⚠️ Failed to create Android notification channel:', error);
+      }
+      return;
+    }
+
     try {
-      await Notifications.setNotificationChannelAsync('chat_messages', {
+      // Tạo channel với Notifee
+      await notifee.createChannel({
+        id: 'chat_messages',
         name: 'Chat Messages',
         description: 'Notifications for chat messages',
-        importance: Notifications.AndroidImportance.HIGH,
+        importance: AndroidImportance.HIGH,
+        vibration: true,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
         sound: 'default',
-        // Sử dụng BigText style để hiển thị đúng xuống dòng
-        enableVibrate: true,
-        showBadge: true,
+        lights: true,
+        lightColor: '#FF231F7C',
       });
-      console.log('[PushNotifications] ✅ Android notification channel created');
+      console.log('[PushNotifications] ✅ Android notification channel created with Notifee');
     } catch (error) {
       console.warn('[PushNotifications] ⚠️ Failed to create Android notification channel:', error);
     }
@@ -437,7 +515,83 @@ class PushNotificationService {
   }
 
   /**
-   * Setup notification listeners cho FCM
+   * Hiển thị notification bằng Notifee với format đúng
+   */
+  private async displayNotificationWithNotifee(
+    title: string,
+    body: string,
+    data: any,
+    imageUrl?: string,
+  ) {
+    if (Platform.OS === 'android') {
+      // Kiểm tra Notifee có sẵn không
+      if (!notifee) {
+        console.warn('[PushNotifications] Notifee not available, using expo-notifications fallback');
+        // Fallback to expo-notifications
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: data || {},
+          },
+          trigger: null,
+        });
+        return;
+      }
+
+      try {
+        await notifee.displayNotification({
+          title,
+          body,
+          data: data || {},
+          android: {
+            channelId: 'chat_messages',
+            importance: AndroidImportance.HIGH,
+            // BigText style để hiển thị đúng xuống dòng
+            style: {
+              type: AndroidStyle.BIGTEXT,
+              text: body, // Body sẽ hiển thị với xuống dòng
+            },
+            // Thêm large icon (avatar) nếu có
+            ...(imageUrl && {
+              largeIcon: imageUrl,
+            }),
+            pressAction: {
+              id: 'default',
+            },
+          },
+        });
+      } catch (error) {
+        console.error('[PushNotifications] Error displaying notification with Notifee:', error);
+        throw error;
+      }
+    } else {
+      // iOS: vẫn dùng expo-notifications
+      const iosContent: any = {
+        title,
+        body,
+        data: data || {},
+      };
+      
+      if (imageUrl) {
+        iosContent.attachments = [
+          {
+            identifier: 'image',
+            url: imageUrl,
+            type: 'image',
+          },
+        ];
+      }
+      
+      await Notifications.scheduleNotificationAsync({
+        content: iosContent,
+        trigger: null,
+      });
+    }
+  }
+
+  /**
+   * Setup notification listeners cho FCM và Notifee
    */
   setupNotificationListeners(
     onNotificationReceived?: (notification: any) => void,
@@ -449,42 +603,77 @@ class PushNotificationService {
       return () => {}; // Return empty cleanup function
     }
 
+    // Setup Notifee foreground event handler cho Android
+    if (Platform.OS === 'android' && notifee) {
+      try {
+        notifee.onForegroundEvent(({ type, detail }: any) => {
+          console.log('[PushNotifications] Notifee foreground event:', type, detail);
+          if (type === EventType.PRESS && onNotificationTapped) {
+            onNotificationTapped({
+              notification: {
+                request: {
+                  content: {
+                    title: detail.notification?.title,
+                    body: detail.notification?.body,
+                    data: detail.notification?.data,
+                  },
+                },
+              },
+              data: detail.notification?.data,
+            });
+          }
+        });
+
+        // Setup Notifee background event handler cho Android
+        notifee.onBackgroundEvent(async ({ type, detail }: any) => {
+          console.log('[PushNotifications] Notifee background event:', type, detail);
+          if (type === EventType.PRESS && onNotificationTapped) {
+            // Gọi callback nếu có (có thể cần delay một chút để app đã sẵn sàng)
+            setTimeout(() => {
+              if (onNotificationTapped) {
+                onNotificationTapped({
+                  notification: {
+                    request: {
+                      content: {
+                        title: detail.notification?.title,
+                        body: detail.notification?.body,
+                        data: detail.notification?.data,
+                      },
+                    },
+                  },
+                  data: detail.notification?.data,
+                });
+              }
+            }, 100);
+          }
+        });
+      } catch (error) {
+        console.warn('[PushNotifications] Failed to setup Notifee event handlers:', error);
+      }
+    }
+
     // Listener cho notification khi app đang foreground (FCM)
-    const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
-      console.log('[PushNotifications] 📬 FCM Notification received (foreground):', {
-        title: remoteMessage.notification?.title,
-        body: remoteMessage.notification?.body,
-        data: remoteMessage.data,
-      });
+    // Với data-only message, data nằm trong remoteMessage.data
+    const unsubscribeForeground = messaging().onMessage(async (remoteMessage: any) => {
+      console.log('[PushNotifications] 📬 FCM Message received (foreground):', remoteMessage);
       
-      // Hiển thị notification qua expo-notifications để có UI đẹp
-      if (remoteMessage.notification) {
-        const notificationContent: any = {
-          title: remoteMessage.notification.title || '',
-          body: remoteMessage.notification.body || '',
-          data: remoteMessage.data || {},
-        };
+      // Lấy data từ message (data-only message)
+      const title = remoteMessage.data?.title || remoteMessage.notification?.title || 'Thông báo mới';
+      const body = remoteMessage.data?.body || remoteMessage.notification?.body || '';
+      const imageUrl = remoteMessage.data?.image || remoteMessage.notification?.android?.imageUrl;
 
-        // Thêm image nếu có (từ Android notification hoặc FCM data)
-        if (remoteMessage.notification.android?.imageUrl) {
-          notificationContent.attachments = [
-            {
-              identifier: 'image',
-              url: remoteMessage.notification.android.imageUrl,
-            },
-          ];
-        } else if (remoteMessage.data?.image) {
-          notificationContent.attachments = [
-            {
-              identifier: 'image',
-              url: remoteMessage.data.image,
-            },
-          ];
-        }
-
+      try {
+        await this.displayNotificationWithNotifee(title, body, remoteMessage.data, imageUrl);
+      } catch (error) {
+        console.error('[PushNotifications] Error displaying notification with Notifee:', error);
+        // Fallback to expo-notifications nếu Notifee fail
         await Notifications.scheduleNotificationAsync({
-          content: notificationContent,
-          trigger: null, // Hiển thị ngay lập tức
+          content: {
+            title,
+            body,
+            data: remoteMessage.data || {},
+          },
+          trigger: null,
         });
       }
       
