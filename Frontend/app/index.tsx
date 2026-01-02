@@ -13,22 +13,32 @@ export default function Index() {
     
     const checkLogin = async () => {
       try {
+        // Tạo Android notification channel trước (nếu là Android)
+        await pushNotificationService.setupAndroidNotificationChannel();
+        
         const token = await checkAsyncStorage();
         setIsLoggedIn(token);
         
-        // Nếu đã đăng nhập, đăng ký push notification token
+        // Nếu đã đăng nhập, kiểm tra và yêu cầu permission notification
         if (token) {
           try {
-            console.log('[Index] 🔔 Attempting to register push notification token...');
-            const registered = await pushNotificationService.registerTokenWithBackend();
-            if (registered) {
-              console.log('[Index] ✅ Push notification token registered successfully');
+            // Kiểm tra permission notification
+            const hasPermission = await pushNotificationService.checkAndRequestNotificationPermission();
+            
+            if (hasPermission) {
+              console.log('[Index] 🔔 Notification permission granted, registering token...');
+              const registered = await pushNotificationService.registerTokenWithBackend();
+              if (registered) {
+                console.log('[Index] ✅ Push notification token registered successfully');
+              } else {
+                console.warn('[Index] ⚠️ Push notification token registration failed (check logs above)');
+              }
             } else {
-              console.warn('[Index] ⚠️ Push notification token registration failed (check logs above)');
+              console.log('[Index] ℹ️ Notification permission not granted, skipping token registration');
             }
           } catch (error) {
-            console.error('[Index] ❌ Error registering push notification token:', error);
-            // Không block app flow nếu đăng ký token fail
+            console.error('[Index] ❌ Error checking notification permission:', error);
+            // Không block app flow nếu có lỗi
           }
         }
       } catch (e) {

@@ -203,19 +203,34 @@ export class ChatGateway extends BaseGateway {
 
                 // Gửi push notification qua Firebase
                 if (userIdsToNotify.length > 0) {
-                    const notificationTitle = `${senderName} - ${family.name}`;
-                    const notificationBody = chat.message || chat.title || 'Tin nhắn mới';
+                    // Format notification: Title = Tên nhóm, Body = Tên người nhắn\nNội dung tin nhắn
+                    const notificationTitle = family.name || 'Nhóm';
+                    const chatContent = chat.message || chat.title || 'Tin nhắn mới';
+                    const notificationBody = `${senderName}\n${chatContent}`;
+
+                    // Lấy avatar URL từ sender
+                    const avatarUrl = sender?.avatar_url || null;
+
+                    // Không cần set icon vì hệ thống tự động dùng app icon từ manifest
+                    const pushData: Record<string, string> = {
+                        type: 'chat_message',
+                        chatId: chat.id.toString(),
+                        familyId: dto.familyId.toString(),
+                        senderId: user.id.toString(),
+                    };
+
+                    // Thêm avatar URL vào data để frontend có thể lấy được
+                    if (avatarUrl) {
+                        pushData.image = avatarUrl;
+                    }
 
                     const pushResult = await this.firebaseService.sendToMultipleUsers(
                         userIdsToNotify,
                         notificationTitle,
                         notificationBody,
-                        {
-                            type: 'chat_message',
-                            chatId: chat.id.toString(),
-                            familyId: dto.familyId.toString(),
-                            senderId: user.id.toString(),
-                        },
+                        pushData,
+                        avatarUrl, // image (avatar - large image trong notification)
+                        null,      // icon - không cần vì hệ thống tự dùng app icon
                     );
 
                     this.logger.log(

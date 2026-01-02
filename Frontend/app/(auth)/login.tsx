@@ -133,15 +133,18 @@ export default function login() {
                 Bạn chưa có tài khoản?
             </Link>
         </View >
-        <View style={styles.loginButton}>
-            <TouchableOpacity  style={styles.touchAble} onPress={handleLogin}>
-              {loading ? (
-                            <ActivityIndicator size="small" color={COLORS.white} />
-                          ) : 
-                          (<Text style={styles.loginButtonText}>Đăng nhập</Text>)
-              }
-            </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={styles.loginButton} 
+          onPress={handleLogin}
+          activeOpacity={0.8}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.white} />
+          ) : (
+            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          )}
+        </TouchableOpacity>
 
         <View style={styles.dividerContainer}>
             <View style={styles.line} />
