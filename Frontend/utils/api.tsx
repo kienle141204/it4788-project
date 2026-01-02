@@ -4,22 +4,19 @@ import { Platform } from 'react-native';
 
 // Tự động phát hiện môi trường để chọn API domain phù hợp
 // Web: localhost, Android emulator: 10.0.2.2, iOS simulator: localhost
-const getApiDomain = () => {
-  // if (Platform.OS === 'web') {
-  //   return 'http://localhost:8090/api/';
-  // } else if (Platform.OS === 'android') {
-  //   return 'http://10.0.2.2:8090/api/';
-  // } else {
-  //   // iOS simulator hoặc các platform khác
-  //   return 'http://localhost:8090/api/';
-  // }
-  return 'https://it4788-project-ttac.onrender.com/api/';
-};
+// const getApiDomain = () => {
+//   if (Platform.OS === 'web') {
+//     return 'http://localhost:8090/api/';
+//   } else if (Platform.OS === 'android') {
+//     return 'http://10.0.2.2:8090/api/';
+//   } else {
+//     // iOS simulator hoặc các platform khác
+//     return 'http://localhost:8090/api/';
+//   }
+// };
 
-// Export API_DOMAIN để các module khác có thể detect environment
-export const API_DOMAIN = getApiDomain();
-// Uncomment dòng dưới khi deploy lên production (Render)
-// export const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
+// const API_DOMAIN = getApiDomain();
+const API_DOMAIN = 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {
@@ -163,7 +160,7 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
         fetch(uploadUrl, {
           method: 'POST',
           headers: headers,
-          body: formData,
+          body: formData as any,
         }),
         timeoutPromise,
       ]);
@@ -174,7 +171,7 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
       }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
+        const errorData: any = await response.json().catch(() => ({
           message: `HTTP ${response.status}: ${response.statusText}`,
         }));
 

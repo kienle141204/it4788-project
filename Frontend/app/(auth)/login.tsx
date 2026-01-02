@@ -12,6 +12,7 @@ import { loginUSer } from '@/service/auth'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkAsyncStorage } from '@/utils/checkAsyncStorage'
 import { pushNotificationService } from '@/service/pushNotifications'
+import { inAppLogger } from '@/utils/logger';
 
 export default function login() {
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
@@ -55,9 +56,22 @@ export default function login() {
       const key = await AsyncStorage.getAllKeys()
       
       // Đăng ký push notification token sau khi đăng nhập thành công
+      console.log('[Login] 🔔 Attempting to register push notification token...');
+      inAppLogger.log('🔔 Attempting to register push notification token...', 'Login');
       try {
-        await pushNotificationService.registerTokenWithBackend();
-      } catch (error) {
+        const registered = await pushNotificationService.registerTokenWithBackend();
+        if (registered) {
+          console.log('[Login] ✅ Push notification token registered successfully');
+          inAppLogger.log('✅ Push notification token registered successfully', 'Login');
+        } else {
+          console.warn('[Login] ⚠️ Push notification token registration failed (check logs above)');
+          inAppLogger.log('⚠️ Push notification token registration failed', 'Login');
+          // Không block login flow, nhưng log để debug
+        }
+      } catch (error: any) {
+        console.error('[Login] ❌ Error registering push notification token:', error);
+        console.error('[Login] ❌ Error details:', error?.message || 'Unknown error');
+        inAppLogger.log(`❌ Error: ${error?.message || 'Unknown error'}`, 'Login');
         // Không block login flow nếu đăng ký token fail
       }
       
