@@ -42,7 +42,7 @@ export class FridgeIngredientService {
     const isOwner = fridge.owner_id === user.id;
     const isAdmin = user.role === 'admin';
     const isFamilyOwner = fridge.family?.owner_id === user.id;
-    const isFamilyMember = fridge.family?.members?.some(member => member.id === user.id) ?? false;
+    const isFamilyMember = fridge.family?.members?.some(member => member.user_id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
       throw new UnauthorizedException(
@@ -84,7 +84,7 @@ export class FridgeIngredientService {
     const isOwner = fridge.owner_id === user.id;
     const isAdmin = user.role === 'admin';
     const isFamilyOwner = fridge.family?.owner_id === user.id;
-    const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
+    const isFamilyMember = fridge.family?.members?.some(m => m.user_id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
       throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00234]);
@@ -112,7 +112,7 @@ export class FridgeIngredientService {
     const isOwner = fridge.owner_id === user.id;
     const isAdmin = user.role === 'admin';
     const isFamilyOwner = fridge.family?.owner_id === user.id;
-    const isFamilyMember = fridge.family?.members?.some(m => m.id === user.id) ?? false;
+    const isFamilyMember = fridge.family?.members?.some(m => m.user_id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
       throw new UnauthorizedException('Bạn không có quyền truy cập tủ lạnh này');
