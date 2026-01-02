@@ -6,10 +6,15 @@ import {
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { BaseGateway, ConnectionManagerService, WsJwtGuard } from '../../common/websocket';
 import { ChatService } from './chat.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { FamilyService } from '../family/family.service';
+import { MemberService } from '../member/member.service';
+import { FirebaseService } from '../../firebase/firebase.service';
+import { User } from '../../entities/user.entity';
 
 @WebSocketGateway({
     namespace: '/chat',
@@ -26,9 +31,14 @@ export class ChatGateway extends BaseGateway {
         wsJwtGuard: WsJwtGuard,
         private readonly chatService: ChatService,
         private readonly familyService: FamilyService,
+        private readonly memberService: MemberService,
+        private readonly firebaseService: FirebaseService,
+        @InjectRepository(User)
+        private readonly userRepository: Repository<User>,
     ) {
         super(connectionManager, wsJwtGuard);
     }
+
 
     /**
      * Join family chat room
@@ -169,12 +179,61 @@ export class ChatGateway extends BaseGateway {
 
             this.logger.log(`Message sent to room ${roomName} by user ${user.id}`);
 
+            // Gửi push notification đến các thành viên gia đình (trừ người gửi)
+            try {
+                const sender = await this.userRepository.findOne({ where: { id: user.id } });
+                const senderName = sender?.full_name || user.email || `User ${user.id}`;
+                const family = await this.familyService.getFamilyById(dto.familyId);
+                const allMembers = await this.memberService.getMembersByFamily(dto.familyId);
+
+                // Lấy danh sách user IDs cần gửi notification (trừ người gửi)
+                const userIdsToNotify: number[] = [];
+
+                for (const member of allMembers) {
+                    if (member.user_id !== user.id) {
+                        userIdsToNotify.push(member.user_id);
+                    }
+                }
+
+                // Gửi cho owner nếu owner không phải là thành viên và không phải người gửi
+                const isOwnerMember = allMembers.some(m => m.user_id === family.owner_id);
+                if (!isOwnerMember && family.owner_id !== user.id) {
+                    userIdsToNotify.push(family.owner_id);
+                }
+
+                // Gửi push notification qua Firebase
+                if (userIdsToNotify.length > 0) {
+                    const notificationTitle = `${senderName} - ${family.name}`;
+                    const notificationBody = chat.message || chat.title || 'Tin nhắn mới';
+
+                    const pushResult = await this.firebaseService.sendToMultipleUsers(
+                        userIdsToNotify,
+                        notificationTitle,
+                        notificationBody,
+                        {
+                            type: 'chat_message',
+                            chatId: chat.id.toString(),
+                            familyId: dto.familyId.toString(),
+                            senderId: user.id.toString(),
+                        },
+                    );
+
+                    this.logger.log(
+                        `[ChatGateway] 📤 Firebase push sent: ${pushResult.success} success, ${pushResult.failed} failed`,
+                    );
+                }
+            } catch (pushError) {
+                // Log lỗi nhưng không ảnh hưởng đến việc gửi tin nhắn
+                this.logger.error(`[ChatGateway] ⚠️ Firebase push error: ${pushError.message}`);
+            }
+
             return { success: true, messageId: chat.id };
         } catch (error) {
             this.logger.error(`Error sending message: ${error.message}`);
             return { success: false, error: error.message };
         }
     }
+
 
     /**
      * Typing indicator
