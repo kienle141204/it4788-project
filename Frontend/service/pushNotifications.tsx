@@ -299,6 +299,13 @@ class PushNotificationService {
         return null;
       }
 
+      // Bỏ qua nếu là Web platform
+      // if (Platform.OS === 'web') {
+      //   console.warn('[PushNotifications] Web platform does not support Firebase push notifications');
+      //   inAppLogger.log('⚠️ Running on Web - Push notifications disabled', 'PushNotifications');
+      //   return null;
+      // }
+
       // Kiểm tra xem có phải device thật không (không phải simulator)
       if (!Device.isDevice) {
         console.warn('[PushNotifications] Must use physical device for Push Notifications');
@@ -315,16 +322,16 @@ class PushNotificationService {
 
       // Request permission cho notifications
       let permissionStatus = 'granted';
-      
+
       if (Platform.OS === 'ios') {
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
-        
+
         if (existingStatus !== 'granted') {
           const { status } = await Notifications.requestPermissionsAsync();
           finalStatus = status;
         }
-        
+
         if (finalStatus !== 'granted') {
           console.warn('[PushNotifications] Failed to get push token for iOS!');
           return null;
@@ -336,7 +343,7 @@ class PushNotificationService {
           console.warn('[PushNotifications] Firebase Messaging not available for Android');
           return null;
         }
-        
+
         const authStatus = await messaging().requestPermission();
         const enabled =
           authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -347,7 +354,7 @@ class PushNotificationService {
           inAppLogger.log(`❌ Android permission denied: ${authStatus}`, 'PushNotifications');
           return null;
         }
-        
+
         inAppLogger.log('✅ Android notification permission granted', 'PushNotifications');
       }
 
@@ -355,7 +362,7 @@ class PushNotificationService {
       // Backend sử dụng Firebase project: push-notification-it4788
       console.log('[PushNotifications] 🔄 Requesting FCM Token from Firebase...');
       console.log('[PushNotifications] 📋 Firebase project: push-notification-it4788');
-      
+
       if (!messaging) {
         console.warn('[PushNotifications] ❌ Firebase Messaging not available');
         inAppLogger.log('❌ Firebase Messaging not available - check if running on physical device', 'PushNotifications');
@@ -532,20 +539,20 @@ class PushNotificationService {
       console.error('[PushNotifications] ❌ Error type:', error?.constructor?.name);
       console.error('[PushNotifications] ❌ Error message:', error?.message);
       console.error('[PushNotifications] ❌ Error stack:', error?.stack);
-      
+
       // Log chi tiết hơn
       let errorDetails = `❌ Error: ${error?.message || 'Unknown error'}`;
-      
+
       if (error?.response) {
         // Axios error với response
         const status = error.response.status;
         const statusText = error.response.statusText;
         const data = error.response.data;
-        
+
         console.error('[PushNotifications] ❌ Error response status:', status);
         console.error('[PushNotifications] ❌ Error response statusText:', statusText);
         console.error('[PushNotifications] ❌ Error response data:', data);
-        
+
         errorDetails = `❌ HTTP ${status} ${statusText}`;
         if (data?.message) {
           errorDetails += `: ${data.message}`;
@@ -554,7 +561,7 @@ class PushNotificationService {
         } else if (data) {
           errorDetails += `: ${JSON.stringify(data)}`;
         }
-        
+
         inAppLogger.log(errorDetails, 'PushNotifications');
         inAppLogger.log(`❌ Status: ${status}`, 'PushNotifications');
       } else if (error?.request) {
@@ -567,7 +574,7 @@ class PushNotificationService {
         // Other error
         inAppLogger.log(errorDetails, 'PushNotifications');
       }
-      
+
       return false;
     }
   }
@@ -685,10 +692,10 @@ class PushNotificationService {
     onNotificationReceived?: (notification: any) => void,
     onNotificationTapped?: (response: any) => void,
   ) {
-    // Bỏ qua nếu không phải device thật, không có Firebase Messaging, hoặc đang chạy trên web
-    if (!Device.isDevice || !messaging || Platform.OS === 'web') {
-      console.warn('[PushNotifications] Skipping notification listeners setup (emulator/simulator/web or Firebase not available)');
-      return () => {}; // Return empty cleanup function
+    // Bỏ qua nếu là Web platform, không phải device thật, hoặc không có Firebase Messaging
+    if (Platform.OS === 'web' || !Device.isDevice || !messaging) {
+      console.warn('[PushNotifications] Skipping notification listeners setup (Web platform, emulator/simulator, or Firebase not available)');
+      return () => { }; // Return empty cleanup function
     }
 
     // Setup Notifee foreground event handler cho Android
@@ -764,7 +771,7 @@ class PushNotificationService {
           trigger: null,
         });
       }
-      
+
       if (onNotificationReceived) {
         onNotificationReceived(remoteMessage);
       }
@@ -803,7 +810,7 @@ class PushNotificationService {
     // Listener cho expo-notifications (backup)
     let receivedListener: any = null;
     let responseListener: any = null;
-    
+
     try {
       receivedListener = Notifications.addNotificationReceivedListener((notification: any) => {
         console.log('[PushNotifications] 📬 Expo Notification received:', {

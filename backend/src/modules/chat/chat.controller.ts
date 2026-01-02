@@ -4,11 +4,12 @@ import {
   Get,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   Patch,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { JwtAuthGuard, User } from 'src/common';
@@ -28,9 +29,18 @@ export class ChatController {
   }
 
   @Get('family/:familyId')
-  @ApiOperation({ summary: 'Lấy danh sách message của nhóm' })
-  findByFamily(@Param('familyId', ParseIntPipe) familyId: number, @User() user: JwtUser) {
-    return this.chatService.findByFamily(familyId, user);
+  @ApiOperation({ summary: 'Lấy danh sách message của nhóm (có pagination)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Số lượng tin nhắn (mặc định 30)' })
+  @ApiQuery({ name: 'lastId', required: false, type: Number, description: 'ID tin nhắn cuối cùng để load tiếp' })
+  findByFamily(
+    @Param('familyId', ParseIntPipe) familyId: number,
+    @Query('limit') limit: string,
+    @Query('lastId') lastId: string,
+    @User() user: JwtUser,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 30;
+    const lastIdNum = lastId ? parseInt(lastId, 10) : undefined;
+    return this.chatService.findByFamily(familyId, user, limitNum, lastIdNum);
   }
 
   @Patch(':id/read')

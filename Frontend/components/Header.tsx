@@ -18,7 +18,7 @@ const defaultAvatar = require('../assets/images/avatar.png');
 export default function Header({ userName, avatarUrl, onNotificationPress, onMenuPress }: HeaderProps) {
   const { unreadCount } = useNotifications();
   const { expiringCount } = useExpiringItems();
-  
+
   // Chỉ hiển thị badge dựa trên unreadCount từ backend
   // Kiểm tra xem có notification về hết hạn không để đổi màu icon
   const hasExpiringNotifications = expiringCount.totalExpiring > 0 || expiringCount.totalExpired > 0;
@@ -70,9 +70,6 @@ export default function Header({ userName, avatarUrl, onNotificationPress, onMen
                 </Text>
               </View>
             )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onMenuPress}>
-            <Ionicons name="ellipsis-horizontal" size={24} color={COLORS.darkGrey} />
           </TouchableOpacity>
         </View>
       </View>
