@@ -208,10 +208,14 @@ export default function GroupDetailPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const chatLastIdRef = useRef<number | null>(null);
 
   // Refs for scrolling
   const chatListRef = useRef<FlatList<ChatMessage>>(null);
   const tabScrollRef = useRef<ScrollView>(null);
+  const shouldScrollToEndRef = useRef(true);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -576,6 +580,7 @@ export default function GroupDetailPage() {
   };
 
   const handleMemberMenu = (member: Member) => {
+    setShowMembersView(false);
     setSelectedMember(member);
     setShowMemberMenu(true);
   };
@@ -695,18 +700,42 @@ export default function GroupDetailPage() {
   };
 
   // ============ CHAT FUNCTIONS ============
-  const fetchChatMessages = useCallback(async () => {
-    setChatLoading(true);
+  const fetchChatMessages = useCallback(async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMoreMessages(true);
+    } else {
+      setChatLoading(true);
+      // Reset cursor when doing fresh load
+      chatLastIdRef.current = null;
+    }
     try {
-      const messages = await getChatMessages(familyId);
-      setChatMessages(messages);
+      const lastId = loadMore ? chatLastIdRef.current : undefined;
+      const response = await getChatMessages(familyId, 30, lastId ?? undefined);
+
+      if (loadMore) {
+        // Prepend older messages - don't scroll
+        shouldScrollToEndRef.current = false;
+        setChatMessages(prev => [...response.data, ...prev]);
+      } else {
+        // Initial load - scroll to end
+        shouldScrollToEndRef.current = true;
+        setChatMessages(response.data);
+      }
+
+      setHasMoreMessages(response.pagination.hasMore);
+      // Update cursor ref
+      chatLastIdRef.current = response.pagination.lastId;
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
         return;
       }
     } finally {
-      setChatLoading(false);
+      if (loadMore) {
+        setLoadingMoreMessages(false);
+      } else {
+        setChatLoading(false);
+      }
     }
   }, [familyId, handleSessionExpired]);
 
@@ -798,6 +827,7 @@ export default function GroupDetailPage() {
         setNewMessage('');
         // Message will be received via onNewMessage listener, no need to fetch
         // Scroll to bottom after sending message
+        shouldScrollToEndRef.current = true;
         setTimeout(() => {
           chatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -809,6 +839,7 @@ export default function GroupDetailPage() {
           message: newMessage.trim(),
         });
         setNewMessage('');
+        shouldScrollToEndRef.current = true;
         await fetchChatMessages();
         // Scroll to bottom after sending message
         setTimeout(() => {
@@ -939,7 +970,7 @@ export default function GroupDetailPage() {
     if (chatLoading && chatMessages.length === 0) {
       return (
         <View style={groupStyles.chatLoadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.purple} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={groupStyles.chatLoadingText}>Đang tải tin nhắn...</Text>
         </View>
       );
@@ -954,7 +985,7 @@ export default function GroupDetailPage() {
         {chatMessages.length === 0 ? (
           <View style={groupStyles.chatEmptyState}>
             <View style={groupStyles.chatEmptyIcon}>
-              <Ionicons name="chatbubbles-outline" size={40} color={COLORS.purple} />
+              <Ionicons name="chatbubbles-outline" size={40} color={COLORS.primary} />
             </View>
             <Text style={groupStyles.chatEmptyTitle}>
               Chưa có tin nhắn nào
@@ -975,15 +1006,43 @@ export default function GroupDetailPage() {
             contentContainerStyle={groupStyles.chatMessagesContent}
             showsVerticalScrollIndicator={false}
             inverted={false}
-            onContentSizeChange={() => {
-              chatListRef.current?.scrollToEnd({ animated: true });
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
             }}
+            onContentSizeChange={(_, contentHeight) => {
+              if (shouldScrollToEndRef.current && contentHeight > 0) {
+                chatListRef.current?.scrollToEnd({ animated: false });
+                // Reset after initial scroll
+                setTimeout(() => {
+                  shouldScrollToEndRef.current = false;
+                }, 100);
+              }
+            }}
+            onScroll={(event) => {
+              const { contentOffset } = event.nativeEvent;
+              // Auto load more when scroll to top (< 50px from top)
+              if (contentOffset.y < 50 && hasMoreMessages && !loadingMoreMessages && !chatLoading) {
+                fetchChatMessages(true);
+              }
+            }}
+            scrollEventThrottle={100}
+            ListHeaderComponent={
+              loadingMoreMessages ? (
+                <View style={{ padding: 12, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={{ color: COLORS.grey, fontSize: 12, marginTop: 4 }}>
+                    Đang tải...
+                  </Text>
+                </View>
+              ) : null
+            }
             refreshControl={
               <RefreshControl
                 refreshing={chatLoading}
-                onRefresh={fetchChatMessages}
-                colors={[COLORS.purple]}
-                tintColor={COLORS.purple}
+                onRefresh={() => fetchChatMessages(false)}
+                colors={[COLORS.primary]}
+                tintColor={COLORS.primary}
               />
             }
           />
@@ -1630,7 +1689,7 @@ export default function GroupDetailPage() {
                     setShowAddItemModal(true);
                   }}
                 >
-                  <Ionicons name="add" size={20} color={COLORS.purple} />
+                  <Ionicons name="add" size={20} color={COLORS.primary} />
                   <Text style={groupStyles.addItemButtonText}>
                     Thêm mặt hàng
                   </Text>
@@ -1735,7 +1794,7 @@ export default function GroupDetailPage() {
       {/* Content */}
       {loading ? (
         <View style={groupStyles.loadingContainer}>
-          <ActivityIndicator size='large' color={COLORS.blue} />
+          <ActivityIndicator size='large' color={COLORS.primary} />
           <Text style={groupStyles.loadingText}>Đang tải...</Text>
         </View>
       ) : activeTab === 'chat' ? (
@@ -1852,7 +1911,7 @@ export default function GroupDetailPage() {
             >
               {loadingMemberProfile ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color={COLORS.purple} />
+                  <ActivityIndicator size="large" color={COLORS.primary} />
                   <Text style={{ marginTop: 12, color: COLORS.grey }}>Đang tải thông tin...</Text>
                 </View>
               ) : memberProfile ? (
@@ -2316,7 +2375,7 @@ export default function GroupDetailPage() {
                 />
 
                 {loadingIngredients && (
-                  <ActivityIndicator size="small" color={COLORS.purple} style={{ marginTop: 8 }} />
+                  <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
                 )}
 
                 {searchedIngredients.length > 0 && (
@@ -2363,7 +2422,7 @@ export default function GroupDetailPage() {
                         />
                       ) : (
                         <View style={groupStyles.selectedIngredientImage}>
-                          <Ionicons name="nutrition-outline" size={24} color={COLORS.purple} />
+                          <Ionicons name="nutrition-outline" size={24} color={COLORS.primary} />
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
