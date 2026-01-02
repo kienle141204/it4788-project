@@ -156,9 +156,6 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
 
         // Dùng cùng host với REST API nhưng namespace /notifications
-<<<<<<< HEAD
-        const baseUrl = 'https://it4788-project-ttac.onrender.com';
-=======
         // Tự động chọn URL dựa trên API_DOMAIN (đồng bộ với api.tsx)
         const { API_DOMAIN } = await import('@/utils/api');
         const isProduction = API_DOMAIN.includes('render.com') || API_DOMAIN.includes('onrender.com');
@@ -172,7 +169,6 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         } else {
           baseUrl = 'http://localhost:8090';
         }
->>>>>>> 963a64e07cbf036acbd6fe18c591c39168b60646
 
         const s = io(`${baseUrl}/notifications`, {
           transports: ['websocket'],

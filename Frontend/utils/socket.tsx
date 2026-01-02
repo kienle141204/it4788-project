@@ -4,17 +4,6 @@ import { Platform } from 'react-native';
 import { API_DOMAIN } from './api';
 
 const getSocketUrl = () => {
-<<<<<<< HEAD
-    // if (Platform.OS === 'web') {
-    //     return 'http://localhost:8090';
-    // } else if (Platform.OS === 'android') {
-    //     return 'http://10.0.2.2:8090';
-    // } else {
-    //     // iOS simulator hoặc các platform khác
-    //     return 'http://localhost:8090';
-    // }
-    return 'https://it4788-project-ttac.onrender.com';
-=======
     // Kiểm tra xem API_DOMAIN có phải Render URL không
     const isProduction = API_DOMAIN.includes('render.com') || API_DOMAIN.includes('onrender.com');
 
@@ -31,7 +20,6 @@ const getSocketUrl = () => {
         // iOS simulator hoặc các platform khác
         return 'http://localhost:8090';
     }
->>>>>>> 963a64e07cbf036acbd6fe18c591c39168b60646
 };
 
 const SOCKET_URL = getSocketUrl();
