@@ -16,8 +16,10 @@ const getApiDomain = () => {
   return 'https://it4788-project-ttac.onrender.com/api/';
 };
 
-const API_DOMAIN = getApiDomain();
-// const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
+// Export API_DOMAIN để các module khác có thể detect environment
+export const API_DOMAIN = getApiDomain();
+// Uncomment dòng dưới khi deploy lên production (Render)
+// export const API_DOMAIN = process.env.API || 'https://it4788-project-ttac.onrender.com/api/';
 const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 const config = {
   headers: {

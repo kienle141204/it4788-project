@@ -118,7 +118,7 @@ export class RefrigeratorService {
 
     // Kiểm tra quyền: admin hoặc owner hoặc member family
     const isOwner = fridge.owner_id === user.id;
-    const isMember = fridge.family?.members?.some(member => member.id === user.id);
+    const isMember = fridge.family?.members?.some(member => member.user_id === user.id);
     const isAdmin = user.role === 'admin';
 
     if (!isOwner && !isMember && !isAdmin) {
@@ -188,7 +188,7 @@ export class RefrigeratorService {
     // Kiểm tra quyền truy cập family
     const family = await this.familyService.getFamilyById(family_id);
     const isOwner = family.owner_id === user.id;
-    const isMember = family.members?.some(member => member.id === user.id) ?? false;
+    const isMember = family.members?.some(member => member.user_id === user.id) ?? false;
     const isAdmin = user.role === 'admin';
 
     if (!isOwner && !isMember && !isAdmin) {

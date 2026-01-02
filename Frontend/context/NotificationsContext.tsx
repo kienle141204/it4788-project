@@ -117,13 +117,13 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       (response) => {
         console.log('[Notifications] Push notification tapped:', response);
         const data = response.notification.request.content.data;
-        
+
         // Navigate đến màn hình notifications
         router.push('/(notifications)');
-        
+
         // Refresh notifications list
         refreshNotifications();
-        
+
         // Nếu có notificationId, có thể mark as read
         if (data?.notificationId) {
           markAsRead(parseInt(data.notificationId));
@@ -156,7 +156,23 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
 
         // Dùng cùng host với REST API nhưng namespace /notifications
+<<<<<<< HEAD
         const baseUrl = 'https://it4788-project-ttac.onrender.com';
+=======
+        // Tự động chọn URL dựa trên API_DOMAIN (đồng bộ với api.tsx)
+        const { API_DOMAIN } = await import('@/utils/api');
+        const isProduction = API_DOMAIN.includes('render.com') || API_DOMAIN.includes('onrender.com');
+
+        let baseUrl: string;
+        if (isProduction) {
+          // Production - sử dụng wss:// (secure WebSocket)
+          baseUrl = 'wss://it4788-project-ttac.onrender.com';
+        } else if (Platform.OS === 'android') {
+          baseUrl = 'http://10.0.2.2:8090';
+        } else {
+          baseUrl = 'http://localhost:8090';
+        }
+>>>>>>> 963a64e07cbf036acbd6fe18c591c39168b60646
 
         const s = io(`${baseUrl}/notifications`, {
           transports: ['websocket'],

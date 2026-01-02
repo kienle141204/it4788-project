@@ -775,9 +775,10 @@ export default function GroupDetailPage() {
   // Auto-scroll to bottom when chat messages are loaded
   useEffect(() => {
     if (chatMessages.length > 0 && activeTab === 'chat' && !chatLoading) {
+      // Increase delay to ensure FlatList has rendered
       setTimeout(() => {
-        chatListRef.current?.scrollToEnd({ animated: false });
-      }, 100);
+        chatListRef.current?.scrollToEnd({ animated: true });
+      }, 300); // Tăng từ 100ms lên 300ms để đảm bảo FlatList đã render xong
     }
   }, [chatMessages, activeTab, chatLoading]);
 
@@ -796,6 +797,10 @@ export default function GroupDetailPage() {
       if (result.success) {
         setNewMessage('');
         // Message will be received via onNewMessage listener, no need to fetch
+        // Scroll to bottom after sending message
+        setTimeout(() => {
+          chatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       } else {
         // Fallback to REST API if WebSocket fails
         await sendChatMessage({
@@ -805,6 +810,10 @@ export default function GroupDetailPage() {
         });
         setNewMessage('');
         await fetchChatMessages();
+        // Scroll to bottom after sending message
+        setTimeout(() => {
+          chatListRef.current?.scrollToEnd({ animated: true });
+        }, 200);
       }
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
