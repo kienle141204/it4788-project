@@ -73,7 +73,7 @@ export default function CreateMenuPage() {
   const fetchFamilies = useCallback(async () => {
     setLoadingFamilies(true);
     try {
-      const payload = await getAccess('families');
+      const payload = await getAccess('families/my-family');
       if (Array.isArray(payload)) {
         setFamilies(payload as Family[]);
       } else if (payload?.success !== false) {
@@ -283,8 +283,8 @@ export default function CreateMenuPage() {
             {[
               { value: 'breakfast', label: 'Bữa sáng' },
               { value: 'lunch', label: 'Bữa trưa' },
-              { value: 'dinner', label: 'Bữa chiều' },
-              { value: 'snack', label: 'Bữa tối' },
+              { value: 'dinner', label: 'Bữa tối' },
+              { value: 'snack', label: 'Bữa phụ' },
             ].map(option => (
               <TouchableOpacity
                 key={option.value}

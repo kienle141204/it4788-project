@@ -66,8 +66,8 @@ const formatTime = (time?: string) => {
   const timeMap: { [key: string]: string } = {
     breakfast: 'Bữa sáng',
     lunch: 'Bữa trưa',
-    dinner: 'Bữa chiều',
-    snack: 'Bữa tối',
+    dinner: 'Bữa tối',
+    snack: 'Bữa phụ',
   };
   return time ? timeMap[time] || time : 'Không xác định';
 };
