@@ -102,11 +102,47 @@ export class FirebaseService implements OnModuleInit {
     /**
      * Gửi notification đến 1 thiết bị
      */
-    async sendNotification(token: string, title: string, body: string, data?: Record<string, string>) {
-        const message = {
-            notification: { title, body },
+    async sendNotification(
+        token: string,
+        title: string,
+        body: string,
+        data?: Record<string, string>,
+        image?: string,
+        icon?: string,
+    ) {
+        const notification: any = { title, body };
+        
+        // Thêm image (large icon/avatar) nếu có
+        if (image) {
+            notification.image = image;
+        }
+        
+        // Thêm icon (small icon/logo) nếu có
+        if (icon) {
+            notification.icon = icon;
+        }
+
+        const message: any = {
+            notification,
             token,
             data: data ? this.convertDataToString(data) : undefined,
+        };
+
+        // Thêm Android config để sử dụng notification channel
+        const androidNotification: any = {
+            channelId: 'chat_messages', // Channel ID phải khớp với channel được tạo trong app
+            sound: 'default',
+            priority: 'high' as const,
+        };
+
+        // Thêm image vào Android notification nếu có (để hiển thị BigPicture style)
+        if (image) {
+            androidNotification.imageUrl = image;
+        }
+
+        message.android = {
+            priority: 'high' as const,
+            notification: androidNotification,
         };
 
         try {
@@ -126,6 +162,8 @@ export class FirebaseService implements OnModuleInit {
         title: string,
         body: string,
         data?: Record<string, string>,
+        image?: string,
+        icon?: string,
     ): Promise<{ success: number; failed: number; errors: string[] }> {
         if (!this.deviceTokenService) {
             console.warn(`[FirebaseService] ⚠️ DeviceTokenService not available for user ${userId}`);
@@ -142,7 +180,7 @@ export class FirebaseService implements OnModuleInit {
 
             const tokens = deviceTokens.map((dt) => dt.deviceToken);
             console.log(`[FirebaseService] 📤 Sending to ${tokens.length} device(s) for user ${userId}`);
-            return await this.sendToMultipleTokens(tokens, title, body, data);
+            return await this.sendToMultipleTokens(tokens, title, body, data, image, icon);
         } catch (error) {
             return { success: 0, failed: 0, errors: [error.message || 'Unknown error'] };
         }
@@ -156,6 +194,8 @@ export class FirebaseService implements OnModuleInit {
         title: string,
         body: string,
         data?: Record<string, string>,
+        image?: string,
+        icon?: string,
     ): Promise<{ success: number; failed: number; errors: string[] }> {
         if (tokens.length === 0) {
             return { success: 0, failed: 0, errors: [] };
@@ -170,7 +210,7 @@ export class FirebaseService implements OnModuleInit {
         // Gửi đến từng token và xử lý lỗi riêng biệt
         const promises = tokens.map(async (token) => {
             try {
-                await this.sendNotification(token, title, body, data);
+                await this.sendNotification(token, title, body, data, image, icon);
                 results.success++;
             } catch (error: any) {
                 results.failed++;
@@ -199,6 +239,8 @@ export class FirebaseService implements OnModuleInit {
         title: string,
         body: string,
         data?: Record<string, string>,
+        image?: string,
+        icon?: string,
     ): Promise<{ success: number; failed: number; errors: string[] }> {
         if (!this.deviceTokenService) {
             return { success: 0, failed: 0, errors: ['DeviceTokenService not available'] };
@@ -222,7 +264,7 @@ export class FirebaseService implements OnModuleInit {
         }
 
         // Gửi đến tất cả tokens
-        const sendResults = await this.sendToMultipleTokens(allTokens, title, body, data);
+        const sendResults = await this.sendToMultipleTokens(allTokens, title, body, data, image, icon);
         return {
             success: sendResults.success,
             failed: sendResults.failed,

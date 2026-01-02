@@ -152,10 +152,12 @@ const getCurrentUserId = async (): Promise<number | null> => {
 
 export default function GroupDetailPage() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id, tab } = useLocalSearchParams();
   const familyId = parseInt(id as string);
 
-  const [activeTab, setActiveTab] = useState<'shopping' | 'chat' | 'statistics'>('shopping');
+  // Đọc query param 'tab' để hỗ trợ deep linking từ notification
+  const initialTab = (tab === 'chat' ? 'chat' : tab === 'statistics' ? 'statistics' : 'shopping') as 'shopping' | 'chat' | 'statistics';
+  const [activeTab, setActiveTab] = useState<'shopping' | 'chat' | 'statistics'>(initialTab);
   const [showMembersView, setShowMembersView] = useState(false);
   const [family, setFamily] = useState<Family | null>(null);
   const [members, setMembers] = useState<Member[]>([]);

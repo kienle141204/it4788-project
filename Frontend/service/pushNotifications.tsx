@@ -2,20 +2,22 @@
 import * as Notifications from 'expo-notifications';
 // @ts-ignore - expo-device types sẽ được cài khi npm install
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 import { postAccess, deleteAccess } from '@/utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { inAppLogger } from '@/utils/logger';
 
 // Firebase Messaging - sử dụng FCM tokens trực tiếp
-// Bỏ qua khi chạy trên emulator/simulator
+// Bỏ qua khi chạy trên emulator/simulator hoặc web
 let messaging: any = null;
 try {
-  if (Device.isDevice) {
+  // React Native Firebase chỉ hoạt động trên native platforms (iOS/Android)
+  // Trên web, bỏ qua Firebase Messaging
+  if (Device.isDevice && Platform.OS !== 'web') {
     messaging = require('@react-native-firebase/messaging').default;
   }
 } catch (error) {
-  console.warn('[PushNotifications] Firebase Messaging not available (likely running on emulator):', error);
+  console.warn('[PushNotifications] Firebase Messaging not available (likely running on emulator or web):', error);
 }
 
 // Firebase Configuration
@@ -23,8 +25,8 @@ try {
 // Sử dụng FCM tokens trực tiếp từ Firebase Messaging
 
 // Cấu hình cách hiển thị notification khi app đang foreground
-// Chỉ setup khi có device thật
-if (Device.isDevice) {
+// Chỉ setup khi có device thật và không phải web
+if (Device.isDevice && Platform.OS !== 'web') {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -49,10 +51,153 @@ class PushNotificationService {
   private isRegistered: boolean = false;
 
   /**
+   * Tạo Android notification channel với BigText style để hiển thị đúng xuống dòng
+   */
+  async setupAndroidNotificationChannel() {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    try {
+      await Notifications.setNotificationChannelAsync('chat_messages', {
+        name: 'Chat Messages',
+        description: 'Notifications for chat messages',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        sound: 'default',
+        // Sử dụng BigText style để hiển thị đúng xuống dòng
+        enableVibrate: true,
+        showBadge: true,
+      });
+      console.log('[PushNotifications] ✅ Android notification channel created');
+    } catch (error) {
+      console.warn('[PushNotifications] ⚠️ Failed to create Android notification channel:', error);
+    }
+  }
+
+  /**
+   * Kiểm tra permission notification và hỏi người dùng nếu chưa bật
+   */
+  async checkAndRequestNotificationPermission(): Promise<boolean> {
+    try {
+      // Bỏ qua trên web
+      if (Platform.OS === 'web') {
+        return false;
+      }
+
+      // Bỏ qua trên emulator/simulator
+      if (!Device.isDevice) {
+        return false;
+      }
+
+      let hasPermission = false;
+
+      if (Platform.OS === 'ios') {
+        const { status } = await Notifications.getPermissionsAsync();
+        hasPermission = status === 'granted';
+
+        if (!hasPermission) {
+          // Hỏi người dùng có muốn bật notification không
+          return new Promise((resolve) => {
+            Alert.alert(
+              'Cho phép thông báo',
+              'Ứng dụng cần quyền thông báo để gửi cho bạn các tin nhắn mới từ nhóm. Bạn có muốn bật thông báo không?',
+              [
+                {
+                  text: 'Không',
+                  style: 'cancel',
+                  onPress: () => resolve(false),
+                },
+                {
+                  text: 'Cài đặt',
+                  onPress: async () => {
+                    // Mở settings để bật notification
+                    await Linking.openSettings();
+                    resolve(false);
+                  },
+                },
+                {
+                  text: 'Cho phép',
+                  onPress: async () => {
+                    // Request permission trực tiếp
+                    const { status: newStatus } = await Notifications.requestPermissionsAsync();
+                    resolve(newStatus === 'granted');
+                  },
+                },
+              ],
+              { cancelable: false }
+            );
+          });
+        }
+      } else {
+        // Android: Kiểm tra permission từ Firebase Messaging
+        if (!messaging) {
+          return false;
+        }
+
+        const authStatus = await messaging().hasPermission();
+        hasPermission =
+          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+        if (!hasPermission) {
+          // Hỏi người dùng có muốn bật notification không
+          return new Promise((resolve) => {
+            Alert.alert(
+              'Cho phép thông báo',
+              'Ứng dụng cần quyền thông báo để gửi cho bạn các tin nhắn mới từ nhóm. Bạn có muốn bật thông báo không?',
+              [
+                {
+                  text: 'Không',
+                  style: 'cancel',
+                  onPress: () => resolve(false),
+                },
+                {
+                  text: 'Cài đặt',
+                  onPress: async () => {
+                    // Mở settings để bật notification
+                    await Linking.openSettings();
+                    resolve(false);
+                  },
+                },
+                {
+                  text: 'Cho phép',
+                  onPress: async () => {
+                    // Request permission trực tiếp
+                    const newStatus = await messaging().requestPermission();
+                    const enabled =
+                      newStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+                      newStatus === messaging.AuthorizationStatus.PROVISIONAL;
+                    resolve(enabled);
+                  },
+                },
+              ],
+              { cancelable: false }
+            );
+          });
+        }
+      }
+
+      return hasPermission;
+    } catch (error) {
+      console.error('[PushNotifications] Error checking notification permission:', error);
+      return false;
+    }
+  }
+
+  /**
    * Request permission và lấy FCM Token trực tiếp từ Firebase
    */
   async registerForPushNotifications(): Promise<string | null> {
     try {
+      // Bỏ qua trên web - push notifications không được hỗ trợ đầy đủ trên web
+      if (Platform.OS === 'web') {
+        console.warn('[PushNotifications] Push notifications are not fully supported on web platform');
+        inAppLogger.log('⚠️ Web platform - Push notifications disabled', 'PushNotifications');
+        return null;
+      }
+
       // Kiểm tra xem có phải device thật không (không phải simulator)
       if (!Device.isDevice) {
         console.warn('[PushNotifications] Must use physical device for Push Notifications');
@@ -154,6 +299,13 @@ class PushNotificationService {
    */
   async registerTokenWithBackend(): Promise<boolean> {
     try {
+      // Bỏ qua trên web - push notifications không được hỗ trợ đầy đủ trên web
+      if (Platform.OS === 'web') {
+        console.log('[PushNotifications] Web platform - skipping token registration');
+        inAppLogger.log('⚠️ Web platform - Push notifications disabled', 'PushNotifications');
+        return false;
+      }
+
       // Kiểm tra xem user đã đăng nhập chưa
       const token = await AsyncStorage.getItem('access_token');
       if (!token) {
@@ -257,6 +409,11 @@ class PushNotificationService {
    */
   async unregisterToken(): Promise<void> {
     try {
+      // Bỏ qua trên web
+      if (Platform.OS === 'web') {
+        return;
+      }
+
       if (!this.fcmToken) {
         return;
       }
@@ -284,9 +441,9 @@ class PushNotificationService {
     onNotificationReceived?: (notification: any) => void,
     onNotificationTapped?: (response: any) => void,
   ) {
-    // Bỏ qua nếu không phải device thật hoặc không có Firebase Messaging
-    if (!Device.isDevice || !messaging) {
-      console.warn('[PushNotifications] Skipping notification listeners setup (emulator/simulator or Firebase not available)');
+    // Bỏ qua nếu không phải device thật, không có Firebase Messaging, hoặc đang chạy trên web
+    if (!Device.isDevice || !messaging || Platform.OS === 'web') {
+      console.warn('[PushNotifications] Skipping notification listeners setup (emulator/simulator/web or Firebase not available)');
       return () => {}; // Return empty cleanup function
     }
 
@@ -300,12 +457,31 @@ class PushNotificationService {
       
       // Hiển thị notification qua expo-notifications để có UI đẹp
       if (remoteMessage.notification) {
+        const notificationContent: any = {
+          title: remoteMessage.notification.title || '',
+          body: remoteMessage.notification.body || '',
+          data: remoteMessage.data || {},
+        };
+
+        // Thêm image nếu có (từ Android notification hoặc FCM data)
+        if (remoteMessage.notification.android?.imageUrl) {
+          notificationContent.attachments = [
+            {
+              identifier: 'image',
+              url: remoteMessage.notification.android.imageUrl,
+            },
+          ];
+        } else if (remoteMessage.data?.image) {
+          notificationContent.attachments = [
+            {
+              identifier: 'image',
+              url: remoteMessage.data.image,
+            },
+          ];
+        }
+
         await Notifications.scheduleNotificationAsync({
-          content: {
-            title: remoteMessage.notification.title || '',
-            body: remoteMessage.notification.body || '',
-            data: remoteMessage.data || {},
-          },
+          content: notificationContent,
           trigger: null, // Hiển thị ngay lập tức
         });
       }
@@ -400,6 +576,11 @@ class PushNotificationService {
    */
   async checkInitialNotification(): Promise<any | null> {
     try {
+      // Bỏ qua trên web
+      if (Platform.OS === 'web') {
+        return null;
+      }
+
       // Chỉ check trên iOS vì Android không hỗ trợ method này
       if (Platform.OS === 'ios') {
         const notification = await Notifications.getLastNotificationResponseAsync();
