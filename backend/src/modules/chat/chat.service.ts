@@ -40,7 +40,7 @@ export class ChatService {
 
   async markAsRead(id: number, user: JwtUser) {
     const chat = await this.chatRepo.findOne({ where: { id } });
-    if (!chat) throw new NotFoundException('Chat not found');
+    if (!chat) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00350]);
 
     await this.checkPermission(chat.familyId, user);
 
@@ -56,7 +56,7 @@ export class ChatService {
     const isAdmin = user.role === 'admin';
 
     if (!isOwner && !isMember && !isAdmin) {
-      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00234]); // Using same error code as refrigerator for consistency
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00351]);
     }
   }
 }

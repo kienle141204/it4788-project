@@ -272,6 +272,37 @@ export enum ResponseCode {
   C00330 = '00330', // Vui lòng chọn file để upload
   C00331 = '00331', // Upload file thành công
   C00332 = '00332', // Xóa file thành công
+
+  // Shopping Item Management
+  C00340 = '00340', // Không tìm thấy item mua sắm
+  C00341 = '00341', // Bạn không có quyền thêm item vào danh sách này
+  C00342 = '00342', // Bạn không có quyền xem hoặc chỉnh sửa item này
+  C00343 = '00343', // Tạo item mua sắm thành công
+  C00344 = '00344', // Cập nhật item mua sắm thành công
+  C00345 = '00345', // Xóa item mua sắm thành công
+  C00346 = '00346', // Đánh dấu item thành công
+
+  // Chat Management
+  C00350 = '00350', // Không tìm thấy tin nhắn
+  C00351 = '00351', // Bạn không có quyền truy cập nhóm chat này
+  C00352 = '00352', // Gửi tin nhắn thành công
+  C00353 = '00353', // Đánh dấu tin nhắn đã đọc thành công
+  C00354 = '00354', // Lấy tin nhắn thành công
+
+  // Device Token Management
+  C00360 = '00360', // Đăng ký device token thành công
+  C00361 = '00361', // Xóa device token thành công
+  C00362 = '00362', // Lấy danh sách device token thành công
+  C00363 = '00363', // Device token không hợp lệ
+
+  // Additional User Management
+  C00325 = '00325', // Tài khoản này đang ở trạng thái riêng tư
+
+  // Additional Shopping List
+  C00269 = '00269', // Bạn không có quyền xem danh sách này
+
+  // Additional Menu
+  C00144 = '00144', // Không tìm thấy món ăn trong menu sau khi cập nhật
 }
 
 // Thông điệp tiếng Việt cho từng mã nghiệp vụ
@@ -514,6 +545,33 @@ export const ResponseMessageVi: Record<ResponseCode, string> = {
   [ResponseCode.C00330]: 'Vui lòng chọn file để upload.',
   [ResponseCode.C00331]: 'Upload file thành công.',
   [ResponseCode.C00332]: 'Xóa file thành công.',
+
+  // Shopping Item Management
+  [ResponseCode.C00340]: 'Không tìm thấy item mua sắm.',
+  [ResponseCode.C00341]: 'Bạn không có quyền thêm item vào danh sách này.',
+  [ResponseCode.C00342]: 'Bạn không có quyền xem hoặc chỉnh sửa item này.',
+  [ResponseCode.C00343]: 'Tạo item mua sắm thành công.',
+  [ResponseCode.C00344]: 'Cập nhật item mua sắm thành công.',
+  [ResponseCode.C00345]: 'Xóa item mua sắm thành công.',
+  [ResponseCode.C00346]: 'Đánh dấu item thành công.',
+
+  // Chat Management
+  [ResponseCode.C00350]: 'Không tìm thấy tin nhắn.',
+  [ResponseCode.C00351]: 'Bạn không có quyền truy cập nhóm chat này.',
+  [ResponseCode.C00352]: 'Gửi tin nhắn thành công.',
+  [ResponseCode.C00353]: 'Đánh dấu tin nhắn đã đọc thành công.',
+  [ResponseCode.C00354]: 'Lấy tin nhắn thành công.',
+
+  // Device Token Management
+  [ResponseCode.C00360]: 'Đăng ký device token thành công.',
+  [ResponseCode.C00361]: 'Xóa device token thành công.',
+  [ResponseCode.C00362]: 'Lấy danh sách device token thành công.',
+  [ResponseCode.C00363]: 'Device token không hợp lệ.',
+
+  // Additional Codes
+  [ResponseCode.C00325]: 'Tài khoản này đang ở trạng thái riêng tư.',
+  [ResponseCode.C00269]: 'Bạn không có quyền xem danh sách này.',
+  [ResponseCode.C00144]: 'Không tìm thấy món ăn trong menu sau khi cập nhật.',
 };
 
 // Thông điệp tiếng Anh cho từng mã nghiệp vụ
@@ -756,6 +814,33 @@ export const ResponseMessageEn: Record<ResponseCode, string> = {
   [ResponseCode.C00330]: 'Please select a file to upload.',
   [ResponseCode.C00331]: 'File uploaded successfully.',
   [ResponseCode.C00332]: 'File deleted successfully.',
+
+  // Shopping Item Management
+  [ResponseCode.C00340]: 'Shopping item not found.',
+  [ResponseCode.C00341]: 'You do not have permission to add items to this list.',
+  [ResponseCode.C00342]: 'You do not have permission to view or edit this item.',
+  [ResponseCode.C00343]: 'Shopping item created successfully.',
+  [ResponseCode.C00344]: 'Shopping item updated successfully.',
+  [ResponseCode.C00345]: 'Shopping item deleted successfully.',
+  [ResponseCode.C00346]: 'Item checked/unchecked successfully.',
+
+  // Chat Management
+  [ResponseCode.C00350]: 'Chat message not found.',
+  [ResponseCode.C00351]: 'You do not have permission to access this chat.',
+  [ResponseCode.C00352]: 'Message sent successfully.',
+  [ResponseCode.C00353]: 'Message marked as read successfully.',
+  [ResponseCode.C00354]: 'Messages retrieved successfully.',
+
+  // Device Token Management
+  [ResponseCode.C00360]: 'Device token registered successfully.',
+  [ResponseCode.C00361]: 'Device token removed successfully.',
+  [ResponseCode.C00362]: 'Device tokens retrieved successfully.',
+  [ResponseCode.C00363]: 'Invalid device token.',
+
+  // Additional Codes
+  [ResponseCode.C00325]: 'This account is in private mode.',
+  [ResponseCode.C00269]: 'You do not have permission to view this list.',
+  [ResponseCode.C00144]: 'Dish not found in menu after update.',
 };
 
 // Tiện ích tạo body lỗi theo mã nghiệp vụ
@@ -780,12 +865,12 @@ export function buildSuccessResponse(
   code: ResponseCode,
   data?: unknown,
   details?: unknown,
-): { 
-  success: boolean; 
-  message: string; 
+): {
+  success: boolean;
+  message: string;
   resultCode: string;
   resultMessage: { en: string; vn: string };
-  data?: unknown; 
+  data?: unknown;
   details?: unknown;
 } {
   return {

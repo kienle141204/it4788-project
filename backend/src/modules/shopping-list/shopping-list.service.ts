@@ -197,7 +197,7 @@ export class ShoppingListService {
     // Kiểm tra user có thuộc family không
     const isMember = members.some(member => member.user_id === user.id);
     if (!isMember) {
-      throw new UnauthorizedException('Bạn không thuộc gia đình này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00173]);
     }
 
     // Lấy các shopping list được chia sẻ trong family với owner info
@@ -216,11 +216,11 @@ export class ShoppingListService {
     });
 
     if (!list) {
-      throw new NotFoundException(`Shopping list with ID ${id} not found`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
     }
 
     if (user.role !== 'admin' && list.owner_id !== user.id) {
-      throw new UnauthorizedException('Bạn không thể xem danh sách này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00269]);
     }
 
     return list;
@@ -330,7 +330,7 @@ export class ShoppingListService {
     });
 
     if (!list) {
-      throw new NotFoundException(`Shopping list with ID ${listId} not found`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
     }
 
     // Tính tổng: SUM(price * stock / 1000) cho tất cả items

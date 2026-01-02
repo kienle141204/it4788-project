@@ -113,7 +113,7 @@ export class MemberService {
     const family = await this.familyRepository.findOne({
       where: { id: family_id },
     });
-    if (!family) throw new NotFoundException(`Không tìm thấy family ${family_id}`);
+    if (!family) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00210]);
 
     const exists = await this.memberRepository.findOne({
       where: { family_id, user_id },
@@ -225,11 +225,11 @@ export class MemberService {
       }
 
       const remainingMembers = allMembers.filter(m => m.user_id !== removedUserId);
-      
+
       if (remainingMembers.length === 0) {
         return;
       }
-      
+
       for (const memberItem of remainingMembers) {
         await this.notificationsService.createNotification(
           memberItem.user_id,
@@ -267,11 +267,11 @@ export class MemberService {
       }
 
       const remainingMembers = allMembers.filter(m => m.user_id !== removedUserId);
-      
+
       if (remainingMembers.length === 0) {
         return;
       }
-      
+
       for (const memberItem of remainingMembers) {
         await this.notificationsService.createNotification(
           memberItem.user_id,
