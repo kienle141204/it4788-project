@@ -18,9 +18,38 @@ export default function register() {
   const route = useRouter()
 
   const handleRegister = async () => {
+    // Validation
+    if (!email || !password) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ email và mật khẩu!');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Lỗi', 'Email không đúng định dạng!');
+      return;
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự!');
+      return;
+    }
+
+    // Validate password match
     if (password !== repassword) {
       Alert.alert('Lỗi', 'Mật khẩu không khớp');
       return;
+    }
+
+    // Validate phone number format if provided
+    if (phone && phone.trim() !== '') {
+      const phoneRegex = /^[0-9+\-\s()]+$/;
+      if (!phoneRegex.test(phone)) {
+        Alert.alert('Lỗi', 'Số điện thoại không hợp lệ!');
+        return;
+      }
     }
 
     setLoading(true);
@@ -28,12 +57,29 @@ export default function register() {
       const data = { email, phone_number: phone, password };
       const res = await registerUser(data);
   
+      // Check if response exists and has error
+      if (!res) {
+        Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+        return;
+      }
+      
+      let message = res?.message;
+      if (res?.statusCode) {
+        if (Array.isArray(message)) {
+          message = message.join('\n'); // Ghép mảng lại thành 1 chuỗi
+        }
+
+        Alert.alert('Lỗi', message || 'Đăng ký thất bại');
+        return;
+      }
+
+      // Success - navigate to verify page
       route.push({
         pathname: '/verify',
         params: { email },  
       });
     } catch (error) {
-      Alert.alert('Lỗi', 'Đăng ký thất bại');
+      Alert.alert('Lỗi', 'Đăng ký thất bại, vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
