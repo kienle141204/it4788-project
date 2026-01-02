@@ -10,6 +10,7 @@ import { MemberService } from '../member/member.service';
 import { JwtUser } from 'src/common/types/user.type';
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FirebaseService } from '../../firebase/firebase.service';
 import { User } from '../../entities/user.entity';
 
 @Injectable()
@@ -28,7 +29,9 @@ export class ShoppingListService {
     private readonly memberService: MemberService,
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
+    private readonly firebaseService: FirebaseService,
   ) { }
+
 
   /** Tạo mới Shopping List */
   async create(dto: CreateShoppingListDto, user: JwtUser): Promise<ShoppingList> {
@@ -48,7 +51,7 @@ export class ShoppingListService {
           const creatorName = creator?.full_name || `User ${user.id}`;
 
           const family = await this.familyService.getFamilyById(savedList.family_id);
-          
+
           // Lấy tất cả thành viên trong gia đình
           const allMembers = await this.memberService.getMembersByFamily(savedList.family_id);
 
@@ -88,12 +91,12 @@ export class ShoppingListService {
       }
 
       const family = await this.familyService.getFamilyById(data.family_id);
-      
+
       // Kiểm tra user có phải là manager không
       const members = await this.memberService.getMembersByFamily(data.family_id);
       const currentMember = members.find(member => member.user_id === user.id);
       const isManager = currentMember?.role === 'manager';
-      
+
       // Chỉ manager mới có quyền giao task
       if (!isManager) {
         throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00262]);
@@ -110,7 +113,7 @@ export class ShoppingListService {
         const creatorName = creator?.full_name || `User ${user.id}`;
 
         const family = await this.familyService.getFamilyById(savedList.family_id);
-        
+
         // Lấy tất cả thành viên trong gia đình
         const allMembers = await this.memberService.getMembersByFamily(savedList.family_id);
 
@@ -194,7 +197,7 @@ export class ShoppingListService {
     // Kiểm tra user có thuộc family không
     const isMember = members.some(member => member.user_id === user.id);
     if (!isMember) {
-      throw new UnauthorizedException('Bạn không thuộc gia đình này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00173]);
     }
 
     // Lấy các shopping list được chia sẻ trong family với owner info
@@ -213,11 +216,11 @@ export class ShoppingListService {
     });
 
     if (!list) {
-      throw new NotFoundException(`Shopping list with ID ${id} not found`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
     }
 
     if (user.role !== 'admin' && list.owner_id !== user.id) {
-      throw new UnauthorizedException('Bạn không thể xem danh sách này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00269]);
     }
 
     return list;
@@ -229,8 +232,76 @@ export class ShoppingListService {
 
     list.is_shared = true;
 
-    return await this.shoppingListRepo.save(list);
+    const savedList = await this.shoppingListRepo.save(list);
+
+    // Gửi thông báo cho tất cả thành viên trong gia đình
+    if (savedList.family_id) {
+      try {
+        const sharer = await this.userRepository.findOne({ where: { id: user.id } });
+        const sharerName = sharer?.full_name || `User ${user.id}`;
+        const family = await this.familyService.getFamilyById(savedList.family_id);
+        const allMembers = await this.memberService.getMembersByFamily(savedList.family_id);
+
+        const notificationTitle = 'Danh sách mua sắm mới được chia sẻ';
+        const notificationBody = `${sharerName} đã chia sẻ danh sách mua sắm với gia đình ${family.name}`;
+
+        // Collect user IDs to send notifications
+        const userIdsToNotify: number[] = [];
+
+        // Gửi thông báo cho tất cả thành viên (trừ người share)
+        for (const member of allMembers) {
+          if (member.user_id !== user.id) {
+            // Tạo notification trong database + gửi qua WebSocket
+            await this.notificationsService.createNotification(
+              member.user_id,
+              notificationTitle,
+              notificationBody,
+            );
+            userIdsToNotify.push(member.user_id);
+          }
+        }
+
+        // Gửi cho owner nếu owner không phải là thành viên
+        const isOwnerMember = allMembers.some(m => m.user_id === family.owner_id);
+        if (!isOwnerMember && family.owner_id !== user.id) {
+          await this.notificationsService.createNotification(
+            family.owner_id,
+            notificationTitle,
+            notificationBody,
+          );
+          userIdsToNotify.push(family.owner_id);
+        }
+
+        // Gửi push notification trực tiếp qua Firebase đến tất cả devices
+        if (userIdsToNotify.length > 0) {
+          try {
+            const pushResult = await this.firebaseService.sendToMultipleUsers(
+              userIdsToNotify,
+              notificationTitle,
+              notificationBody,
+              {
+                type: 'shopping_list_shared',
+                shoppingListId: savedList.id.toString(),
+                familyId: savedList.family_id.toString(),
+              },
+            );
+            console.log(
+              `[ShoppingListService] 📤 Direct Firebase push sent: ${pushResult.success} success, ${pushResult.failed} failed`,
+            );
+          } catch (firebaseError) {
+            console.error('[ShoppingListService] ⚠️ Direct Firebase push error:', firebaseError);
+          }
+        }
+      } catch (error) {
+        // Log lỗi nhưng không throw để không ảnh hưởng đến việc share
+        console.error('Error sending notification for shopping list share:', error);
+      }
+    }
+
+    return savedList;
   }
+
+
 
   /** Cập nhật danh sách */
   async update(id: number, updateDto: UpdateShoppingListDto, user: JwtUser): Promise<ShoppingList> {
@@ -243,10 +314,10 @@ export class ShoppingListService {
   /** Xóa danh sách */
   async remove(id: number, user: JwtUser): Promise<void> {
     const list = await this.findOne(id, user);
-    
+
     // Xóa tất cả items trong list trước
     await this.shoppingItemRepo.delete({ list_id: id });
-    
+
     // Sau đó xóa list
     await this.shoppingListRepo.remove(list);
   }
@@ -259,7 +330,7 @@ export class ShoppingListService {
     });
 
     if (!list) {
-      throw new NotFoundException(`Shopping list with ID ${listId} not found`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
     }
 
     // Tính tổng: SUM(price * stock / 1000) cho tất cả items
@@ -276,7 +347,7 @@ export class ShoppingListService {
 
     // Làm tròn 2 chữ số thập phân
     list.cost = Number(totalCost.toFixed(2));
-    
+
     return await this.shoppingListRepo.save(list);
   }
 }

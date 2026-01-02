@@ -107,7 +107,7 @@ export class FridgeIngredientService {
       relations: ['owner', 'family', 'family.members'],
     });
 
-    if (!fridge) throw new NotFoundException(`Không tìm thấy tủ lạnh`);
+    if (!fridge) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00230]);
 
     const isOwner = fridge.owner_id === user.id;
     const isAdmin = user.role === 'admin';
@@ -115,7 +115,7 @@ export class FridgeIngredientService {
     const isFamilyMember = fridge.family?.members?.some(m => m.user_id === user.id) ?? false;
 
     if (!isOwner && !isAdmin && !isFamilyOwner && !isFamilyMember) {
-      throw new UnauthorizedException('Bạn không có quyền truy cập tủ lạnh này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00234]);
     }
 
     const { page = 1, limit = 10 } = paginationDto;

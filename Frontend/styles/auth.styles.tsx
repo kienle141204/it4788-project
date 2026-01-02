@@ -169,15 +169,18 @@ input: {
 loginButton: {
   backgroundColor: COLORS.primary,
   paddingVertical: 16,
+  paddingHorizontal: 24,
   borderRadius: 12,
   marginTop: 24,
   alignItems: 'center',
+  justifyContent: 'center',
   shadowColor: COLORS.primary,
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.3,
   shadowRadius: 8,
   elevation: 5,
-  width: '85%'
+  width: '85%',
+  minHeight: 50,
 },
 loginButtonText: {
   color: COLORS.white,

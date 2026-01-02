@@ -56,7 +56,7 @@ export class UserService {
 
     // Kiểm tra profile_status: nếu private thì không cho phép user khác xem
     if (user.profile_status === 'private') {
-      throw new ForbiddenException('Tài khoản này đang ở trạng thái riêng tư');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00325]);
     }
     return user;
   }
@@ -102,7 +102,7 @@ export class UserService {
   async deleteUser(id: number): Promise<void> {
     const result = await this.userRepository.delete(id);
     if (!result.affected) {
-      throw new NotFoundException(`User ${id} not found`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00052]);
     }
   }
 }
