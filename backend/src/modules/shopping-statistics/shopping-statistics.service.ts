@@ -187,7 +187,7 @@ export class ShoppingStatisticsService {
   async statisticsByUser(userId: number, user: JwtUser) {
     // Admin hoặc chính user đó mới được xem
     if (user.role !== 'admin' && user.id !== userId) {
-      throw new ForbiddenException('Bạn không có quyền truy cập thống kê này');
+      throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00270]);
     }
     const lists = await this.shoppingListRepo.find({
       where: { owner_id: userId },

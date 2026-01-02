@@ -28,7 +28,7 @@ export class MenuService {
     private userRepository: Repository<User>,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   /**
    * Helper method: Kiểm tra user có quyền truy cập family không
@@ -415,7 +415,7 @@ export class MenuService {
     });
 
     if (!updatedMenuDish) {
-      throw new NotFoundException('Không tìm thấy món ăn trong menu sau khi cập nhật');
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00144]);
     }
 
     return updatedMenuDish;

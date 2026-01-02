@@ -7,6 +7,7 @@ import { UpdateShoppingItemDto } from './dto/update-shopping-item.dto';
 import { ShoppingList } from '../../entities/shopping-list.entity';
 import { Ingredient } from '../../entities/ingredient.entity';
 import type { JwtUser } from 'src/common/types/user.type';
+import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { FamilyService } from '../family/family.service';
 import { ShoppingListService } from '../shopping-list/shopping-list.service';
 import { MemberService } from '../member/member.service';
@@ -24,7 +25,7 @@ export class ShoppingItemService {
     private readonly ingredientRepo: Repository<Ingredient>,
 
     private readonly familyService: FamilyService,
-    
+
     @Inject(forwardRef(() => ShoppingListService))
     private readonly shoppingListService: ShoppingListService,
 
@@ -37,7 +38,7 @@ export class ShoppingItemService {
 
     // Kiểm tra danh sách tồn tại
     const shoppingList = await this.shoppingListRepo.findOne({ where: { id: list_id } });
-    if (!shoppingList) throw new NotFoundException(`Không tìm thấy danh sách mua sắm ${list_id}`);
+    if (!shoppingList) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
 
     // Kiểm tra quyền: owner của list, admin, owner của family, manager của family, hoặc member nếu list được share
     const family = await this.familyService.getFamilyById(shoppingList.family_id);
@@ -64,12 +65,12 @@ export class ShoppingItemService {
     const hasPermission = isListOwner || isAdmin || isFamilyOwner || isManager || (isMember && shoppingList.is_shared);
 
     if (!hasPermission) {
-      throw new UnauthorizedException('Bạn không có quyền thêm nguyên liệu vào danh sách này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00341]);
     }
 
     // Kiểm tra ingredient tồn tại
     const ingredient = await this.ingredientRepo.findOne({ where: { id: ingredient_id } });
-    if (!ingredient) throw new NotFoundException(`Không tìm thấy nguyên liệu ${ingredient_id}`);
+    if (!ingredient) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
 
     // Auto-populate price from ingredient if not provided
     const itemData = { ...dto };
@@ -91,7 +92,7 @@ export class ShoppingItemService {
     });
 
     if (!result) {
-      throw new NotFoundException(`Shopping item not found`);
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00340]);
     }
 
     return result;
@@ -113,10 +114,10 @@ export class ShoppingItemService {
       relations: ['shoppingList', 'ingredient'],
     });
 
-    if (!item) throw new NotFoundException(`ShoppingItem ${id} not found`);
+    if (!item) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00340]);
 
     const shoppingList = item.shoppingList;
-    if (!shoppingList) throw new NotFoundException(`Không tìm thấy danh sách mua sắm`);
+    if (!shoppingList) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
 
     // Kiểm tra quyền: owner của list, admin, owner của family, manager của family, hoặc member nếu list được share
     const family = await this.familyService.getFamilyById(shoppingList.family_id);
@@ -143,7 +144,7 @@ export class ShoppingItemService {
     const hasPermission = isListOwner || isAdmin || isFamilyOwner || isManager || (isMember && shoppingList.is_shared);
 
     if (!hasPermission) {
-      throw new UnauthorizedException('Bạn không có quyền xem hoặc chỉnh sửa item này');
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00342]);
     }
 
     return item;
@@ -157,13 +158,13 @@ export class ShoppingItemService {
     // Nếu có truyền lại list_id hay ingredient_id thì cập nhật đúng quan hệ
     if (dto.list_id) {
       const list = await this.shoppingListRepo.findOne({ where: { id: dto.list_id } });
-      if (!list) throw new NotFoundException(`ShoppingList ${dto.list_id} not found`);
+      if (!list) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
       item.shoppingList = list;
     }
 
     if (dto.ingredient_id) {
       const ingredient = await this.ingredientRepo.findOne({ where: { id: dto.ingredient_id } });
-      if (!ingredient) throw new NotFoundException(`Ingredient ${dto.ingredient_id} not found`);
+      if (!ingredient) throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
       item.ingredient = ingredient;
     }
 
@@ -200,7 +201,7 @@ export class ShoppingItemService {
     const item = await this.findOne(id, user);
     const listId = item.list_id;
     await this.shoppingItemRepo.remove(item);
-    
+
     // Recalculate shopping list cost after removal
     await this.shoppingListService.recalculateShoppingListCost(listId);
   }
