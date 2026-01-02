@@ -364,92 +364,172 @@ Nút quay lại sẽ điều hướng về màn hình trước đó nếu có th
 
 **A. Cấu trúc Layout (Component Tree):**
 ```
-SafeAreaView
+View (container)
 ├── StatusBar
 ├── View (header)
 │   ├── TouchableOpacity (back)
 │   ├── Text (title)
-│   └── TouchableOpacity (add button)
-├── View (dateCarousel)
-│   ├── TouchableOpacity (prev)
-│   ├── ScrollView (horizontal)
-│   │   └── TouchableOpacity (dateItem) [mapped]
-│   └── TouchableOpacity (next)
-├── ScrollView
-│   ├── View (menuCard) [mapped]
-│   │   ├── TouchableOpacity (header)
-│   │   │   ├── View (menuInfo)
-│   │   │   │   ├── Text (familyName)
-│   │   │   │   └── Text (time)
-│   │   │   └── Ionicons (chevron)
-│   │   └── View (expandedContent) [conditional]
-│   │       ├── Text (description)
-│   │       └── View (dishList)
-│   │           └── TouchableOpacity (dishCard) [mapped]
-│   └── TouchableOpacity (loadMore)
-└── Modal (menuOptions)
+│   └── View (spacer)
+├── View (dateCarouselContainer)
+│   ├── TouchableOpacity (prev button)
+│   ├── ScrollView (horizontal - dateCarousel)
+│   │   └── TouchableOpacity (dateItem) [mapped - 5 items]
+│   │       ├── Text (weekday hoặc "Hôm nay")
+│   │       └── Text (day number)
+│   └── TouchableOpacity (next button)
+├── [Loading State]
+│   └── View (loadingContainer)
+│       └── ActivityIndicator
+├── [Content State]
+│   └── ScrollView (với RefreshControl và infinite scroll)
+│       ├── [Error State]
+│       │   └── View (errorContainer)
+│       │       └── Text (error message)
+│       ├── [Empty State]
+│       │   └── View (emptyState)
+│       │       └── Text ("Chưa có thực đơn")
+│       └── [Menu List]
+│           └── View (menuCard) [mapped - filtered by selectedDate]
+│               ├── TouchableOpacity (header - onPress expand, onLongPress menu)
+│               │   ├── View (menuInfo)
+│               │   │   └── Text (familyName)
+│               │   └── View (menuDate)
+│               │       ├── Ionicons (time icon)
+│               │       ├── Text (time: "Bữa sáng/trưa/tối/phụ")
+│               │       └── Ionicons (chevron up/down)
+│               ├── Text (description) [conditional - nếu không có description]
+│               └── View (expandedContent) [conditional - khi expanded]
+│                   ├── Text (description) [conditional - nếu có]
+│                   └── View (dishList)
+│                       └── TouchableOpacity (dishCard) [mapped]
+│                           ├── Image (dishImage) / View (placeholder với icon)
+│                           ├── View (dishContent)
+│                           │   ├── Text (dishName)
+│                           │   ├── Text (stock: "Số lượng: X")
+│                           │   └── Text (price: "X ₫")
+│                           └── View (dishMeta)
+└── Modal (menuOptionsModal)
+    └── ActionMenu
+        ├── TouchableOpacity (edit option)
+        └── TouchableOpacity (delete option)
 ```
 
 **B. Xây dựng Themes và Styles:**
 
-Màn hình lên lịch bữa ăn sử dụng date carousel ở phần đầu để người dùng có thể chọn ngày một cách trực quan. Date carousel được thiết kế với nền trắng, có border bottom màu xám nhạt để phân tách với phần nội dung. Mỗi item ngày có kích thước tối thiểu 70px, padding dọc 12px và ngang 16px, border radius 12, và nền xám nhạt. Khi ngày được chọn, nền sẽ chuyển sang màu xanh lá (Primary Color) để báo hiệu trạng thái active.
+Màn hình lên lịch bữa ăn sử dụng date carousel ở phần đầu để người dùng có thể chọn ngày một cách trực quan. Date carousel hiển thị 5 ngày: 2 ngày trước, ngày hiện tại, và 2 ngày sau (dựa trên dateOffset). Mỗi item ngày hiển thị thứ trong tuần (hoặc "Hôm nay" nếu là ngày hôm nay) và số ngày. Khi ngày được chọn, item sẽ được highlight với style active (thường là màu primary/purple). Các nút prev/next cho phép người dùng chuyển sang các ngày trước/sau.
 
-Các card thực đơn được thiết kế với nền trắng, border radius 20 để tạo góc bo tròn lớn hơn, padding 16px, và có shadow nhẹ để tạo độ sâu. Card món ăn bên trong có nền xanh lá nhạt (#F4FBF6), border radius 16, padding 10px, và gap 12px giữa các phần tử để tạo khoảng cách hợp lý.
+Các card thực đơn được thiết kế với nền trắng, border radius hợp lý, padding đủ lớn, và có shadow nhẹ để tạo độ sâu. Header của card hiển thị tên gia đình và thời gian bữa ăn với icon thời gian. Card có thể expand/collapse để hiển thị mô tả và danh sách món ăn. Card món ăn bên trong có nền xám nhạt, border radius hợp lý, và hiển thị hình ảnh món ăn (hoặc placeholder icon nếu không có ảnh), tên món, số lượng và giá tiền.
 
 **C. Xử lý các dữ liệu người dùng nhập vào và cử chỉ:**
 
-Màn hình lên lịch bữa ăn sử dụng date carousel cho phép người dùng chọn ngày bằng cách tap vào item ngày, hoặc sử dụng nút mũi tên để chuyển sang ngày trước/sau. Ngày được chọn sẽ được highlight với màu xanh lá để dễ nhận biết. Danh sách thực đơn được lọc theo ngày đã chọn và hiển thị dưới dạng card có thể expand/collapse.
+Màn hình lên lịch bữa ăn tự động tải danh sách thực đơn khi được mở thông qua hàm `fetchMenus()` với pagination (page và limit). Màn hình sử dụng date carousel cho phép người dùng chọn ngày bằng cách tap vào item ngày, hoặc sử dụng nút mũi tên để chuyển sang các ngày trước/sau (thay đổi dateOffset). Date carousel hiển thị 5 ngày dựa trên dateOffset hiện tại. Ngày được chọn sẽ được highlight với style active để dễ nhận biết. Danh sách thực đơn được lọc theo ngày đã chọn (so sánh created_at với selectedDate) và hiển thị dưới dạng card có thể expand/collapse.
 
-Người dùng có thể tap vào card thực đơn để mở rộng hoặc thu gọn, xem danh sách món ăn bên trong. Long press vào card thực đơn sẽ mở menu tùy chọn (sửa thực đơn, xóa thực đơn). Màn hình hỗ trợ pull-to-refresh để làm mới danh sách thực đơn, và infinite scroll để tải thêm thực đơn khi người dùng cuộn xuống cuối danh sách.
+Người dùng có thể tap vào header của card thực đơn để mở rộng hoặc thu gọn (toggle expandedMenuId), xem danh sách món ăn bên trong. Long press vào card thực đơn sẽ mở modal menu tùy chọn với các option: "Sửa thực đơn" (điều hướng đến `/(meal)/edit-menu?id=${menu.id}`) và "Xóa thực đơn" (hiển thị Alert xác nhận trước khi xóa). Tap vào món ăn trong danh sách sẽ điều hướng đến màn hình chi tiết món ăn `/(food)/${dishId}`.
+
+Màn hình hỗ trợ pull-to-refresh để làm mới danh sách thực đơn (reset về page 1), và infinite scroll để tải thêm thực đơn khi người dùng cuộn xuống cuối danh sách (tự động load page tiếp theo nếu hasNextPage = true). Màn hình cũng tự động refresh khi được focus lại (sử dụng useFocusEffect).
 
 #### 2.3.2. Màn hình Tạo Thực đơn (`(meal)/create-menu.tsx`)
 
 **A. Cấu trúc Layout (Component Tree):**
 ```
 SafeAreaView
+├── StatusBar
 ├── View (header)
 │   ├── TouchableOpacity (back)
-│   ├── Text (title)
+│   ├── Text (title: "Thêm thực đơn mới")
 │   └── View (spacer)
 ├── ScrollView
 │   ├── View (menuCard)
-│   │   ├── Text (label: "Gia đình")
+│   │   ├── Text (label: "Gia đình *")
 │   │   └── TouchableOpacity (selectFamily)
+│   │       ├── Text (selectedFamily name hoặc "Chọn gia đình")
+│   │       └── Ionicons (chevron-down)
 │   ├── View (menuCard)
-│   │   ├── Text (label: "Bữa ăn")
-│   │   └── View (timeOptions)
-│   │       └── TouchableOpacity (timeButton) [mapped]
+│   │   ├── Text (label: "Bữa ăn *")
+│   │   └── View (timeOptions - flexDirection row, flexWrap)
+│   │       └── TouchableOpacity (timeButton) [mapped - 4 options]
+│   │           └── Text (label: "Bữa sáng/trưa/tối/phụ")
 │   ├── View (menuCard)
 │   │   ├── Text (label: "Mô tả")
-│   │   └── TextInput (description)
+│   │   └── TextInput (description - multiline)
 │   ├── View (menuCard)
-│   │   ├── View (header)
-│   │   │   ├── Text (label: "Món ăn")
-│   │   │   └── TouchableOpacity (addDish)
+│   │   ├── View (header - flexDirection row)
+│   │   │   ├── Text (label: "Món ăn *")
+│   │   │   └── TouchableOpacity (addDish button)
+│   │   │       ├── Ionicons (add icon)
+│   │   │       └── Text ("Thêm món")
 │   │   └── View (selectedDishes)
+│   │       ├── [Empty State]
+│   │       │   └── Text ("Chưa có món ăn nào...")
 │   │       └── View (dishItem) [mapped]
-│   │           ├── Image (dishImage)
+│   │           ├── Image (dishImage) / View (placeholder với icon)
 │   │           ├── View (dishInfo)
-│   │           │   ├── Text (dishName)
-│   │           │   └── View (inputs)
-│   │           │       ├── TextInput (stock)
-│   │           │       └── TextInput (price)
-│   │           └── TouchableOpacity (remove)
-│   └── TouchableOpacity (createButton)
-└── Modal (familyModal)
-    └── FlatList (families)
-└── Modal (dishModal)
-    ├── TextInput (search)
-    └── FlatList (dishes)
+│   │           │   ├── View (header - flexDirection row)
+│   │           │   │   ├── Text (dishName)
+│   │           │   │   └── TouchableOpacity (remove button)
+│   │           │   └── View (inputs - flexDirection row)
+│   │           │       ├── View (stockInput)
+│   │           │       │   ├── Text (label: "Số lượng")
+│   │           │       │   └── TextInput (stock - keyboardType numeric)
+│   │           │       └── View (priceInput)
+│   │           │           ├── Text (label: "Giá (₫)")
+│   │           │           └── TextInput (price - keyboardType numeric)
+│   │           └── View (spacer)
+│   └── TouchableOpacity (createButton với loading state)
+└── Modals
+    ├── Modal (familyModal)
+    │   └── FlatList (families)
+    │       └── TouchableOpacity (familyItem)
+    │           └── Text (familyName)
+    └── Modal (dishModal)
+        ├── View (searchContainer)
+        │   └── TextInput (searchQuery)
+        ├── [Loading State]
+        │   └── ActivityIndicator
+        └── FlatList (dishes với infinite scroll)
+            └── TouchableOpacity (dishItem)
+                ├── Image (dishImage) / View (placeholder)
+                ├── View (dishInfo)
+                │   ├── Text (dishName)
+                │   └── Text (dishDescription) [conditional]
+                └── Ionicons (add icon)
 ```
 
-**B. Xử lý các dữ liệu người dùng nhập vào và cử chỉ:**
+**B. Xây dựng Themes và Styles:**
 
-Màn hình tạo thực đơn quản lý nhiều trường dữ liệu bao gồm gia đình được chọn, bữa ăn (sáng, trưa, tối, phụ), mô tả thực đơn, và danh sách món ăn đã chọn. Mỗi trường dữ liệu được quản lý thông qua state riêng biệt để theo dõi giá trị người dùng nhập vào.
+Màn hình tạo thực đơn sử dụng SafeAreaView để đảm bảo nội dung không bị che bởi notch hoặc status bar. Header được thiết kế với nền trắng, có nút quay lại ở bên trái và tiêu đề ở giữa.
 
-Khi người dùng nhấn nút "Tạo thực đơn", hệ thống sẽ thực hiện validation để kiểm tra các điều kiện: gia đình phải được chọn, phải có ít nhất một món ăn trong danh sách, và mô tả không được để trống. Nếu bất kỳ điều kiện nào không thỏa mãn, ứng dụng sẽ hiển thị thông báo lỗi tương ứng.
+Các menuCard được thiết kế với nền trắng, border radius hợp lý, và padding đủ lớn. Time buttons được thiết kế với border, border radius 12, và khi được chọn sẽ có nền màu purple với text màu trắng. TextInput cho mô tả có minHeight 80px, multiline, và textAlignVertical top.
 
-Đối với mỗi món ăn đã được thêm vào thực đơn, người dùng có thể nhập số lượng và giá. Các trường này chỉ chấp nhận số, và hệ thống sẽ tự động chuyển đổi giá trị nhập vào thành số nguyên. Khi người dùng thay đổi số lượng hoặc giá của một món ăn, state sẽ được cập nhật ngay lập tức để phản ánh thay đổi.
+Dish items được thiết kế với nền xám nhạt (#F8F9FB), border radius 12, và có gap giữa các phần tử. Input fields cho stock và price có border, border radius 8, và sử dụng keyboardType numeric.
+
+Nút "Tạo thực đơn" được thiết kế với nền màu purple, border radius hợp lý, và có loading state với ActivityIndicator khi đang xử lý.
+
+**C. Xử lý các dữ liệu người dùng nhập vào và cử chỉ:**
+
+Màn hình tạo thực đơn tự động tải danh sách gia đình khi được mở thông qua hàm `fetchFamilies()`. Màn hình quản lý các trường dữ liệu: `selectedFamilyId`, `time` (mặc định 'breakfast'), `description`, và `selectedDishes` (mảng các món ăn đã chọn với stock và price).
+
+Khi người dùng tap vào "Chọn gia đình", modal hiển thị danh sách gia đình từ API. Khi chọn một gia đình, modal sẽ đóng và gia đình được chọn sẽ hiển thị trong input.
+
+Time buttons cho phép người dùng chọn một trong 4 bữa ăn: "Bữa sáng", "Bữa trưa", "Bữa tối", "Bữa phụ". Button được chọn sẽ có style active (nền purple, text trắng).
+
+Khi người dùng tap vào nút "Thêm món", modal hiển thị danh sách món ăn với chức năng tìm kiếm. Modal tự động tải danh sách món ăn khi được mở, và hỗ trợ infinite scroll để tải thêm món ăn. Người dùng có thể nhập từ khóa vào TextInput để tìm kiếm món ăn (tối thiểu 2 ký tự). Khi chọn một món ăn, món đó sẽ được thêm vào danh sách selectedDishes với stock mặc định 0 và price mặc định 0.
+
+Đối với mỗi món ăn đã được thêm vào thực đơn, người dùng có thể nhập số lượng (stock) và giá (price) thông qua TextInput với keyboardType numeric. Khi người dùng thay đổi số lượng hoặc giá, hàm `handleUpdateDish` sẽ cập nhật state ngay lập tức. Người dùng có thể xóa món ăn khỏi danh sách bằng cách tap vào nút remove (close-circle icon).
+
+Khi người dùng nhấn nút "Tạo thực đơn", hệ thống sẽ thực hiện validation:
+1. Kiểm tra gia đình phải được chọn (selectedFamilyId không null)
+2. Kiểm tra phải có ít nhất một món ăn trong danh sách (selectedDishes.length > 0)
+3. Mô tả không bắt buộc (có thể để trống)
+
+Nếu validation thành công, ứng dụng sẽ:
+1. Hiển thị loading state và disable nút
+2. Gửi POST request đến API để tạo menu với dữ liệu: family_id, time, description
+3. Nhận menuId từ response
+4. Gửi các POST request song song để thêm từng món ăn vào menu (menuId, dish_id, stock, price)
+5. Nếu thành công, hiển thị Alert "Thành công" và điều hướng về màn hình trước đó hoặc home
+6. Nếu có lỗi, hiển thị Alert với thông báo lỗi
+7. Tắt loading state sau khi hoàn tất
 
 ### 2.4. Use Case: Quản lí công thức nấu ăn
 
