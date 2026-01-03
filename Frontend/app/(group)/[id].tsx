@@ -27,6 +27,7 @@ import {
   addItemToList,
   toggleItemChecked,
   deleteShoppingItem,
+  updateShoppingItem,
   deleteShoppingList,
   type ShoppingList,
   type ShoppingItem,
@@ -40,6 +41,20 @@ import GroupStatistics from '../../components/GroupStatistics';
 import { getChatMessages, sendChatMessage, type ChatMessage, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage } from '../../service/chat';
 
 const defaultAvatar = require('../../assets/images/avatar.png');
+
+// Helper function to format currency consistently
+const formatCurrency = (amount: number | string | null | undefined): string => {
+  if (amount === null || amount === undefined || amount === '') {
+    return '0đ';
+  }
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(numAmount)) {
+    return '0đ';
+  }
+  // Round to integer and format with thousand separators
+  // Use default locale which works better on React Native
+  return `${Math.round(numAmount).toLocaleString()}đ`;
+};
 
 // InfoRow component for member profile
 const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
@@ -187,6 +202,12 @@ export default function GroupDetailPage() {
   const [searchedIngredients, setSearchedIngredients] = useState<any[]>([]);
   const [selectedIngredient, setSelectedIngredient] = useState<any>(null);
   const [loadingIngredients, setLoadingIngredients] = useState<boolean>(false);
+
+  // Edit item states
+  const [showEditItemModal, setShowEditItemModal] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
+  const [editItemStock, setEditItemStock] = useState<string>('');
+  const [editItemPrice, setEditItemPrice] = useState<string>('');
 
   // Menu states
   const [showFamilyMenu, setShowFamilyMenu] = useState(false);
@@ -1116,40 +1137,95 @@ export default function GroupDetailPage() {
     );
   };
 
-  // Filter shopping lists by selected date
+  // Filter shopping lists by selected date and sort by creation time (newest at bottom)
   const filteredShoppingLists = useMemo(() => {
-    return shoppingLists.filter(list => {
-      const listDate = new Date(list.shopping_date);
-      return isSameDay(listDate, selectedDate);
-    });
+    return shoppingLists
+      .filter(list => {
+        const listDate = new Date(list.shopping_date);
+        return isSameDay(listDate, selectedDate);
+      })
+      .sort((a, b) => {
+        // Sort by created_at (ascending) - newest at bottom
+        // For optimistic lists with negative IDs, use the absolute value for comparison
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        
+        // If dates are equal, sort by ID (ascending) - higher ID (newer) at bottom
+        if (dateA === dateB) {
+          return a.id - b.id;
+        }
+        
+        return dateA - dateB;
+      });
   }, [shoppingLists, selectedDate]);
 
-  // Handle create shopping list (optimized)
+  // Handle create shopping list (optimistic UI)
   const handleCreateShoppingList = async () => {
+    // Format date in local timezone (YYYY-MM-DD)
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    // Ensure owner_id is number or undefined (not null or string)
+    const ownerId = assignedOwner ? Number(assignedOwner.user_id) : undefined;
+
+    // Close modal immediately for better UX
+    setShowAddListModal(false);
+    setAssignedOwner(null);
+    setShowAssignMemberDropdown(false);
+
+    // Create optimistic shopping list (temporary ID will be negative)
+    const tempId = Date.now() * -1; // Use negative timestamp as temporary ID
+    
+    // Determine owner info for optimistic list
+    let ownerInfo: ShoppingList['owner'] = undefined;
+    if (assignedOwner) {
+      ownerInfo = {
+        id: assignedOwner.user_id,
+        full_name: assignedOwner.user.full_name,
+        email: assignedOwner.user.email,
+        avatar_url: assignedOwner.user.avatar_url,
+      };
+    } else if (currentMember) {
+      // Use current user info when no owner is assigned
+      ownerInfo = {
+        id: currentMember.user_id,
+        full_name: currentMember.user.full_name,
+        email: currentMember.user.email,
+        avatar_url: currentMember.user.avatar_url,
+      };
+    }
+    
+    const optimisticList: ShoppingList = {
+      id: tempId,
+      owner_id: ownerId || currentUserId || 0,
+      family_id: familyId,
+      cost: 0,
+      is_shared: true,
+      shopping_date: dateStr,
+      created_at: new Date().toISOString(),
+      items: [],
+      owner: ownerInfo,
+    };
+
+    // Add optimistic list to state immediately
+    setShoppingLists(prevLists => [...prevLists, optimisticList]);
+
+    // Make API call in background
     try {
-      // Format date in local timezone (YYYY-MM-DD)
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      // Ensure owner_id is number or undefined (not null or string)
-      const ownerId = assignedOwner ? Number(assignedOwner.user_id) : undefined;
-
-
-      const newList = await createShoppingList(familyId, dateStr, ownerId);
-
-      // Close modal immediately
-      setShowAddListModal(false);
-      setAssignedOwner(null);
-      setShowAssignMemberDropdown(false);
-
-      // Only fetch shopping lists (much faster)
+      await createShoppingList(familyId, dateStr, ownerId);
+      
+      // Fetch fresh data from API to ensure consistency
       await fetchShoppingLists();
-
-      Alert.alert('Thành công', 'Đã tạo danh sách mua sắm mới');
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể tạo danh sách mua sắm');
+      // Remove optimistic list on error
+      setShoppingLists(prevLists => 
+        prevLists.filter(list => list.id !== tempId)
+      );
+      
+      // Show error notification
+      Alert.alert('Lỗi', 'Không thể tạo danh sách mua sắm. Vui lòng thử lại.');
     }
   };
 
@@ -1250,19 +1326,20 @@ export default function GroupDetailPage() {
     }
   }, [newItemStock, selectedIngredient]);
 
-  // Handle add item to list (optimized with optimistic update)
+  // Handle add item to list (optimistic UI)
   const handleAddItem = async () => {
-    if (!selectedListId || !newItemIngredientId || !newItemStock) {
+    if (!selectedListId || !newItemIngredientId || !newItemStock || !selectedIngredient) {
       Alert.alert('Lỗi', 'Vui lòng chọn nguyên liệu và nhập số lượng');
       return;
     }
 
-    // Ensure all values are correct types
+    // Store values before resetting form
     const listId = Number(selectedListId);
     const ingredientId = Number(newItemIngredientId);
     const stock = parseInt(newItemStock);
     // Backend expects price per kg, not total price
     const price = selectedIngredient?.price ? Number(selectedIngredient.price) : undefined;
+    const ingredient = selectedIngredient;
 
     // Validate numbers
     if (isNaN(listId) || isNaN(ingredientId) || isNaN(stock)) {
@@ -1270,64 +1347,79 @@ export default function GroupDetailPage() {
       return;
     }
 
+    // Store original cost for rollback
+    let originalCost = 0;
+    const targetList = shoppingLists.find(list => Number(list.id) === Number(listId));
+    if (targetList) {
+      originalCost = targetList.cost;
+    }
+
+    // Create optimistic item with temporary negative ID
+    const tempId = Date.now() * -1;
+    const itemCost = (price || ingredient.price || 0) * stock / 1000;
+    const optimisticItem: ShoppingItem = {
+      id: tempId,
+      list_id: listId,
+      ingredient_id: ingredientId,
+      stock: stock,
+      price: price || ingredient.price || 0,
+      is_checked: false,
+      created_at: new Date().toISOString(),
+      ingredient: {
+        id: ingredient.id,
+        name: ingredient.name,
+        image_url: ingredient.image_url || null,
+        price: ingredient.price || null,
+        description: ingredient.description || null,
+      },
+    };
+
     // Close modal immediately for better UX
     setShowAddItemModal(false);
 
     // Reset form immediately
-    const resetForm = () => {
-      setSelectedListId(null);
-      setNewItemIngredientId(null);
-      setSelectedIngredient(null);
-      setNewItemStock('500');
-      setNewItemPrice('');
-      setIngredientSearchTerm('');
-      setSearchedIngredients([]);
-    };
+    setSelectedListId(null);
+    setNewItemIngredientId(null);
+    setSelectedIngredient(null);
+    setNewItemStock('500');
+    setNewItemPrice('');
+    setIngredientSearchTerm('');
+    setSearchedIngredients([]);
 
-    // Optimistic update: Add item to state immediately
-    const optimisticItem: ShoppingItem = {
-      id: Date.now(), // Temporary ID
-      list_id: listId,
-      ingredient_id: ingredientId,
-      stock: stock,
-      price: price || selectedIngredient?.price || 0,
-      is_checked: false,
-      created_at: new Date().toISOString(),
-      ingredient: {
-        id: selectedIngredient.id,
-        name: selectedIngredient.name,
-        image_url: selectedIngredient.image_url || null,
-        price: selectedIngredient.price || null,
-        description: selectedIngredient.description || null,
-      },
-    };
-
-    // Update local state immediately
+    // Update local state immediately (optimistic update)
     setShoppingLists(prevLists =>
       prevLists.map(list =>
-        list.id === listId
+        Number(list.id) === Number(listId)
           ? {
             ...list,
             items: [...(list.items || []), optimisticItem],
-            cost: list.cost + ((optimisticItem.price || 0) * stock / 1000),
+            cost: list.cost + itemCost,
           }
           : list
       )
     );
 
-    resetForm();
-
     // Call API in background
     try {
       const newItem = await addItemToList(listId, ingredientId, stock, price);
-
-      // Only fetch shopping lists (much faster than fetchFamilyData)
+      
+      // Fetch fresh data from API to ensure consistency
       await fetchShoppingLists();
     } catch (error) {
-
       // Rollback optimistic update on error
-      await fetchShoppingLists();
-
+      setShoppingLists(prevLists =>
+        prevLists.map(list =>
+          Number(list.id) === Number(listId)
+            ? {
+              ...list,
+              items: list.items.filter(item => item.id !== tempId),
+              cost: originalCost,
+            }
+            : list
+        )
+      );
+      
+      // Show error notification
       Alert.alert('Lỗi', 'Không thể thêm mặt hàng. Vui lòng thử lại.');
     }
   };
@@ -1418,6 +1510,111 @@ export default function GroupDetailPage() {
         },
       ]
     );
+  };
+
+  // Handle edit item (optimistic UI)
+  const handleEditItem = async () => {
+    if (!editingItem || !editItemStock) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng');
+      return;
+    }
+
+    const itemId = editingItem.id;
+    const stock = parseInt(editItemStock);
+    const price = editingItem.ingredient?.price ? Number(editingItem.ingredient.price) : undefined;
+
+    // Validate numbers
+    if (isNaN(stock) || stock <= 0) {
+      Alert.alert('Lỗi', 'Số lượng không hợp lệ');
+      return;
+    }
+
+    // Store original values for rollback
+    let originalItem: ShoppingItem | null = null;
+    let originalCost = 0;
+    let listId: number | null = null;
+
+    const targetList = shoppingLists.find(list => 
+      list.items?.some(item => item.id === itemId)
+    );
+    if (targetList) {
+      const item = targetList.items?.find(item => item.id === itemId);
+      if (item) {
+        originalItem = { ...item };
+        originalCost = targetList.cost;
+        listId = targetList.id;
+      }
+    }
+
+    if (!originalItem || !listId) {
+      Alert.alert('Lỗi', 'Không tìm thấy mặt hàng');
+      return;
+    }
+
+    // Calculate old and new costs
+    const oldItemCost = (originalItem.price || 0) * originalItem.stock / 1000;
+    const newItemCost = (price || 0) * stock / 1000;
+    const costDifference = newItemCost - oldItemCost;
+
+    // Close modal immediately
+    setShowEditItemModal(false);
+
+    // Optimistic update: Update item immediately
+    setShoppingLists(prevLists =>
+      prevLists.map(list =>
+        Number(list.id) === Number(listId)
+          ? {
+            ...list,
+            items: list.items.map(item =>
+              item.id === itemId
+                ? {
+                  ...item,
+                  stock: stock,
+                  price: price || item.price || 0,
+                }
+                : item
+            ),
+            cost: list.cost + costDifference,
+          }
+          : list
+      )
+    );
+
+    // Reset form
+    setEditingItem(null);
+    setEditItemStock('');
+    setEditItemPrice('');
+
+    // Call API in background
+    try {
+      await updateShoppingItem(itemId, {
+        stock: stock,
+        price: price,
+      });
+      
+      // Fetch fresh data from API to ensure consistency
+      await fetchShoppingLists();
+    } catch (error) {
+      // Rollback optimistic update on error
+      if (originalItem && listId) {
+        setShoppingLists(prevLists =>
+          prevLists.map(list =>
+            Number(list.id) === Number(listId)
+              ? {
+                ...list,
+                items: list.items.map(item =>
+                  item.id === itemId ? originalItem! : item
+                ),
+                cost: originalCost,
+              }
+              : list
+          )
+        );
+      }
+      
+      // Show error notification
+      Alert.alert('Lỗi', 'Không thể cập nhật mặt hàng. Vui lòng thử lại.');
+    }
   };
 
   // Filter members based on search term
@@ -1576,51 +1773,76 @@ export default function GroupDetailPage() {
 
   const renderShoppingItem = (item: ShoppingItem, list: ShoppingList) => {
     return (
-      <TouchableOpacity
+      <View
         key={item.id}
-        style={groupStyles.shoppingItemRow}
-        onPress={() => handleToggleItem(item.id)}
-        onLongPress={() => handleDeleteItem(item.id)}
+        style={[groupStyles.shoppingItemRow, { flexDirection: 'row', alignItems: 'center' }]}
       >
         <TouchableOpacity
-          style={[
-            groupStyles.checkbox,
-            item.is_checked && groupStyles.checkboxChecked,
-          ]}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
           onPress={() => handleToggleItem(item.id)}
         >
-          {item.is_checked && (
-            <Ionicons name="checkmark" size={16} color={COLORS.white} />
+          <TouchableOpacity
+            style={[
+              groupStyles.checkbox,
+              item.is_checked && groupStyles.checkboxChecked,
+            ]}
+            onPress={() => handleToggleItem(item.id)}
+          >
+            {item.is_checked && (
+              <Ionicons name="checkmark" size={16} color={COLORS.white} />
+            )}
+          </TouchableOpacity>
+
+          {item.ingredient?.image_url ? (
+            <Image
+              source={{ uri: item.ingredient.image_url }}
+              style={groupStyles.itemImage}
+            />
+          ) : (
+            <View style={groupStyles.itemImage}>
+              <Ionicons name="fast-food-outline" size={24} color={COLORS.grey} />
+            </View>
           )}
+
+          <View style={[groupStyles.itemInfo, { flex: 1, marginRight: 2 }]}>
+            <Text style={[
+              groupStyles.itemName,
+              item.is_checked && groupStyles.itemNameChecked,
+            ]}>
+              {item.ingredient?.name || 'Nguyên liệu'}
+            </Text>
+            <Text style={groupStyles.itemDetails}>
+              Số lượng: {item.stock}g
+            </Text>
+          </View>
         </TouchableOpacity>
 
-        {item.ingredient?.image_url ? (
-          <Image
-            source={{ uri: item.ingredient.image_url }}
-            style={groupStyles.itemImage}
-          />
-        ) : (
-          <View style={groupStyles.itemImage}>
-            <Ionicons name="fast-food-outline" size={24} color={COLORS.grey} />
-          </View>
-        )}
-
-        <View style={groupStyles.itemInfo}>
-          <Text style={[
-            groupStyles.itemName,
-            item.is_checked && groupStyles.itemNameChecked,
-          ]}>
-            {item.ingredient?.name || 'Nguyên liệu'}
-          </Text>
-          <Text style={groupStyles.itemDetails}>
-            Số lượng: {item.stock}g
+        {/* Edit and Delete buttons */}
+        <View style={{ flexDirection: 'row', gap: 0, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => {
+              setEditingItem(item);
+              setEditItemStock(item.stock.toString());
+              setEditItemPrice(item.ingredient?.price ? ((item.ingredient.price * item.stock) / 1000).toString() : '');
+              setShowEditItemModal(true);
+            }}
+            style={{ padding: 8 }}
+          >
+            <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleDeleteItem(item.id)}
+            style={{ padding: 8 }}
+          >
+            <Ionicons name="trash-outline" size={20} color={COLORS.red} />
+          </TouchableOpacity>
+          
+          {/* Price - outside right */}
+          <Text style={[groupStyles.itemQuantity, { marginLeft: 4 }]}>
+            {formatCurrency((item.price || 0) * item.stock / 1000)}
           </Text>
         </View>
-
-        <Text style={groupStyles.itemQuantity}>
-          {item.price ? `${((item.price * item.stock) / 1000).toLocaleString()}đ` : ''}
-        </Text>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -1670,7 +1892,7 @@ export default function GroupDetailPage() {
                     )}
                   </View>
                   <Text style={groupStyles.shoppingListCost}>
-                    {list.cost.toLocaleString()}đ
+                    {formatCurrency(list.cost)}
                   </Text>
                 </View>
 
@@ -2405,7 +2627,7 @@ export default function GroupDetailPage() {
                           <Text style={groupStyles.ingredientSearchName}>{ingredient.name}</Text>
                           {ingredient.price && (
                             <Text style={groupStyles.ingredientSearchPrice}>
-                              {ingredient.price.toLocaleString()}đ/kg
+                              {formatCurrency(ingredient.price)}/kg
                             </Text>
                           )}
                         </View>
@@ -2433,7 +2655,7 @@ export default function GroupDetailPage() {
                         </Text>
                         {selectedIngredient.price && (
                           <Text style={groupStyles.selectedIngredientPrice}>
-                            {selectedIngredient.price.toLocaleString()}đ/kg
+                            {formatCurrency(selectedIngredient.price)}/kg
                           </Text>
                         )}
                       </View>
@@ -2474,7 +2696,7 @@ export default function GroupDetailPage() {
                 <View style={groupStyles.priceDisplayContainer}>
                   <Ionicons name="pricetag" size={18} color="#7B1FA2" />
                   <Text style={groupStyles.priceDisplayText}>
-                    Tổng giá: <Text style={groupStyles.priceDisplayAmount}>{parseInt(newItemPrice).toLocaleString()}đ</Text>
+                    Tổng giá: <Text style={groupStyles.priceDisplayAmount}>{formatCurrency(newItemPrice)}</Text>
                   </Text>
                 </View>
               )}
@@ -2503,6 +2725,137 @@ export default function GroupDetailPage() {
                 >
                   <Text style={[groupStyles.modalButtonText, groupStyles.modalButtonTextPrimary]}>
                     Thêm
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Edit Item Modal */}
+      <Modal
+        visible={showEditItemModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowEditItemModal(false);
+          setEditingItem(null);
+          setEditItemStock('');
+          setEditItemPrice('');
+        }}
+      >
+        <TouchableOpacity
+          style={groupStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setShowEditItemModal(false);
+            setEditingItem(null);
+            setEditItemStock('');
+            setEditItemPrice('');
+          }}
+        >
+          <TouchableOpacity
+            style={groupStyles.modalContent}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={groupStyles.modalHeader}>
+              <Text style={groupStyles.modalTitle}>Chỉnh sửa mặt hàng</Text>
+              <TouchableOpacity
+                style={groupStyles.modalCloseButton}
+                onPress={() => {
+                  setShowEditItemModal(false);
+                  setEditingItem(null);
+                  setEditItemStock('');
+                  setEditItemPrice('');
+                }}
+              >
+                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={groupStyles.modalBody}>
+              {editingItem && (
+                <>
+                  {/* Ingredient Info */}
+                  <View style={groupStyles.selectedIngredientCard}>
+                    <View style={groupStyles.selectedIngredientInfo}>
+                      {editingItem.ingredient?.image_url ? (
+                        <Image
+                          source={{ uri: editingItem.ingredient.image_url }}
+                          style={groupStyles.selectedIngredientImage}
+                        />
+                      ) : (
+                        <View style={groupStyles.selectedIngredientImage}>
+                          <Ionicons name="nutrition-outline" size={24} color={COLORS.primary} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={groupStyles.selectedIngredientName}>
+                          {editingItem.ingredient?.name || 'Nguyên liệu'}
+                        </Text>
+                        {editingItem.ingredient?.price && (
+                          <Text style={groupStyles.selectedIngredientPrice}>
+                            {formatCurrency(editingItem.ingredient.price)}/kg
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Stock Input */}
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={groupStyles.modalLabel}>Số lượng (g)</Text>
+                    <TextInput
+                      style={groupStyles.modalInput}
+                      placeholder="Nhập số lượng"
+                      placeholderTextColor={COLORS.grey}
+                      value={editItemStock}
+                      onChangeText={(text) => {
+                        setEditItemStock(text);
+                        if (editingItem.ingredient?.price) {
+                          const stock = parseInt(text) || 0;
+                          const calculatedPrice = (editingItem.ingredient.price * stock / 1000).toFixed(0);
+                          setEditItemPrice(calculatedPrice);
+                        }
+                      }}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  {/* Price Display */}
+                  {editItemPrice && editingItem.ingredient?.price && (
+                    <View style={groupStyles.priceDisplayContainer}>
+                      <Ionicons name="pricetag" size={18} color="#7B1FA2" />
+                      <Text style={groupStyles.priceDisplayText}>
+                        Tổng giá: <Text style={groupStyles.priceDisplayAmount}>{formatCurrency(editItemPrice)}</Text>
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+
+              <View style={groupStyles.modalButtonContainer}>
+                <TouchableOpacity
+                  style={[groupStyles.modalButton, groupStyles.modalButtonSecondary]}
+                  onPress={() => {
+                    setShowEditItemModal(false);
+                    setEditingItem(null);
+                    setEditItemStock('');
+                    setEditItemPrice('');
+                  }}
+                >
+                  <Text style={[groupStyles.modalButtonText, groupStyles.modalButtonTextSecondary]}>
+                    Hủy
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[groupStyles.modalButton, groupStyles.modalButtonPrimary]}
+                  onPress={handleEditItem}
+                >
+                  <Text style={[groupStyles.modalButtonText, groupStyles.modalButtonTextPrimary]}>
+                    Lưu
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -10,10 +10,14 @@ import {
   RefreshControl,
   FlatList,
   Image,
+  Modal,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '@/constants/themes';
 import {
   getRefrigeratorById,
@@ -24,7 +28,11 @@ import {
   removeFridgeDish,
   removeFridgeIngredient,
   updateRefrigerator,
+  addDishToRefrigerator,
+  addIngredientToRefrigerator,
 } from '@/service/fridge';
+import { getAccess } from '@/utils/api';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import ActionMenu from '@/components/ActionMenu';
 
 interface Refrigerator {
@@ -74,6 +82,25 @@ interface DishSuggestion {
   missingIngredients: string[];
 }
 
+interface Dish {
+  id: number;
+  name: string;
+  image_url: string | null;
+  description?: string;
+}
+
+interface Ingredient {
+  id: number;
+  name: string;
+  image_url: string | null;
+  category?: {
+    id: number;
+    name: string;
+  };
+}
+
+const PAGE_LIMIT = 20;
+
 export default function FridgeDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -91,6 +118,36 @@ export default function FridgeDetailPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+
+  // Modal states for adding dish
+  const [showAddDishModal, setShowAddDishModal] = useState(false);
+  const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [dishSearchQuery, setDishSearchQuery] = useState('');
+  const [dishPage, setDishPage] = useState(1);
+  const [hasNextDishPage, setHasNextDishPage] = useState(false);
+  const [loadingDishes, setLoadingDishes] = useState(false);
+  const [dishStock, setDishStock] = useState('');
+  const [dishPrice, setDishPrice] = useState('');
+  const [dishExpirationDate, setDishExpirationDate] = useState<Date | null>(null);
+  const [showDishDatePicker, setShowDishDatePicker] = useState(false);
+  const [addingDish, setAddingDish] = useState(false);
+  const [showDishSelection, setShowDishSelection] = useState(true);
+
+  // Modal states for adding ingredient
+  const [showAddIngredientModal, setShowAddIngredientModal] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [ingredientSearchQuery, setIngredientSearchQuery] = useState('');
+  const [ingredientPage, setIngredientPage] = useState(1);
+  const [hasNextIngredientPage, setHasNextIngredientPage] = useState(false);
+  const [loadingIngredients, setLoadingIngredients] = useState(false);
+  const [ingredientStock, setIngredientStock] = useState('');
+  const [ingredientPrice, setIngredientPrice] = useState('');
+  const [ingredientExpirationDate, setIngredientExpirationDate] = useState<Date | null>(null);
+  const [showIngredientDatePicker, setShowIngredientDatePicker] = useState(false);
+  const [addingIngredient, setAddingIngredient] = useState(false);
+  const [showIngredientSelection, setShowIngredientSelection] = useState(true);
 
   const handleSessionExpired = useCallback(() => {
     if (sessionExpiredRef.current) {
@@ -224,11 +281,241 @@ export default function FridgeDetailPage() {
   };
 
   const handleAddDish = () => {
-    router.push(`/(fridge)/add-dish?refrigeratorId=${refrigeratorId}` as any);
+    setShowAddDishModal(true);
+    setShowDishSelection(true);
+    setSelectedDish(null);
+    setDishStock('');
+    setDishPrice('');
+    setDishExpirationDate(null);
+    setDishSearchQuery('');
   };
 
   const handleAddIngredient = () => {
-    router.push(`/(fridge)/add-ingredient?refrigeratorId=${refrigeratorId}` as any);
+    setShowAddIngredientModal(true);
+    setShowIngredientSelection(true);
+    setSelectedIngredient(null);
+    setIngredientStock('');
+    setIngredientPrice('');
+    setIngredientExpirationDate(null);
+    setIngredientSearchQuery('');
+  };
+
+  // Fetch dishes for modal
+  const fetchDishes = useCallback(
+    async (pageNumber = 1, reset = false) => {
+      setLoadingDishes(true);
+      try {
+        const endpoint = dishSearchQuery.trim()
+          ? `dishes/search-paginated?name=${encodeURIComponent(dishSearchQuery)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
+          : `dishes/get-paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
+
+        const payload = await getAccess(endpoint);
+
+        if (!payload?.success) {
+          throw new Error(payload?.message || 'Không thể tải danh sách món ăn');
+        }
+
+        const newDishes: Dish[] = payload.data || [];
+        const pagination = payload.pagination || {};
+
+        setDishes(prev => (reset ? newDishes : [...prev, ...newDishes]));
+        setHasNextDishPage(Boolean(pagination.hasNextPage));
+        setDishPage(pagination.currentPage || pageNumber);
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+      } finally {
+        setLoadingDishes(false);
+      }
+    },
+    [dishSearchQuery, handleSessionExpired],
+  );
+
+  // Fetch ingredients for modal
+  const fetchIngredients = useCallback(
+    async (pageNumber = 1, reset = false) => {
+      setLoadingIngredients(true);
+      try {
+        const endpoint = ingredientSearchQuery.trim()
+          ? `ingredients/search/name?name=${encodeURIComponent(ingredientSearchQuery)}&page=${pageNumber}&limit=${PAGE_LIMIT}`
+          : `ingredients/paginated?page=${pageNumber}&limit=${PAGE_LIMIT}`;
+
+        const payload = await getAccess(endpoint);
+
+        if (!payload?.success && !Array.isArray(payload)) {
+          throw new Error(payload?.message || 'Không thể tải danh sách nguyên liệu');
+        }
+
+        const newIngredients: Ingredient[] = Array.isArray(payload) ? payload : (payload.data || []);
+        const pagination = payload.pagination || {};
+
+        setIngredients(prev => (reset ? newIngredients : [...prev, ...newIngredients]));
+        setHasNextIngredientPage(Boolean(pagination.hasNextPage));
+        setIngredientPage(pagination.currentPage || pageNumber);
+      } catch (err: any) {
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+      } finally {
+        setLoadingIngredients(false);
+      }
+    },
+    [ingredientSearchQuery, handleSessionExpired],
+  );
+
+  useEffect(() => {
+    if (showAddDishModal && showDishSelection) {
+      fetchDishes(1, true);
+    }
+  }, [showAddDishModal, showDishSelection, fetchDishes]);
+
+  useEffect(() => {
+    if (showAddIngredientModal && showIngredientSelection) {
+      fetchIngredients(1, true);
+    }
+  }, [showAddIngredientModal, showIngredientSelection, fetchIngredients]);
+
+  const handleSelectDish = (dish: Dish) => {
+    setSelectedDish(dish);
+    setShowDishSelection(false);
+  };
+
+  const handleSelectIngredient = (ingredient: Ingredient) => {
+    setSelectedIngredient(ingredient);
+    setShowIngredientSelection(false);
+  };
+
+  const handleSubmitDish = async () => {
+    if (!selectedDish) {
+      Alert.alert('Lỗi', 'Vui lòng chọn món ăn');
+      return;
+    }
+
+    if (!dishStock.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng');
+      return;
+    }
+
+    const stockValue = parseInt(dishStock);
+    if (isNaN(stockValue) || stockValue <= 0) {
+      Alert.alert('Lỗi', 'Số lượng phải là số nguyên dương');
+      return;
+    }
+
+    let priceValue: number | undefined = undefined;
+    if (dishPrice.trim()) {
+      const parsedPrice = parseFloat(dishPrice);
+      if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+        priceValue = parsedPrice;
+      } else {
+        Alert.alert('Lỗi', 'Giá phải là số hợp lệ');
+        return;
+      }
+    }
+
+    setAddingDish(true);
+    try {
+      const dishId = typeof selectedDish.id === 'string' ? parseInt(selectedDish.id) : Number(selectedDish.id);
+      if (isNaN(dishId)) {
+        Alert.alert('Lỗi', 'ID món ăn không hợp lệ');
+        setAddingDish(false);
+        return;
+      }
+
+      await addDishToRefrigerator(refrigeratorId, {
+        dish_id: dishId,
+        stock: stockValue,
+        price: priceValue,
+        expiration_date: dishExpirationDate ? dishExpirationDate.toISOString().split('T')[0] : undefined,
+      });
+
+      Alert.alert('Thành công', 'Đã thêm món ăn vào tủ lạnh', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowAddDishModal(false);
+            fetchRefrigeratorData(true);
+          },
+        },
+      ]);
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể thêm món ăn. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setAddingDish(false);
+    }
+  };
+
+  const handleSubmitIngredient = async () => {
+    if (!selectedIngredient) {
+      Alert.alert('Lỗi', 'Vui lòng chọn nguyên liệu');
+      return;
+    }
+
+    if (!ingredientStock.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng');
+      return;
+    }
+
+    const stockValue = parseInt(ingredientStock);
+    if (isNaN(stockValue) || stockValue < 0) {
+      Alert.alert('Lỗi', 'Số lượng phải là số nguyên không âm');
+      return;
+    }
+
+    let priceValue: number | undefined = undefined;
+    if (ingredientPrice.trim()) {
+      const parsedPrice = parseFloat(ingredientPrice);
+      if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+        priceValue = parsedPrice;
+      } else {
+        Alert.alert('Lỗi', 'Giá phải là số hợp lệ');
+        return;
+      }
+    }
+
+    setAddingIngredient(true);
+    try {
+      const ingredientId = typeof selectedIngredient.id === 'string' ? parseInt(selectedIngredient.id) : Number(selectedIngredient.id);
+      if (isNaN(ingredientId)) {
+        Alert.alert('Lỗi', 'ID nguyên liệu không hợp lệ');
+        setAddingIngredient(false);
+        return;
+      }
+
+      await addIngredientToRefrigerator(refrigeratorId, {
+        ingredient_id: ingredientId,
+        stock: stockValue,
+        price: priceValue,
+        expiration_date: ingredientExpirationDate ? ingredientExpirationDate.toISOString().split('T')[0] : undefined,
+      });
+
+      Alert.alert('Thành công', 'Đã thêm nguyên liệu vào tủ lạnh', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowAddIngredientModal(false);
+            fetchRefrigeratorData(true);
+          },
+        },
+      ]);
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể thêm nguyên liệu. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setAddingIngredient(false);
+    }
   };
 
 
@@ -389,9 +676,9 @@ export default function FridgeDetailPage() {
             Số lượng: {item.stock}
           </Text>
         )}
-        {item.price !== undefined && item.price !== null && typeof item.price === 'number' && (
+        {item.price !== undefined && item.price !== null && (
           <Text style={{ fontSize: 14, color: COLORS.grey, marginTop: 2 }}>
-            Giá: {item.price.toLocaleString('vi-VN')} đ
+            Giá: {typeof item.price === 'number' ? item.price.toLocaleString('vi-VN') : Number(item.price).toLocaleString('vi-VN')} đ
           </Text>
         )}
         {(() => {
@@ -462,9 +749,9 @@ export default function FridgeDetailPage() {
             Số lượng: {item.stock}
           </Text>
         )}
-        {item.price !== undefined && item.price !== null && typeof item.price === 'number' && (
+        {item.price !== undefined && item.price !== null && (
           <Text style={{ fontSize: 14, color: COLORS.grey, marginTop: 2 }}>
-            Giá: {item.price.toLocaleString('vi-VN')} đ
+            Giá: {typeof item.price === 'number' ? item.price.toLocaleString('vi-VN') : Number(item.price).toLocaleString('vi-VN')} đ
           </Text>
         )}
         {(() => {
@@ -830,6 +1117,621 @@ export default function FridgeDetailPage() {
         title="Tùy chọn"
         options={getMenuOptions()}
       />
+
+      {/* Modal thêm món ăn */}
+      <Modal visible={showAddDishModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+              {showDishSelection ? (
+                <>
+                  <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chọn món ăn</Text>
+                      <TouchableOpacity onPress={() => {
+                        setShowAddDishModal(false);
+                        setDishSearchQuery('');
+                        setDishes([]);
+                      }}>
+                        <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={{
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: COLORS.grey,
+                        borderRadius: 8,
+                        fontSize: 16,
+                        color: COLORS.darkGrey,
+                      }}
+                      placeholder="Tìm kiếm món ăn..."
+                      placeholderTextColor={COLORS.grey}
+                      value={dishSearchQuery}
+                      onChangeText={text => {
+                        setDishSearchQuery(text);
+                        fetchDishes(1, true);
+                      }}
+                    />
+                  </View>
+                  <FlatList
+                    data={dishes}
+                    keyExtractor={item => item.id.toString()}
+                    renderItem={({ item }) => {
+                      const existingDishIds = fridgeDishes.map(d => d.dish_id).filter(Boolean);
+                      const isExisting = existingDishIds.includes(item.id);
+                      return (
+                        <TouchableOpacity
+                          onPress={() => handleSelectDish(item)}
+                          disabled={isExisting}
+                          style={{
+                            padding: 12,
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#F0F0F0',
+                            flexDirection: 'row',
+                            gap: 12,
+                            opacity: isExisting ? 0.5 : 1,
+                          }}
+                        >
+                          {item.image_url ? (
+                            <Image
+                              source={{ uri: item.image_url }}
+                              style={{ width: 60, height: 60, borderRadius: 8 }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View
+                              style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 8,
+                                backgroundColor: '#E8EAF6',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Ionicons name="restaurant-outline" size={24} color={COLORS.grey} />
+                            </View>
+                          )}
+                          <View style={{ flex: 1, justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey }}>
+                              {item.name}
+                            </Text>
+                            {isExisting && (
+                              <Text style={{ fontSize: 12, color: COLORS.primary, marginTop: 4 }}>
+                                Đã có trong tủ lạnh
+                              </Text>
+                            )}
+                          </View>
+                          {isExisting && <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />}
+                        </TouchableOpacity>
+                      );
+                    }}
+                    ListFooterComponent={
+                      hasNextDishPage ? (
+                        <TouchableOpacity
+                          onPress={() => fetchDishes(dishPage + 1, false)}
+                          disabled={loadingDishes}
+                          style={{ padding: 16, alignItems: 'center' }}
+                        >
+                          {loadingDishes ? (
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                          ) : (
+                            <Text style={{ color: COLORS.primary, fontWeight: '600' }}>Tải thêm</Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null
+                    }
+                    ListEmptyComponent={
+                      !loadingDishes ? (
+                        <View style={{ padding: 40, alignItems: 'center' }}>
+                          <Text style={{ color: COLORS.grey }}>Không tìm thấy món ăn nào</Text>
+                        </View>
+                      ) : null
+                    }
+                  />
+                  {loadingDishes && dishes.length === 0 && (
+                    <View style={{ padding: 40, alignItems: 'center' }}>
+                      <ActivityIndicator size="large" color={COLORS.primary} />
+                    </View>
+                  )}
+                </>
+              ) : (
+                <KeyboardAwareScrollView 
+                  style={{ maxHeight: '90%' }} 
+                  contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+                  showsVerticalScrollIndicator={true}
+                  enableOnAndroid={true}
+                  extraScrollHeight={20}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Thông tin món ăn</Text>
+                    <TouchableOpacity onPress={() => {
+                      setShowAddDishModal(false);
+                      setSelectedDish(null);
+                      setDishStock('');
+                      setDishPrice('');
+                      setDishExpirationDate(null);
+                    }}>
+                      <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {selectedDish && (
+                    <View style={{ backgroundColor: '#E0F2FE', borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 12 }}>
+                      {selectedDish.image_url ? (
+                        <Image
+                          source={{ uri: selectedDish.image_url }}
+                          style={{ width: 80, height: 80, borderRadius: 8 }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 8,
+                            backgroundColor: '#E8EAF6',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Ionicons name="restaurant-outline" size={32} color={COLORS.grey} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: COLORS.primary, marginBottom: 4 }}>
+                          Món ăn đã chọn
+                        </Text>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey }}>
+                          {selectedDish.name}
+                        </Text>
+                        {selectedDish.description && (
+                          <Text style={{ fontSize: 12, color: COLORS.grey, marginTop: 4 }} numberOfLines={2}>
+                            {selectedDish.description}
+                          </Text>
+                        )}
+                        <TouchableOpacity
+                          onPress={() => setShowDishSelection(true)}
+                          style={{ marginTop: 8 }}
+                        >
+                          <Text style={{ color: COLORS.primary, fontSize: 14 }}>Chọn lại món ăn</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Số lượng <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        fontSize: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                      }}
+                      placeholder="Nhập số lượng"
+                      value={dishStock}
+                      onChangeText={setDishStock}
+                      keyboardType="numeric"
+                      placeholderTextColor={COLORS.grey}
+                    />
+                  </View>
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Giá (tùy chọn)
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        fontSize: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                      }}
+                      placeholder="Nhập giá"
+                      value={dishPrice}
+                      onChangeText={setDishPrice}
+                      keyboardType="numeric"
+                      placeholderTextColor={COLORS.grey}
+                    />
+                  </View>
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Ngày hết hạn (tùy chọn)
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                      onPress={() => setShowDishDatePicker(true)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          color: dishExpirationDate ? COLORS.darkGrey : COLORS.grey,
+                        }}
+                      >
+                        {dishExpirationDate
+                          ? dishExpirationDate.toLocaleDateString('vi-VN')
+                          : 'Chọn ngày hết hạn'}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={20} color={COLORS.grey} />
+                    </TouchableOpacity>
+                    {dishExpirationDate && (
+                      <TouchableOpacity
+                        onPress={() => setDishExpirationDate(null)}
+                        style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                      >
+                        <Text style={{ color: COLORS.red || '#EF4444', fontSize: 14 }}>
+                          Xóa ngày hết hạn
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {showDishDatePicker && (
+                    <DateTimePicker
+                      value={dishExpirationDate || new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      minimumDate={new Date()}
+                      onChange={(event, selectedDate) => {
+                        setShowDishDatePicker(Platform.OS === 'ios');
+                        if (event.type === 'set' && selectedDate) {
+                          setDishExpirationDate(selectedDate);
+                        }
+                      }}
+                    />
+                  )}
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: COLORS.primary,
+                      borderRadius: 12,
+                      padding: 16,
+                      alignItems: 'center',
+                      marginTop: 8,
+                    }}
+                    onPress={handleSubmitDish}
+                    disabled={addingDish}
+                  >
+                    {addingDish ? (
+                      <ActivityIndicator color={COLORS.white} />
+                    ) : (
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.white }}>
+                        Thêm vào tủ lạnh
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </KeyboardAwareScrollView>
+              )}
+            </View>
+        </View>
+      </Modal>
+
+      {/* Modal thêm nguyên liệu */}
+      <Modal visible={showAddIngredientModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+              {showIngredientSelection ? (
+                <>
+                  <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chọn nguyên liệu</Text>
+                      <TouchableOpacity onPress={() => {
+                        setShowAddIngredientModal(false);
+                        setIngredientSearchQuery('');
+                        setIngredients([]);
+                      }}>
+                        <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={{
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: COLORS.grey,
+                        borderRadius: 8,
+                        fontSize: 16,
+                        color: COLORS.darkGrey,
+                      }}
+                      placeholder="Tìm kiếm nguyên liệu..."
+                      placeholderTextColor={COLORS.grey}
+                      value={ingredientSearchQuery}
+                      onChangeText={text => {
+                        setIngredientSearchQuery(text);
+                        fetchIngredients(1, true);
+                      }}
+                    />
+                  </View>
+                  <FlatList
+                    data={ingredients}
+                    keyExtractor={item => item.id?.toString() || Math.random().toString()}
+                    renderItem={({ item }) => {
+                      const existingIngredientIds = fridgeIngredients.map(i => i.ingredient_id).filter(Boolean);
+                      const isExisting = existingIngredientIds.includes(item.id);
+                      return (
+                        <TouchableOpacity
+                          onPress={() => handleSelectIngredient(item)}
+                          disabled={isExisting}
+                          style={{
+                            padding: 12,
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#F0F0F0',
+                            flexDirection: 'row',
+                            gap: 12,
+                            opacity: isExisting ? 0.5 : 1,
+                          }}
+                        >
+                          {item.image_url ? (
+                            <Image
+                              source={{ uri: item.image_url }}
+                              style={{ width: 60, height: 60, borderRadius: 8 }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View
+                              style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 8,
+                                backgroundColor: '#E8F5E9',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Ionicons name="leaf-outline" size={24} color={COLORS.grey} />
+                            </View>
+                          )}
+                          <View style={{ flex: 1, justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey }}>
+                              {item.name}
+                            </Text>
+                            {item.category && (
+                              <Text style={{ fontSize: 12, color: COLORS.grey, marginTop: 4 }}>
+                                {item.category.name}
+                              </Text>
+                            )}
+                            {isExisting && (
+                              <Text style={{ fontSize: 12, color: COLORS.primary, marginTop: 4 }}>
+                                Đã có trong tủ lạnh
+                              </Text>
+                            )}
+                          </View>
+                          {isExisting && <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />}
+                        </TouchableOpacity>
+                      );
+                    }}
+                    ListFooterComponent={
+                      hasNextIngredientPage ? (
+                        <TouchableOpacity
+                          onPress={() => fetchIngredients(ingredientPage + 1, false)}
+                          disabled={loadingIngredients}
+                          style={{ padding: 16, alignItems: 'center' }}
+                        >
+                          {loadingIngredients ? (
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                          ) : (
+                            <Text style={{ color: COLORS.primary, fontWeight: '600' }}>Tải thêm</Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null
+                    }
+                    ListEmptyComponent={
+                      !loadingIngredients ? (
+                        <View style={{ padding: 40, alignItems: 'center' }}>
+                          <Text style={{ color: COLORS.grey }}>Không tìm thấy nguyên liệu nào</Text>
+                        </View>
+                      ) : null
+                    }
+                  />
+                  {loadingIngredients && ingredients.length === 0 && (
+                    <View style={{ padding: 40, alignItems: 'center' }}>
+                      <ActivityIndicator size="large" color={COLORS.primary} />
+                    </View>
+                  )}
+                </>
+              ) : (
+                <KeyboardAwareScrollView 
+                  style={{ maxHeight: '90%' }} 
+                  contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+                  showsVerticalScrollIndicator={true}
+                  enableOnAndroid={true}
+                  extraScrollHeight={20}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Thông tin nguyên liệu</Text>
+                    <TouchableOpacity onPress={() => {
+                      setShowAddIngredientModal(false);
+                      setSelectedIngredient(null);
+                      setIngredientStock('');
+                      setIngredientPrice('');
+                      setIngredientExpirationDate(null);
+                    }}>
+                      <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {selectedIngredient && (
+                    <View style={{ backgroundColor: '#E0F2FE', borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 12 }}>
+                      {selectedIngredient.image_url ? (
+                        <Image
+                          source={{ uri: selectedIngredient.image_url }}
+                          style={{ width: 80, height: 80, borderRadius: 8 }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 8,
+                            backgroundColor: '#E8F5E9',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Ionicons name="leaf-outline" size={32} color={COLORS.grey} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: COLORS.primary, marginBottom: 4 }}>
+                          Nguyên liệu đã chọn
+                        </Text>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey }}>
+                          {selectedIngredient.name}
+                        </Text>
+                        {selectedIngredient.category && (
+                          <Text style={{ fontSize: 14, color: COLORS.grey, marginTop: 4 }}>
+                            {selectedIngredient.category.name}
+                          </Text>
+                        )}
+                        <TouchableOpacity
+                          onPress={() => setShowIngredientSelection(true)}
+                          style={{ marginTop: 8 }}
+                        >
+                          <Text style={{ color: COLORS.primary, fontSize: 14 }}>Chọn lại nguyên liệu</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Số lượng <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        fontSize: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                      }}
+                      placeholder="Nhập số lượng"
+                      value={ingredientStock}
+                      onChangeText={setIngredientStock}
+                      keyboardType="numeric"
+                      placeholderTextColor={COLORS.grey}
+                    />
+                  </View>
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Giá (tùy chọn)
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        fontSize: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                      }}
+                      placeholder="Nhập giá"
+                      value={ingredientPrice}
+                      onChangeText={setIngredientPrice}
+                      keyboardType="numeric"
+                      placeholderTextColor={COLORS.grey}
+                    />
+                  </View>
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Ngày hết hạn (tùy chọn)
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                      onPress={() => setShowIngredientDatePicker(true)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          color: ingredientExpirationDate ? COLORS.darkGrey : COLORS.grey,
+                        }}
+                      >
+                        {ingredientExpirationDate
+                          ? ingredientExpirationDate.toLocaleDateString('vi-VN')
+                          : 'Chọn ngày hết hạn'}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={20} color={COLORS.grey} />
+                    </TouchableOpacity>
+                    {ingredientExpirationDate && (
+                      <TouchableOpacity
+                        onPress={() => setIngredientExpirationDate(null)}
+                        style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                      >
+                        <Text style={{ color: COLORS.red || '#EF4444', fontSize: 14 }}>
+                          Xóa ngày hết hạn
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {showIngredientDatePicker && (
+                    <DateTimePicker
+                      value={ingredientExpirationDate || new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      minimumDate={new Date()}
+                      onChange={(event, selectedDate) => {
+                        setShowIngredientDatePicker(Platform.OS === 'ios');
+                        if (event.type === 'set' && selectedDate) {
+                          setIngredientExpirationDate(selectedDate);
+                        }
+                      }}
+                    />
+                  )}
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: COLORS.primary,
+                      borderRadius: 12,
+                      padding: 16,
+                      alignItems: 'center',
+                      marginTop: 8,
+                    }}
+                    onPress={handleSubmitIngredient}
+                    disabled={addingIngredient}
+                  >
+                    {addingIngredient ? (
+                      <ActivityIndicator color={COLORS.white} />
+                    ) : (
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.white }}>
+                        Thêm vào tủ lạnh
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </KeyboardAwareScrollView>
+              )}
+            </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

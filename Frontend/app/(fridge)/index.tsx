@@ -151,7 +151,19 @@ export default function FridgeListPage() {
     let expiringIngredients = 0;
     let expiredIngredients = 0;
 
+    // Lưu thông tin chi tiết theo từng tủ lạnh
+    const fridgeDetails: Array<{
+      fridgeName: string;
+      expiredCount: number;
+      expiringCount: number;
+    }> = [];
+
     refrigerators.forEach((fridge) => {
+      let fridgeExpiredDishes = 0;
+      let fridgeExpiringDishes = 0;
+      let fridgeExpiredIngredients = 0;
+      let fridgeExpiringIngredients = 0;
+
       // Kiểm tra món ăn
       const dishes = fridge.fridgeDishes || fridge.dishes || [];
       dishes.forEach((dish: any) => {
@@ -162,8 +174,10 @@ export default function FridgeListPage() {
 
           if (expiryDate < today) {
             expiredDishes++;
+            fridgeExpiredDishes++;
           } else if (expiryDate <= threeDaysLater) {
             expiringDishes++;
+            fridgeExpiringDishes++;
           }
         }
       });
@@ -178,11 +192,29 @@ export default function FridgeListPage() {
 
           if (expiryDate < today) {
             expiredIngredients++;
+            fridgeExpiredIngredients++;
           } else if (expiryDate <= threeDaysLater) {
             expiringIngredients++;
+            fridgeExpiringIngredients++;
           }
         }
       });
+
+      // Lưu thông tin tủ lạnh nếu có sản phẩm hết hạn hoặc sắp hết hạn
+      const totalFridgeExpired = fridgeExpiredDishes + fridgeExpiredIngredients;
+      const totalFridgeExpiring = fridgeExpiringDishes + fridgeExpiringIngredients;
+      if (totalFridgeExpired > 0 || totalFridgeExpiring > 0) {
+        const isFamily = fridge.family_id !== null && fridge.family_id !== undefined;
+        const fridgeName = isFamily && fridge.family?.name
+          ? fridge.family.name
+          : (fridge.name || 'Tủ lạnh Cá nhân');
+        
+        fridgeDetails.push({
+          fridgeName,
+          expiredCount: totalFridgeExpired,
+          expiringCount: totalFridgeExpiring,
+        });
+      }
     });
 
     return {
@@ -192,6 +224,7 @@ export default function FridgeListPage() {
       expiredIngredients,
       totalExpiring: expiringDishes + expiringIngredients,
       totalExpired: expiredDishes + expiredIngredients,
+      fridgeDetails, // Thêm thông tin chi tiết theo tủ lạnh
     };
   }, [refrigerators]);
 
@@ -453,9 +486,32 @@ export default function FridgeListPage() {
                   <NotificationCard
                     title="Cảnh báo hết hạn"
                     message={
-                      expiringItems.totalExpired > 0
-                        ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày). Vui lòng kiểm tra ngay!`
-                        : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn trong vòng 3 ngày tới. Vui lòng kiểm tra!`
+                      (() => {
+                        const fridgeDetails = expiringItems.fridgeDetails || [];
+                        if (fridgeDetails.length === 0) {
+                          return expiringItems.totalExpired > 0
+                            ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày). Vui lòng kiểm tra ngay!`
+                            : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn trong vòng 3 ngày tới. Vui lòng kiểm tra!`;
+                        }
+
+                        // Tạo thông báo chi tiết với tên tủ lạnh
+                        const fridgeMessages = fridgeDetails.map((fridge) => {
+                          const parts: string[] = [];
+                          if (fridge.expiredCount > 0) {
+                            parts.push(`${fridge.expiredCount} đã hết hạn`);
+                          }
+                          if (fridge.expiringCount > 0) {
+                            parts.push(`${fridge.expiringCount} sắp hết hạn`);
+                          }
+                          return `${fridge.fridgeName} (${parts.join(', ')})`;
+                        });
+
+                        const summary = expiringItems.totalExpired > 0
+                          ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày)`
+                          : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày)`;
+
+                        return `${summary} tại: ${fridgeMessages.join('; ')}. Vui lòng kiểm tra ngay!`;
+                      })()
                     }
                     type="warning"
                   />

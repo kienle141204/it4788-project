@@ -25,20 +25,6 @@ export default function FridgeLayout() {
           title: 'Tạo tủ lạnh mới'
         }} 
       />
-      <Stack.Screen 
-        name="add-dish" 
-        options={{ 
-          headerShown: false,
-          title: 'Thêm món ăn'
-        }} 
-      />
-      <Stack.Screen 
-        name="add-ingredient" 
-        options={{ 
-          headerShown: false,
-          title: 'Thêm nguyên liệu'
-        }} 
-      />
     </Stack>
   );
 }
