@@ -12,6 +12,7 @@ import NotificationCard from '@/components/NotificationCard';
 import FeatureGrid from '@/components/FeatureGrid';
 import { COLORS } from '@/constants/themes';
 import { getAccess } from '@/utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getMyShoppingLists } from '@/service/shopping';
 import { LogViewer } from '@/utils/logger';
@@ -42,9 +43,55 @@ export default function HomePage() {
   const { unreadCount, refreshNotifications } = useNotifications();
 
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (isRefreshing = false) => {
     try {
-      const response = await getAccess('auth/profile');
+      let response: any;
+      if (isRefreshing) {
+        // Force refresh
+        const result = await refreshCachedAccess<any>(
+          'auth/profile',
+          {},
+          {
+            ttl: CACHE_TTL.SHORT,
+            cacheKey: 'home:profile',
+            compareData: true,
+          }
+        );
+        response = result.data;
+      } else {
+        // Use cache if available
+        const result = await getCachedAccess<any>(
+          'auth/profile',
+          {},
+          {
+            ttl: CACHE_TTL.SHORT,
+            cacheKey: 'home:profile',
+            compareData: true,
+          }
+        );
+        response = result.data;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<any>(
+            'auth/profile',
+            {},
+            {
+              ttl: CACHE_TTL.SHORT,
+              cacheKey: 'home:profile',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const userData = freshResult.data?.data || freshResult.data;
+              setProfile(userData);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
+      
       // API response có cấu trúc: { success, message, data: { ...userInfo } }
       const userData = response?.data || response;
       setProfile(userData);
@@ -110,7 +157,7 @@ export default function HomePage() {
   // Refresh data khi màn hình được focus
   useFocusEffect(
     useCallback(() => {
-      fetchProfile();
+      fetchProfile(true); // Refresh profile on focus
       fetchTodayTasks();
       refreshNotifications();
     }, [fetchProfile, fetchTodayTasks, refreshNotifications])

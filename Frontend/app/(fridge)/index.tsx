@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/themes';
 import { getMyRefrigerators } from '@/service/fridge';
 import { getAccess } from '@/utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
+import { clearCacheByPattern } from '@/utils/cache';
 import NotificationCard from '@/components/NotificationCard';
 
 interface Refrigerator {
@@ -63,7 +65,61 @@ export default function FridgeListPage() {
       }
       setError(null);
 
-      const response = await getMyRefrigerators();
+      // Use cached API for better performance
+      let response: Refrigerator[] | { data: Refrigerator[] } | Refrigerator;
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        const result = await refreshCachedAccess<Refrigerator[] | { data: Refrigerator[] } | Refrigerator>(
+          'fridge/my-frifge',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'fridge:list',
+            compareData: true,
+          }
+        );
+        response = result.data;
+      } else {
+        // Normal fetch: use cache if available
+        const result = await getCachedAccess<Refrigerator[] | { data: Refrigerator[] } | Refrigerator>(
+          'fridge/my-frifge',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'fridge:list',
+            compareData: true,
+          }
+        );
+        response = result.data;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<Refrigerator[] | { data: Refrigerator[] } | Refrigerator>(
+            'fridge/my-frifge',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'fridge:list',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshData = freshResult.data;
+              let freshRefrigerators: Refrigerator[] = [];
+              if (Array.isArray(freshData)) {
+                freshRefrigerators = freshData;
+              } else if (freshData?.data && Array.isArray(freshData.data)) {
+                freshRefrigerators = freshData.data;
+              } else if (freshData && typeof freshData === 'object' && (freshData as any).id) {
+                freshRefrigerators = [freshData as Refrigerator];
+              }
+              setRefrigerators(freshRefrigerators);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
 
       // getMyRefrigerators now returns array directly
       let refrigeratorsData: Refrigerator[] = [];
@@ -71,9 +127,9 @@ export default function FridgeListPage() {
         refrigeratorsData = response;
       } else if (response?.data && Array.isArray(response.data)) {
         refrigeratorsData = response.data;
-      } else if (response && typeof response === 'object' && response.id) {
+      } else if (response && typeof response === 'object' && (response as any).id) {
         // Backend returns single refrigerator object, wrap it in array
-        refrigeratorsData = [response];
+        refrigeratorsData = [response as Refrigerator];
       }
 
       setRefrigerators(refrigeratorsData);

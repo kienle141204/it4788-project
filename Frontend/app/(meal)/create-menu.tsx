@@ -20,6 +20,8 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { mealStyles } from '../../styles/meal.styles';
 import { getAccess, postAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern } from '../../utils/cache';
 
 interface Family {
   id: string;
@@ -75,7 +77,18 @@ export default function CreateMenuPage() {
   const fetchFamilies = useCallback(async () => {
     setLoadingFamilies(true);
     try {
-      const payload = await getAccess('families/my-family');
+      // Use cached API for families list
+      const result = await getCachedAccess<any>(
+        'families/my-family',
+        {},
+        {
+          ttl: CACHE_TTL.LONG,
+          cacheKey: 'meal:families:list',
+          compareData: true,
+        }
+      );
+      
+      const payload = result.data;
       if (Array.isArray(payload)) {
         setFamilies(payload as Family[]);
       } else if (payload?.success !== false) {
@@ -212,6 +225,9 @@ export default function CreateMenuPage() {
       );
 
       await Promise.all(addDishPromises);
+
+      // Invalidate cache when creating menu
+      await clearCacheByPattern('meal:menus');
 
       // Back trước, rồi mới hiện thông báo
       if (router.canGoBack()) {

@@ -30,8 +30,12 @@ import {
   updateRefrigerator,
   addDishToRefrigerator,
   addIngredientToRefrigerator,
+  updateFridgeDish,
+  updateFridgeIngredient,
 } from '@/service/fridge';
 import { getAccess } from '@/utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
+import { clearCacheByPattern, getCache } from '@/utils/cache';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import ActionMenu from '@/components/ActionMenu';
 
@@ -49,6 +53,7 @@ interface FridgeDish {
   stock?: number;
   price?: number;
   expiration_date?: string | null;
+  created_at?: string;
   dish?: {
     id: number;
     name: string;
@@ -65,6 +70,7 @@ interface FridgeIngredient {
   stock?: number;
   price?: number;
   expiration_date?: string | null;
+  created_at?: string;
   ingredient?: {
     id: number;
     name: string;
@@ -149,6 +155,22 @@ export default function FridgeDetailPage() {
   const [addingIngredient, setAddingIngredient] = useState(false);
   const [showIngredientSelection, setShowIngredientSelection] = useState(true);
 
+  // Edit modal states
+  const [showEditDishModal, setShowEditDishModal] = useState(false);
+  const [showEditIngredientModal, setShowEditIngredientModal] = useState(false);
+  const [editingDish, setEditingDish] = useState<FridgeDish | null>(null);
+  const [editingIngredient, setEditingIngredient] = useState<FridgeIngredient | null>(null);
+  const [editDishStock, setEditDishStock] = useState('');
+  const [editDishPrice, setEditDishPrice] = useState('');
+  const [editDishExpirationDate, setEditDishExpirationDate] = useState<Date | null>(null);
+  const [showEditDishDatePicker, setShowEditDishDatePicker] = useState(false);
+  const [editIngredientStock, setEditIngredientStock] = useState('');
+  const [editIngredientPrice, setEditIngredientPrice] = useState('');
+  const [editIngredientExpirationDate, setEditIngredientExpirationDate] = useState<Date | null>(null);
+  const [showEditIngredientDatePicker, setShowEditIngredientDatePicker] = useState(false);
+  const [updatingDish, setUpdatingDish] = useState(false);
+  const [updatingIngredient, setUpdatingIngredient] = useState(false);
+
   const handleSessionExpired = useCallback(() => {
     if (sessionExpiredRef.current) {
       return;
@@ -164,23 +186,163 @@ export default function FridgeDetailPage() {
 
   const fetchRefrigeratorData = useCallback(async (isRefreshing = false) => {
     try {
-      if (isRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
       setError(null);
 
-      // Fetch refrigerator details
-      const fridgeData = await getRefrigeratorById(refrigeratorId);
+      // Check cache first for initial load
+      if (!isRefreshing) {
+        const fridgeCacheKey = `fridge:${refrigeratorId}`;
+        const dishesCacheKey = `fridge:${refrigeratorId}:dishes`;
+        const ingredientsCacheKey = `fridge:${refrigeratorId}:ingredients`;
+        
+        const [cachedFridge, cachedDishes, cachedIngredients] = await Promise.all([
+          getCache<any>(fridgeCacheKey),
+          getCache<any>(dishesCacheKey),
+          getCache<any>(ingredientsCacheKey),
+        ]);
+        
+        if (cachedFridge) {
+          // We have cache, show it immediately without loading
+          setRefrigerator(cachedFridge);
+          setLoading(false);
+          
+          if (cachedDishes) {
+            const dishesData = cachedDishes?.data && Array.isArray(cachedDishes.data) 
+              ? cachedDishes.data 
+              : Array.isArray(cachedDishes) 
+                ? cachedDishes 
+                : [];
+            setFridgeDishes(dishesData);
+          }
+          
+          if (cachedIngredients) {
+            const ingredientsData = cachedIngredients?.data && Array.isArray(cachedIngredients.data)
+              ? cachedIngredients.data
+              : Array.isArray(cachedIngredients)
+                ? cachedIngredients
+                : [];
+            setFridgeIngredients(ingredientsData);
+          }
+          
+          // Fetch fresh data in background
+          Promise.all([
+            refreshCachedAccess<any>(
+              `fridge/${refrigeratorId}`,
+              {},
+              {
+                ttl: CACHE_TTL.LONG,
+                cacheKey: fridgeCacheKey,
+                compareData: true,
+              }
+            ),
+            getCachedAccess<any>(
+              `fridge/${refrigeratorId}/dishes`,
+              {},
+              {
+                ttl: CACHE_TTL.MEDIUM,
+                cacheKey: dishesCacheKey,
+                compareData: true,
+              }
+            ).catch(() => null),
+            getCachedAccess<any>(
+              `fridge/${refrigeratorId}/ingredients`,
+              {},
+              {
+                ttl: CACHE_TTL.MEDIUM,
+                cacheKey: ingredientsCacheKey,
+                compareData: true,
+              }
+            ).catch(() => null),
+          ]).then(([fridgeResult, dishesResult, ingredientsResult]) => {
+            if (fridgeResult?.updated) {
+              setRefrigerator(fridgeResult.data);
+            }
+            
+            if (dishesResult && !dishesResult.fromCache) {
+              const dishesData = dishesResult.data?.data && Array.isArray(dishesResult.data.data)
+                ? dishesResult.data.data
+                : Array.isArray(dishesResult.data)
+                  ? dishesResult.data
+                  : [];
+              setFridgeDishes(dishesData);
+            }
+            
+            if (ingredientsResult && !ingredientsResult.fromCache) {
+              const ingredientsData = ingredientsResult.data?.data && Array.isArray(ingredientsResult.data.data)
+                ? ingredientsResult.data.data
+                : Array.isArray(ingredientsResult.data)
+                  ? ingredientsResult.data
+                  : [];
+              setFridgeIngredients(ingredientsData);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+          
+          return;
+        }
+        
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      // Fetch refrigerator details with caching
+      let fridgeData: any;
+      if (isRefreshing) {
+        const result = await refreshCachedAccess<any>(
+          `fridge/${refrigeratorId}`,
+          {},
+          {
+            ttl: CACHE_TTL.LONG,
+            cacheKey: `fridge:${refrigeratorId}`,
+            compareData: true,
+          }
+        );
+        fridgeData = result.data;
+      } else {
+        const result = await getCachedAccess<any>(
+          `fridge/${refrigeratorId}`,
+          {},
+          {
+            ttl: CACHE_TTL.LONG,
+            cacheKey: `fridge:${refrigeratorId}`,
+            compareData: true,
+          }
+        );
+        fridgeData = result.data;
+      }
       setRefrigerator(fridgeData);
 
-      // Fetch dishes and ingredients - handle 404 as empty arrays
+      // Fetch dishes and ingredients with caching - handle 404 as empty arrays
       let dishesData: any[] = [];
       let ingredientsData: any[] = [];
       
       try {
-        const dishesResponse = await getRefrigeratorDishes(refrigeratorId);
+        let dishesResponse: any;
+        if (isRefreshing) {
+          const result = await refreshCachedAccess<any>(
+            `fridge/${refrigeratorId}/dishes`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `fridge:${refrigeratorId}:dishes`,
+              compareData: true,
+            }
+          );
+          dishesResponse = result.data;
+        } else {
+          const result = await getCachedAccess<any>(
+            `fridge/${refrigeratorId}/dishes`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `fridge:${refrigeratorId}:dishes`,
+              compareData: true,
+            }
+          );
+          dishesResponse = result.data;
+        }
+        
         // Backend trả về { success, message, data, pagination }
         if (dishesResponse?.data && Array.isArray(dishesResponse.data)) {
           dishesData = dishesResponse.data;
@@ -200,7 +362,31 @@ export default function FridgeDetailPage() {
       }
       
       try {
-        const ingredientsResponse = await getRefrigeratorIngredients(refrigeratorId);
+        let ingredientsResponse: any;
+        if (isRefreshing) {
+          const result = await refreshCachedAccess<any>(
+            `fridge/${refrigeratorId}/ingredients`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `fridge:${refrigeratorId}:ingredients`,
+              compareData: true,
+            }
+          );
+          ingredientsResponse = result.data;
+        } else {
+          const result = await getCachedAccess<any>(
+            `fridge/${refrigeratorId}/ingredients`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `fridge:${refrigeratorId}:ingredients`,
+              compareData: true,
+            }
+          );
+          ingredientsResponse = result.data;
+        }
+        
         // Backend trả về { success, message, data, pagination }
         if (ingredientsResponse?.data && Array.isArray(ingredientsResponse.data)) {
           ingredientsData = ingredientsResponse.data;
@@ -233,12 +419,82 @@ export default function FridgeDetailPage() {
     }
   }, [refrigeratorId, handleSessionExpired]);
 
-  const fetchSuggestions = useCallback(async () => {
+  const fetchSuggestions = useCallback(async (showLoading = true) => {
     try {
-      setLoadingSuggestions(true);
+      // Only show loading if we don't have suggestions yet
+      if (showLoading && suggestions.length === 0) {
+        setLoadingSuggestions(true);
+      }
       setSuggestionsError(null);
-      const suggestionsData = await getDishSuggestions(refrigeratorId);
+      
+      // Check cache first
+      const cacheKey = `fridge:${refrigeratorId}:suggestions`;
+      const cachedData = await getCache<any>(cacheKey);
+      
+      if (cachedData && Array.isArray(cachedData)) {
+        // We have cache, show it immediately without loading
+        setSuggestions(cachedData);
+        setLoadingSuggestions(false);
+        
+        // Fetch fresh data in background
+        refreshCachedAccess<any>(
+          `fridge/${refrigeratorId}/suggestions`,
+          {},
+          {
+            ttl: CACHE_TTL.SHORT,
+            cacheKey,
+            compareData: true,
+          }
+        ).then((freshResult) => {
+          if (freshResult.updated) {
+            const freshSuggestions = Array.isArray(freshResult.data) ? freshResult.data : [];
+            setSuggestions(freshSuggestions);
+          }
+        }).catch(() => {
+          // Silently fail background refresh
+        });
+        
+        return;
+      }
+      
+      // No cache, fetch from API
+      if (showLoading) {
+        setLoadingSuggestions(true);
+      }
+      
+      // Use cached API for suggestions
+      const result = await getCachedAccess<any>(
+        `fridge/${refrigeratorId}/suggestions`,
+        {},
+        {
+          ttl: CACHE_TTL.SHORT, // Short TTL for suggestions as they change based on ingredients
+          cacheKey,
+          compareData: true,
+        }
+      );
+      
+      const suggestionsData = result.data;
       setSuggestions(Array.isArray(suggestionsData) ? suggestionsData : []);
+      
+      // If we got data from cache, fetch fresh data in background
+      if (result.fromCache) {
+        refreshCachedAccess<any>(
+          `fridge/${refrigeratorId}/suggestions`,
+          {},
+          {
+            ttl: CACHE_TTL.SHORT,
+            cacheKey,
+            compareData: true,
+          }
+        ).then((freshResult) => {
+          if (freshResult.updated) {
+            const freshSuggestions = Array.isArray(freshResult.data) ? freshResult.data : [];
+            setSuggestions(freshSuggestions);
+          }
+        }).catch(() => {
+          // Silently fail background refresh
+        });
+      }
     } catch (err: any) {
       setSuggestions([]);
       // Kiểm tra nếu là lỗi database connection
@@ -251,7 +507,7 @@ export default function FridgeDetailPage() {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [refrigeratorId]);
+  }, [refrigeratorId, suggestions.length]);
 
   useEffect(() => {
     fetchRefrigeratorData();
@@ -259,18 +515,26 @@ export default function FridgeDetailPage() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchRefrigeratorData(true);
-      if (activeTab === 'suggestions') {
-        fetchSuggestions();
+      // Only refresh if we don't have data yet, otherwise skip refresh on focus
+      // This prevents loading spinner from showing when switching tabs
+      if (fridgeDishes.length === 0 && fridgeIngredients.length === 0) {
+        fetchRefrigeratorData(false); // Don't show refreshing indicator
       }
-    }, [fetchRefrigeratorData, activeTab, fetchSuggestions])
+      // If we have data, don't refresh on focus to avoid loading spinner
+      
+      if (activeTab === 'suggestions' && suggestions.length === 0) {
+        fetchSuggestions(true);
+      }
+      // If we have suggestions, don't refresh on focus
+    }, [fetchRefrigeratorData, activeTab, fetchSuggestions, fridgeDishes.length, fridgeIngredients.length, suggestions.length])
   );
 
   useEffect(() => {
     if (activeTab === 'suggestions') {
-      fetchSuggestions();
+      // Only show loading if we don't have suggestions yet
+      fetchSuggestions(suggestions.length === 0);
     }
-  }, [activeTab, fetchSuggestions]);
+  }, [activeTab, fetchSuggestions, suggestions.length]);
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -416,41 +680,78 @@ export default function FridgeDetailPage() {
       }
     }
 
-    setAddingDish(true);
-    try {
-      const dishId = typeof selectedDish.id === 'string' ? parseInt(selectedDish.id) : Number(selectedDish.id);
-      if (isNaN(dishId)) {
-        Alert.alert('Lỗi', 'ID món ăn không hợp lệ');
-        setAddingDish(false);
-        return;
-      }
-
-      await addDishToRefrigerator(refrigeratorId, {
-        dish_id: dishId,
-        stock: stockValue,
-        price: priceValue,
-        expiration_date: dishExpirationDate ? dishExpirationDate.toISOString().split('T')[0] : undefined,
-      });
-
-      Alert.alert('Thành công', 'Đã thêm món ăn vào tủ lạnh', [
-        {
-          text: 'OK',
-          onPress: () => {
-            setShowAddDishModal(false);
-            fetchRefrigeratorData(true);
-          },
-        },
-      ]);
-    } catch (err: any) {
-      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
-        handleSessionExpired();
-        return;
-      }
-      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể thêm món ăn. Vui lòng thử lại.';
-      Alert.alert('Lỗi', errorMessage);
-    } finally {
-      setAddingDish(false);
+    const dishId = typeof selectedDish.id === 'string' ? parseInt(selectedDish.id) : Number(selectedDish.id);
+    if (isNaN(dishId)) {
+      Alert.alert('Lỗi', 'ID món ăn không hợp lệ');
+      return;
     }
+
+    // Create optimistic item with temporary negative ID
+    const tempId = Date.now() * -1;
+    const optimisticDish: FridgeDish = {
+      id: tempId,
+      refrigerator_id: refrigeratorId,
+      dish_id: dishId,
+      stock: stockValue,
+      price: priceValue,
+      expiration_date: dishExpirationDate ? dishExpirationDate.toISOString().split('T')[0] : null,
+      created_at: new Date().toISOString(),
+      dish: {
+        id: selectedDish.id,
+        name: selectedDish.name,
+        image_url: selectedDish.image_url,
+        description: selectedDish.description,
+      },
+    };
+
+    // Update local state IMMEDIATELY before closing modal (optimistic update)
+    setFridgeDishes(prevDishes => [...prevDishes, optimisticDish]);
+
+    // Close modal immediately for better UX
+    setShowAddDishModal(false);
+
+    // Reset form immediately
+    setSelectedDish(null);
+    setDishStock('');
+    setDishPrice('');
+    setDishExpirationDate(null);
+    setShowDishSelection(true);
+
+    // Call API in background (don't await to keep UI responsive)
+    addDishToRefrigerator(refrigeratorId, {
+      dish_id: dishId,
+      stock: stockValue,
+      price: priceValue,
+      expiration_date: dishExpirationDate ? dishExpirationDate.toISOString().split('T')[0] : undefined,
+    })
+      .then((newDish) => {
+        clearCacheByPattern(`fridge:${refrigeratorId}`).catch(() => {});
+
+        if (newDish) {
+          setFridgeDishes(prevDishes =>
+            prevDishes.map(dish =>
+              dish.id === tempId
+                ? { ...newDish, dish: optimisticDish.dish }
+                : dish
+            )
+          );
+        }
+
+        // Fetch fresh data from API after a delay to sync with server
+        setTimeout(() => {
+          fetchRefrigeratorData(true).catch(() => {
+            // Silently fail, optimistic update is already shown
+          });
+        }, 2000);
+      })
+      .catch((error) => {
+        // Rollback optimistic update on error
+        setFridgeDishes(prevDishes =>
+          prevDishes.filter(dish => dish.id !== tempId)
+        );
+
+        Alert.alert('Lỗi', 'Không thể thêm món ăn. Vui lòng thử lại.');
+      });
   };
 
   const handleSubmitIngredient = async () => {
@@ -481,41 +782,77 @@ export default function FridgeDetailPage() {
       }
     }
 
-    setAddingIngredient(true);
-    try {
-      const ingredientId = typeof selectedIngredient.id === 'string' ? parseInt(selectedIngredient.id) : Number(selectedIngredient.id);
-      if (isNaN(ingredientId)) {
-        Alert.alert('Lỗi', 'ID nguyên liệu không hợp lệ');
-        setAddingIngredient(false);
-        return;
-      }
-
-      await addIngredientToRefrigerator(refrigeratorId, {
-        ingredient_id: ingredientId,
-        stock: stockValue,
-        price: priceValue,
-        expiration_date: ingredientExpirationDate ? ingredientExpirationDate.toISOString().split('T')[0] : undefined,
-      });
-
-      Alert.alert('Thành công', 'Đã thêm nguyên liệu vào tủ lạnh', [
-        {
-          text: 'OK',
-          onPress: () => {
-            setShowAddIngredientModal(false);
-            fetchRefrigeratorData(true);
-          },
-        },
-      ]);
-    } catch (err: any) {
-      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
-        handleSessionExpired();
-        return;
-      }
-      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể thêm nguyên liệu. Vui lòng thử lại.';
-      Alert.alert('Lỗi', errorMessage);
-    } finally {
-      setAddingIngredient(false);
+    const ingredientId = typeof selectedIngredient.id === 'string' ? parseInt(selectedIngredient.id) : Number(selectedIngredient.id);
+    if (isNaN(ingredientId)) {
+      Alert.alert('Lỗi', 'ID nguyên liệu không hợp lệ');
+      return;
     }
+
+    // Create optimistic item with temporary negative ID
+    const tempId = Date.now() * -1;
+    const optimisticIngredient: FridgeIngredient = {
+      id: tempId,
+      refrigerator_id: refrigeratorId,
+      ingredient_id: ingredientId,
+      stock: stockValue,
+      price: priceValue,
+      expiration_date: ingredientExpirationDate ? ingredientExpirationDate.toISOString().split('T')[0] : null,
+      created_at: new Date().toISOString(),
+      ingredient: {
+        id: selectedIngredient.id,
+        name: selectedIngredient.name,
+        image_url: selectedIngredient.image_url,
+      },
+    };
+
+    // Update local state IMMEDIATELY before closing modal (optimistic update)
+    setFridgeIngredients(prevIngredients => [...prevIngredients, optimisticIngredient]);
+
+    // Close modal immediately for better UX
+    setShowAddIngredientModal(false);
+
+    // Reset form immediately
+    setSelectedIngredient(null);
+    setIngredientStock('');
+    setIngredientPrice('');
+    setIngredientExpirationDate(null);
+    setShowIngredientSelection(true);
+
+    // Call API in background (don't await to keep UI responsive)
+    addIngredientToRefrigerator(refrigeratorId, {
+      ingredient_id: ingredientId,
+      stock: stockValue,
+      price: priceValue,
+      expiration_date: ingredientExpirationDate ? ingredientExpirationDate.toISOString().split('T')[0] : undefined,
+    })
+      .then((newIngredient) => {
+        clearCacheByPattern(`fridge:${refrigeratorId}`).catch(() => {});
+
+        if (newIngredient) {
+          setFridgeIngredients(prevIngredients =>
+            prevIngredients.map(ingredient =>
+              ingredient.id === tempId
+                ? { ...newIngredient, ingredient: optimisticIngredient.ingredient }
+                : ingredient
+            )
+          );
+        }
+
+        // Fetch fresh data from API after a delay to sync with server
+        setTimeout(() => {
+          fetchRefrigeratorData(true).catch(() => {
+            // Silently fail, optimistic update is already shown
+          });
+        }, 2000);
+      })
+      .catch((error) => {
+        // Rollback optimistic update on error
+        setFridgeIngredients(prevIngredients =>
+          prevIngredients.filter(ingredient => ingredient.id !== tempId)
+        );
+
+        Alert.alert('Lỗi', 'Không thể thêm nguyên liệu. Vui lòng thử lại.');
+      });
   };
 
 
@@ -528,6 +865,8 @@ export default function FridgeDetailPage() {
         onPress: async () => {
           try {
             await removeFridgeDish(dishId);
+            // Invalidate cache when removing dish
+            await clearCacheByPattern(`fridge:${refrigeratorId}`);
             fetchRefrigeratorData(true);
           } catch (err: any) {
             Alert.alert('Lỗi', 'Không thể xóa món ăn. Vui lòng thử lại.');
@@ -546,6 +885,8 @@ export default function FridgeDetailPage() {
         onPress: async () => {
           try {
             await removeFridgeIngredient(ingredientId);
+            // Invalidate cache when removing ingredient
+            await clearCacheByPattern(`fridge:${refrigeratorId}`);
             fetchRefrigeratorData(true);
           } catch (err: any) {
             Alert.alert('Lỗi', 'Không thể xóa nguyên liệu. Vui lòng thử lại.');
@@ -553,6 +894,167 @@ export default function FridgeDetailPage() {
         },
       },
     ]);
+  };
+
+  const handleUpdateDish = async () => {
+    if (!editingDish) return;
+
+    if (!editDishStock.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng');
+      return;
+    }
+
+    const stockValue = parseInt(editDishStock);
+    if (isNaN(stockValue) || stockValue <= 0) {
+      Alert.alert('Lỗi', 'Số lượng phải là số nguyên dương');
+      return;
+    }
+
+    let priceValue: number | undefined = undefined;
+    if (editDishPrice.trim()) {
+      const parsedPrice = parseFloat(editDishPrice);
+      if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+        priceValue = parsedPrice;
+      } else {
+        Alert.alert('Lỗi', 'Giá phải là số hợp lệ');
+        return;
+      }
+    }
+
+    setUpdatingDish(true);
+    try {
+      // Optimistic update
+      const originalDish = editingDish;
+      setFridgeDishes(prevDishes =>
+        prevDishes.map(dish =>
+          dish.id === editingDish.id
+            ? {
+                ...dish,
+                stock: stockValue,
+                price: priceValue,
+                expiration_date: editDishExpirationDate ? editDishExpirationDate.toISOString().split('T')[0] : null,
+              }
+            : dish
+        )
+      );
+
+      // Close modal immediately
+      setShowEditDishModal(false);
+      setEditingDish(null);
+
+      // Call API in background
+      await updateFridgeDish(editingDish.id, {
+        stock: stockValue,
+        price: priceValue,
+        expiration_date: editDishExpirationDate ? editDishExpirationDate.toISOString().split('T')[0] : undefined,
+      });
+
+      // Invalidate cache
+      await clearCacheByPattern(`fridge:${refrigeratorId}`);
+
+      // Fetch fresh data after a delay
+      setTimeout(() => {
+        fetchRefrigeratorData(true).catch(() => {});
+      }, 2000);
+    } catch (err: any) {
+      // Rollback on error
+      if (editingDish) {
+        setFridgeDishes(prevDishes =>
+          prevDishes.map(dish =>
+            dish.id === editingDish.id ? editingDish : dish
+          )
+        );
+      }
+
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể cập nhật món ăn. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setUpdatingDish(false);
+    }
+  };
+
+  const handleUpdateIngredient = async () => {
+    if (!editingIngredient) return;
+
+    if (!editIngredientStock.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng');
+      return;
+    }
+
+    const stockValue = parseInt(editIngredientStock);
+    if (isNaN(stockValue) || stockValue < 0) {
+      Alert.alert('Lỗi', 'Số lượng phải là số nguyên không âm');
+      return;
+    }
+
+    let priceValue: number | undefined = undefined;
+    if (editIngredientPrice.trim()) {
+      const parsedPrice = parseFloat(editIngredientPrice);
+      if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+        priceValue = parsedPrice;
+      } else {
+        Alert.alert('Lỗi', 'Giá phải là số hợp lệ');
+        return;
+      }
+    }
+
+    setUpdatingIngredient(true);
+    try {
+      // Optimistic update
+      setFridgeIngredients(prevIngredients =>
+        prevIngredients.map(ingredient =>
+          ingredient.id === editingIngredient.id
+            ? {
+                ...ingredient,
+                stock: stockValue,
+                price: priceValue,
+                expiration_date: editIngredientExpirationDate ? editIngredientExpirationDate.toISOString().split('T')[0] : null,
+              }
+            : ingredient
+        )
+      );
+
+      // Close modal immediately
+      setShowEditIngredientModal(false);
+      setEditingIngredient(null);
+
+      // Call API in background
+      await updateFridgeIngredient(editingIngredient.id, {
+        stock: stockValue,
+        price: priceValue,
+        expiration_date: editIngredientExpirationDate ? editIngredientExpirationDate.toISOString().split('T')[0] : undefined,
+      });
+
+      // Invalidate cache
+      await clearCacheByPattern(`fridge:${refrigeratorId}`);
+
+      // Fetch fresh data after a delay
+      setTimeout(() => {
+        fetchRefrigeratorData(true).catch(() => {});
+      }, 2000);
+    } catch (err: any) {
+      // Rollback on error
+      if (editingIngredient) {
+        setFridgeIngredients(prevIngredients =>
+          prevIngredients.map(ingredient =>
+            ingredient.id === editingIngredient.id ? editingIngredient : ingredient
+          )
+        );
+      }
+
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể cập nhật nguyên liệu. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setUpdatingIngredient(false);
+    }
   };
 
   const handleDeleteRefrigerator = async () => {
@@ -567,6 +1069,8 @@ export default function FridgeDetailPage() {
           onPress: async () => {
             try {
               await deleteRefrigerator(refrigeratorId);
+              // Invalidate cache when deleting refrigerator
+              await clearCacheByPattern('fridge:');
               Alert.alert('Thành công', 'Đã xóa tủ lạnh thành công', [
                 {
                   text: 'OK',
@@ -696,12 +1200,26 @@ export default function FridgeDetailPage() {
           return null;
         })()}
       </View>
-      <TouchableOpacity
-        onPress={() => handleDeleteDish(item.id)}
-        style={{ padding: 8 }}
-      >
-        <Ionicons name="trash-outline" size={20} color={COLORS.red || '#EF4444'} />
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TouchableOpacity
+          onPress={() => {
+            setEditingDish(item);
+            setEditDishStock(item.stock?.toString() || '');
+            setEditDishPrice(item.price?.toString() || '');
+            setEditDishExpirationDate(item.expiration_date ? new Date(item.expiration_date) : null);
+            setShowEditDishModal(true);
+          }}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleDeleteDish(item.id)}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="trash-outline" size={20} color={COLORS.red || '#EF4444'} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -769,12 +1287,26 @@ export default function FridgeDetailPage() {
           return null;
         })()}
       </View>
-      <TouchableOpacity
-        onPress={() => handleDeleteIngredient(item.id)}
-        style={{ padding: 8 }}
-      >
-        <Ionicons name="trash-outline" size={20} color={COLORS.red || '#EF4444'} />
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TouchableOpacity
+          onPress={() => {
+            setEditingIngredient(item);
+            setEditIngredientStock(item.stock?.toString() || '');
+            setEditIngredientPrice(item.price?.toString() || '');
+            setEditIngredientExpirationDate(item.expiration_date ? new Date(item.expiration_date) : null);
+            setShowEditIngredientModal(true);
+          }}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleDeleteIngredient(item.id)}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="trash-outline" size={20} color={COLORS.red || '#EF4444'} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -848,7 +1380,17 @@ export default function FridgeDetailPage() {
             </View>
           ) : (
             <FlatList
-              data={fridgeDishes}
+              data={[...fridgeDishes].sort((a, b) => {
+                // Sort by created_at: oldest first (top), newest last (bottom)
+                // If no created_at, use id as fallback (id increases over time)
+                if (a.created_at && b.created_at) {
+                  const dateA = new Date(a.created_at).getTime();
+                  const dateB = new Date(b.created_at).getTime();
+                  return dateA - dateB; // Ascending: older items first
+                }
+                // Fallback to id if created_at is missing
+                return a.id - b.id; // Ascending: older items (lower id) first
+              })}
               renderItem={renderDishItem}
               keyExtractor={item => item.id.toString()}
               scrollEnabled={false}
@@ -885,7 +1427,17 @@ export default function FridgeDetailPage() {
             </View>
           ) : (
             <FlatList
-              data={fridgeIngredients}
+              data={[...fridgeIngredients].sort((a, b) => {
+                // Sort by created_at: oldest first (top), newest last (bottom)
+                // If no created_at, use id as fallback (id increases over time)
+                if (a.created_at && b.created_at) {
+                  const dateA = new Date(a.created_at).getTime();
+                  const dateB = new Date(b.created_at).getTime();
+                  return dateA - dateB; // Ascending: older items first
+                }
+                // Fallback to id if created_at is missing
+                return a.id - b.id; // Ascending: older items (lower id) first
+              })}
               renderItem={renderIngredientItem}
               keyExtractor={item => item.id.toString()}
               scrollEnabled={false}
@@ -913,7 +1465,7 @@ export default function FridgeDetailPage() {
     if (activeTab === 'suggestions') {
       return (
         <>
-          {loadingSuggestions ? (
+          {loadingSuggestions && suggestions.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
@@ -1099,8 +1651,16 @@ export default function FridgeDetailPage() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchRefrigeratorData(true)}
+              refreshing={refreshing && (fridgeDishes.length === 0 && fridgeIngredients.length === 0)}
+              onRefresh={() => {
+                // Only show refreshing indicator if we don't have data
+                if (fridgeDishes.length === 0 && fridgeIngredients.length === 0) {
+                  fetchRefrigeratorData(true);
+                } else {
+                  // Silently refresh in background
+                  fetchRefrigeratorData(true).catch(() => {});
+                }
+              }}
               colors={[COLORS.primary]}
               tintColor={COLORS.primary}
             />
@@ -1730,6 +2290,350 @@ export default function FridgeDetailPage() {
                 </KeyboardAwareScrollView>
               )}
             </View>
+        </View>
+      </Modal>
+
+      {/* Edit Dish Modal */}
+      <Modal visible={showEditDishModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+            <KeyboardAwareScrollView 
+              style={{ maxHeight: '90%' }} 
+              contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+              enableOnAndroid={true}
+              extraScrollHeight={20}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chỉnh sửa món ăn</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowEditDishModal(false);
+                  setEditingDish(null);
+                }}>
+                  <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                </TouchableOpacity>
+              </View>
+
+              {editingDish && editingDish.dish && (
+                <View style={{ backgroundColor: '#E0F2FE', borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 12 }}>
+                  {editingDish.dish.image_url ? (
+                    <Image
+                      source={{ uri: editingDish.dish.image_url }}
+                      style={{ width: 80, height: 80, borderRadius: 8 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 8,
+                        backgroundColor: '#E8EAF6',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Ionicons name="restaurant-outline" size={32} color={COLORS.grey} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey }}>
+                      {editingDish.dish.name}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Số lượng <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                  }}
+                  placeholder="Nhập số lượng"
+                  value={editDishStock}
+                  onChangeText={setEditDishStock}
+                  keyboardType="numeric"
+                  placeholderTextColor={COLORS.grey}
+                />
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Giá (tùy chọn)
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                  }}
+                  placeholder="Nhập giá"
+                  value={editDishPrice}
+                  onChangeText={setEditDishPrice}
+                  keyboardType="numeric"
+                  placeholderTextColor={COLORS.grey}
+                />
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Ngày hết hạn (tùy chọn)
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setShowEditDishDatePicker(true)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: editDishExpirationDate ? COLORS.darkGrey : COLORS.grey,
+                    }}
+                  >
+                    {editDishExpirationDate
+                      ? editDishExpirationDate.toLocaleDateString('vi-VN')
+                      : 'Chọn ngày hết hạn'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color={COLORS.grey} />
+                </TouchableOpacity>
+                {editDishExpirationDate && (
+                  <TouchableOpacity
+                    onPress={() => setEditDishExpirationDate(null)}
+                    style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                  >
+                    <Text style={{ color: COLORS.red || '#EF4444', fontSize: 14 }}>
+                      Xóa ngày hết hạn
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {showEditDishDatePicker && (
+                <DateTimePicker
+                  value={editDishExpirationDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowEditDishDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setEditDishExpirationDate(selectedDate);
+                    }
+                  }}
+                />
+              )}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: COLORS.primary,
+                  borderRadius: 12,
+                  padding: 16,
+                  alignItems: 'center',
+                  marginTop: 16,
+                }}
+                onPress={handleUpdateDish}
+                disabled={updatingDish}
+              >
+                {updatingDish ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.white }}>
+                    Cập nhật
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </KeyboardAwareScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Ingredient Modal */}
+      <Modal visible={showEditIngredientModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+            <KeyboardAwareScrollView 
+              style={{ maxHeight: '90%' }} 
+              contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+              enableOnAndroid={true}
+              extraScrollHeight={20}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chỉnh sửa nguyên liệu</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowEditIngredientModal(false);
+                  setEditingIngredient(null);
+                }}>
+                  <Ionicons name="close" size={24} color={COLORS.darkGrey} />
+                </TouchableOpacity>
+              </View>
+
+              {editingIngredient && editingIngredient.ingredient && (
+                <View style={{ backgroundColor: '#E0F2FE', borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 12 }}>
+                  {editingIngredient.ingredient.image_url ? (
+                    <Image
+                      source={{ uri: editingIngredient.ingredient.image_url }}
+                      style={{ width: 80, height: 80, borderRadius: 8 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 8,
+                        backgroundColor: '#E8F5E9',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Ionicons name="leaf-outline" size={32} color={COLORS.grey} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey }}>
+                      {editingIngredient.ingredient.name}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Số lượng <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                  }}
+                  placeholder="Nhập số lượng"
+                  value={editIngredientStock}
+                  onChangeText={setEditIngredientStock}
+                  keyboardType="numeric"
+                  placeholderTextColor={COLORS.grey}
+                />
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Giá (tùy chọn)
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                  }}
+                  placeholder="Nhập giá"
+                  value={editIngredientPrice}
+                  onChangeText={setEditIngredientPrice}
+                  keyboardType="numeric"
+                  placeholderTextColor={COLORS.grey}
+                />
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Ngày hết hạn (tùy chọn)
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setShowEditIngredientDatePicker(true)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: editIngredientExpirationDate ? COLORS.darkGrey : COLORS.grey,
+                    }}
+                  >
+                    {editIngredientExpirationDate
+                      ? editIngredientExpirationDate.toLocaleDateString('vi-VN')
+                      : 'Chọn ngày hết hạn'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color={COLORS.grey} />
+                </TouchableOpacity>
+                {editIngredientExpirationDate && (
+                  <TouchableOpacity
+                    onPress={() => setEditIngredientExpirationDate(null)}
+                    style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                  >
+                    <Text style={{ color: COLORS.red || '#EF4444', fontSize: 14 }}>
+                      Xóa ngày hết hạn
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {showEditIngredientDatePicker && (
+                <DateTimePicker
+                  value={editIngredientExpirationDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowEditIngredientDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setEditIngredientExpirationDate(selectedDate);
+                    }
+                  }}
+                />
+              )}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: COLORS.primary,
+                  borderRadius: 12,
+                  padding: 16,
+                  alignItems: 'center',
+                  marginTop: 16,
+                }}
+                onPress={handleUpdateIngredient}
+                disabled={updatingIngredient}
+              >
+                {updatingIngredient ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.white }}>
+                    Cập nhật
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </KeyboardAwareScrollView>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>

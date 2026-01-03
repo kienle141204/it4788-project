@@ -8,6 +8,8 @@ import { groupStyles } from '@/styles/group.styles';
 import { getMyShoppingLists, getShoppingListById } from '@/service/shopping';
 import { toggleItemChecked, type ShoppingItem as ShoppingItemType } from '@/service/shoppingList';
 import { COLORS } from '@/constants/themes';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
+import { clearCacheByPattern } from '@/utils/cache';
 
 interface ShoppingList {
   id: number;
@@ -49,15 +51,69 @@ export default function TaskPage() {
     });
   }, [shoppingLists, selectedDateFull]);
 
-  const loadShoppingLists = useCallback(async () => {
+  const loadShoppingLists = useCallback(async (isRefreshing = false) => {
     try {
-      setLoading(true);
-      const lists = await getMyShoppingLists();
+      if (!isRefreshing) {
+        setLoading(true);
+      }
+      
+      // Use cached API for better performance
+      let lists: any[];
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        const result = await refreshCachedAccess<any[]>(
+          'shopping-lists/my-list',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'calendar:shopping-lists',
+            compareData: true,
+          }
+        );
+        lists = Array.isArray(result.data) ? result.data : [];
+      } else {
+        // Normal fetch: use cache if available
+        const result = await getCachedAccess<any[]>(
+          'shopping-lists/my-list',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'calendar:shopping-lists',
+            compareData: true,
+          }
+        );
+        lists = Array.isArray(result.data) ? result.data : [];
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<any[]>(
+            'shopping-lists/my-list',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'calendar:shopping-lists',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshLists = Array.isArray(freshResult.data) ? freshResult.data : [];
+              const typedLists: ShoppingList[] = freshLists.map((list: any) => ({
+                ...list,
+                items: list.items !== undefined ? list.items : undefined,
+              }));
+              setShoppingLists(typedLists);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
 
       // Ensure items are properly typed
+      // Keep items as undefined if not present, so we know to load them
       const typedLists: ShoppingList[] = (lists || []).map((list: any) => ({
         ...list,
-        items: list.items || [],
+        items: list.items !== undefined ? list.items : undefined,
       }));
 
       setShoppingLists(typedLists);
@@ -83,19 +139,20 @@ export default function TaskPage() {
   // Reload data when page comes into focus (to sync with group page)
   useFocusEffect(
     useCallback(() => {
-      loadShoppingLists();
+      loadShoppingLists(true); // Silent refresh, use cache first
     }, [loadShoppingLists])
   );
 
   // Load items when filtered lists change or date changes
   useEffect(() => {
     if (filteredShoppingLists.length > 0) {
-      // Load items for all filtered lists that don't have items yet and haven't been loaded
+      // Load items for all filtered lists that don't have items loaded yet
+      // Check if items is undefined (not loaded) vs empty array (loaded but empty)
       filteredShoppingLists.forEach(list => {
-        const hasItems = list.items && list.items.length > 0;
+        const itemsNotLoaded = list.items === undefined;
         const alreadyLoaded = loadedListIds.has(list.id);
 
-        if (!hasItems && !alreadyLoaded) {
+        if (itemsNotLoaded && !alreadyLoaded) {
           setLoadedListIds(prev => new Set(prev).add(list.id));
           loadShoppingListItems(list.id);
         }
@@ -104,11 +161,65 @@ export default function TaskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredShoppingLists, selectedDateFull]);
 
-  const loadShoppingListItems = async (listId: number) => {
+  const loadShoppingListItems = async (listId: number, forceRefresh = false) => {
     try {
-      const list = await getShoppingListById(listId);
-      if (list && list.items) {
-        // Update the list in shoppingLists with items
+      // Use cached API for better performance
+      let list: any;
+      if (forceRefresh) {
+        // Force refresh: always fetch from API
+        const result = await refreshCachedAccess<any>(
+          `shopping-lists/${listId}`,
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: `calendar:shopping-list:${listId}`,
+            compareData: true,
+          }
+        );
+        list = result.data;
+      } else {
+        // Normal fetch: use cache if available
+        const result = await getCachedAccess<any>(
+          `shopping-lists/${listId}`,
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: `calendar:shopping-list:${listId}`,
+            compareData: true,
+          }
+        );
+        list = result.data;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<any>(
+            `shopping-lists/${listId}`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `calendar:shopping-list:${listId}`,
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated && freshResult.data && freshResult.data.items) {
+              // Update the list in shoppingLists with fresh items
+              setShoppingLists(prevLists =>
+                prevLists.map(l => {
+                  if (l.id === listId) {
+                    return { ...l, items: freshResult.data.items || [] };
+                  }
+                  return l;
+                })
+              );
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
+
+      if (list) {
+        // Update the list in shoppingLists with items (even if items is empty array)
         setShoppingLists(prevLists =>
           prevLists.map(l => {
             if (l.id === listId) {
@@ -179,8 +290,12 @@ export default function TaskPage() {
       // Call API
       await toggleItemChecked(itemId);
 
+      // Clear cache for this specific list and main lists cache to force refresh
+      await clearCacheByPattern(`calendar:shopping-list:${listId}`);
+      await clearCacheByPattern('calendar:shopping-lists');
+
       // Reload only this list's items to sync with server (faster than reloading all)
-      await loadShoppingListItems(listId);
+      await loadShoppingListItems(listId, true); // Force refresh after cache clear
     } catch (error: any) {
 
       // Rollback optimistic update on error
@@ -199,7 +314,7 @@ export default function TaskPage() {
         );
       } else {
         // If we don't have previous state, reload the list
-        await loadShoppingListItems(listId);
+        await loadShoppingListItems(listId, true); // Force refresh
       }
 
       if (error.message === 'SESSION_EXPIRED' || error.response?.status === 401) {
@@ -309,7 +424,14 @@ export default function TaskPage() {
                 </View>
 
                 {/* Items */}
-                {list.items && list.items.length > 0 ? (
+                {list.items === undefined ? (
+                  <View style={taskStyles.emptyState}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <Text style={[taskStyles.emptyStateText, { marginTop: 8 }]}>
+                      Đang tải...
+                    </Text>
+                  </View>
+                ) : list.items.length > 0 ? (
                   list.items.map(item => renderShoppingItem(item, list.id))
                 ) : (
                   <View style={taskStyles.emptyState}>

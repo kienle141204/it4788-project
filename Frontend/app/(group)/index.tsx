@@ -22,6 +22,8 @@ import { COLORS } from '../../constants/themes';
 import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, createFamily, leaveFamily, deleteFamily, type Family } from '../../service/family';
 import { getFamilySharedLists } from '../../service/shopping';
 import { getAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern, getCache } from '../../utils/cache';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import JoinFamilyModal from '../../components/JoinFamilyModal';
@@ -78,6 +80,7 @@ export default function GroupPage() {
   const [families, setFamilies] = useState<FamilyWithStats[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [initialLoadDone, setInitialLoadDone] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showFamilyMenu, setShowFamilyMenu] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<FamilyWithStats | null>(null);
@@ -104,72 +107,158 @@ export default function GroupPage() {
     );
   }, [router]);
 
+  // Process families data with shopping list stats
+  const processFamiliesData = useCallback(async (familiesData: Family[]) => {
+    // Fetch shopping list statistics for each family
+    const familiesWithStats: FamilyWithStats[] = await Promise.all(
+      familiesData.map(async (family) => {
+        const memberCount = family.members?.length || 0;
+
+        // Get shopping lists for this family
+        let shoppingListInfo = {};
+        try {
+          const sharedLists = await getFamilySharedLists(family.id);
+
+          // Calculate this week's items
+          const now = new Date();
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay());
+          startOfWeek.setHours(0, 0, 0, 0);
+
+          const thisWeekLists = (sharedLists || []).filter((list: any) => {
+            const listDate = new Date(list.created_at || list.shopping_date);
+            return listDate >= startOfWeek;
+          });
+
+          const thisWeekItems = thisWeekLists.reduce((total: number, list: any) => {
+            return total + (list.items?.length || 0);
+          }, 0);
+
+          // Calculate bought items from all lists
+          const allItems = sharedLists.reduce((total: number, list: any) => {
+            return total + (list.items?.length || 0);
+          }, 0);
+
+          const boughtItems = sharedLists.reduce((total: number, list: any) => {
+            const checked = list.items?.filter((item: any) => item.is_checked) || [];
+            return total + checked.length;
+          }, 0);
+
+          shoppingListInfo = {
+            thisWeekItems,
+            boughtItems,
+            totalItems: allItems,
+          };
+        } catch (error) {
+        }
+
+        return {
+          ...family,
+          memberCount,
+          shoppingListInfo,
+        };
+      })
+    );
+
+    setFamilies(familiesWithStats);
+  }, []);
+
   const fetchFamilies = useCallback(async (isRefreshing = false) => {
     try {
-      if (isRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
       setError(null);
 
-      const response = await getMyFamilies();
-
-      // getMyFamilies always returns an array
-      const familiesData = Array.isArray(response) ? response : [];
-
-      // Fetch shopping list statistics for each family
-      const familiesWithStats: FamilyWithStats[] = await Promise.all(
-        familiesData.map(async (family) => {
-          const memberCount = family.members?.length || 0;
-
-          // Get shopping lists for this family
-          let shoppingListInfo = {};
-          try {
-            const sharedLists = await getFamilySharedLists(family.id);
-
-            // Calculate this week's items
-            const now = new Date();
-            const startOfWeek = new Date(now);
-            startOfWeek.setDate(now.getDate() - now.getDay());
-            startOfWeek.setHours(0, 0, 0, 0);
-
-            const thisWeekLists = (sharedLists || []).filter((list: any) => {
-              const listDate = new Date(list.created_at || list.shopping_date);
-              return listDate >= startOfWeek;
-            });
-
-            const thisWeekItems = thisWeekLists.reduce((total: number, list: any) => {
-              return total + (list.items?.length || 0);
-            }, 0);
-
-            // Calculate bought items from all lists
-            const allItems = sharedLists.reduce((total: number, list: any) => {
-              return total + (list.items?.length || 0);
-            }, 0);
-
-            const boughtItems = sharedLists.reduce((total: number, list: any) => {
-              const checked = list.items?.filter((item: any) => item.is_checked) || [];
-              return total + checked.length;
-            }, 0);
-
-            shoppingListInfo = {
-              thisWeekItems,
-              boughtItems,
-              totalItems: allItems,
-            };
-          } catch (error) {
+      // Use cached API for better performance
+      let response: Family[];
+      let fromCache = false;
+      let skipLoading = false;
+      
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        setRefreshing(true);
+        const result = await refreshCachedAccess<Family[] | { data: Family[] }>(
+          'families/my-family',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'group:families:list',
+            compareData: true,
           }
-
-          return {
+        );
+        const data = result.data;
+        response = Array.isArray(data) ? data : (data?.data || []);
+      } else {
+        // Normal fetch: check cache first, only show loading if no cache
+        const cacheKey = 'group:families:list';
+        const cachedData = await getCache<Family[] | { data: Family[] }>(cacheKey);
+        
+        if (cachedData) {
+          // We have cache, show it immediately without loading
+          fromCache = true;
+          const data = cachedData;
+          response = Array.isArray(data) ? data : (data?.data || []);
+          
+          // Set loading to false immediately before processing
+          setLoading(false);
+          setInitialLoadDone(true);
+          
+          // Set basic families data immediately (without shopping stats) to avoid showing "empty"
+          // This gives instant feedback while processing shopping stats in background
+          const basicFamilies: FamilyWithStats[] = response.map((family: Family) => ({
             ...family,
-            memberCount,
-            shoppingListInfo,
-          };
-        })
-      );
+            memberCount: family.members?.length || 0,
+            shoppingListInfo: {},
+          }));
+          setFamilies(basicFamilies);
+          
+          // Then process cached data with shopping stats (don't await - let it run in background)
+          // This way UI shows immediately
+          processFamiliesData(response).catch(() => {
+            // Silently handle errors
+          });
+          
+          // Fetch fresh data in background
+          refreshCachedAccess<Family[] | { data: Family[] }>(
+            'families/my-family',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'group:families:list',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            // Only update if data actually changed (compareData handles this)
+            if (freshResult.updated) {
+              const freshData = freshResult.data;
+              const freshFamilies = Array.isArray(freshData) ? freshData : (freshData?.data || []);
+              processFamiliesData(freshFamilies);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+          
+          // Don't continue to finally block since we already set loading = false
+          return;
+        } else {
+          // No cache, show loading and fetch from API
+          if (!initialLoadDone) {
+            setLoading(true);
+          }
+          const result = await getCachedAccess<Family[] | { data: Family[] }>(
+            'families/my-family',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'group:families:list',
+              compareData: true,
+            }
+          );
+          const data = result.data;
+          response = Array.isArray(data) ? data : (data?.data || []);
+        }
+      }
 
-      setFamilies(familiesWithStats);
+      // Process families data
+      await processFamiliesData(response);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -181,11 +270,44 @@ export default function GroupPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [handleSessionExpired]);
+  }, [handleSessionExpired, processFamiliesData]);
 
   useEffect(() => {
-    fetchFamilies();
-  }, [fetchFamilies]);
+    // Check cache first before showing loading
+    const checkCacheAndLoad = async () => {
+      const cacheKey = 'group:families:list';
+      const cachedData = await getCache<Family[] | { data: Family[] }>(cacheKey);
+      
+      if (cachedData) {
+        // We have cache, set loading to false immediately
+        setLoading(false);
+        setInitialLoadDone(true);
+        
+        // Process and display cached data immediately
+        const data = cachedData;
+        const response = Array.isArray(data) ? data : (data?.data || []);
+        
+        // Set basic families data immediately (without shopping stats) to avoid showing "empty"
+        // This gives instant feedback while processing shopping stats in background
+        const basicFamilies: FamilyWithStats[] = response.map((family: Family) => ({
+          ...family,
+          memberCount: family.members?.length || 0,
+          shoppingListInfo: {},
+        }));
+        setFamilies(basicFamilies);
+        
+        // Then process with shopping stats in background
+        processFamiliesData(response).catch(() => {
+          // Silently handle errors
+        });
+      }
+      
+      // Always fetch (will use cache if available, or fetch fresh)
+      fetchFamilies();
+    };
+    
+    checkCacheAndLoad();
+  }, [fetchFamilies, processFamiliesData]);
 
   // Load current user ID
   useEffect(() => {
@@ -242,6 +364,11 @@ export default function GroupPage() {
     setLeavingFamilyId(familyId);
     try {
       await leaveFamily(familyId);
+      
+      // Invalidate cache when leaving family
+      await clearCacheByPattern('group:families');
+      await clearCacheByPattern(`group:family:${familyId}`);
+      
       Alert.alert(
         'Thành công',
         'Bạn đã rời khỏi nhóm thành công',
@@ -250,7 +377,7 @@ export default function GroupPage() {
             text: 'OK',
             onPress: () => {
               setShowFamilyMenu(false);
-              fetchFamilies();
+              fetchFamilies(true); // Force refresh
             },
           },
         ]
@@ -317,6 +444,11 @@ export default function GroupPage() {
     setDeletingFamilyId(familyId);
     try {
       await deleteFamily(familyId);
+      
+      // Invalidate cache when deleting family
+      await clearCacheByPattern('group:families');
+      await clearCacheByPattern(`group:family:${familyId}`);
+      
       Alert.alert(
         'Thành công',
         'Nhóm đã được xóa thành công',
@@ -325,7 +457,7 @@ export default function GroupPage() {
             text: 'OK',
             onPress: () => {
               setShowFamilyMenu(false);
-              fetchFamilies();
+              fetchFamilies(true); // Force refresh
             },
           },
         ]
@@ -465,13 +597,16 @@ export default function GroupPage() {
 
       await createFamily(data);
 
+      // Invalidate cache when creating new family
+      await clearCacheByPattern('group:families');
+
       Alert.alert('Thành công', 'Đã tạo gia đình thành công!', [
         {
           text: 'OK',
           onPress: () => {
             setShowCreateModal(false);
             setNewFamilyName('');
-            fetchFamilies();
+            fetchFamilies(true); // Force refresh
           },
         },
       ]);
@@ -493,6 +628,9 @@ export default function GroupPage() {
       // Handle both direct object and wrapped response
       const result = response?.data || response;
 
+      // Invalidate cache when joining family
+      await clearCacheByPattern('group:families');
+      
       if (result?.message || result?.family) {
         Alert.alert(
           'Thành công',
@@ -502,7 +640,7 @@ export default function GroupPage() {
               text: 'OK',
               onPress: () => {
                 // Refresh families list
-                fetchFamilies();
+                fetchFamilies(true); // Force refresh
               },
             },
           ]
@@ -512,7 +650,7 @@ export default function GroupPage() {
           {
             text: 'OK',
             onPress: () => {
-              fetchFamilies();
+              fetchFamilies(true); // Force refresh
             },
           },
         ]);
@@ -643,6 +781,12 @@ export default function GroupPage() {
                 <Text style={groupStyles.retryButtonText}>Thử lại</Text>
               </TouchableOpacity>
             </View>
+          ) : !initialLoadDone && families.length === 0 ? (
+            // Don't show "empty" state if we're still loading initial data
+            <View style={groupStyles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={groupStyles.loadingText}>Đang tải...</Text>
+            </View>
           ) : families.length === 0 ? (
             <View style={groupStyles.emptyState}>
               <Ionicons name="people-outline" size={48} color={COLORS.grey} />
@@ -727,7 +871,7 @@ export default function GroupPage() {
         }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
           keyboardVerticalOffset={0}
         >

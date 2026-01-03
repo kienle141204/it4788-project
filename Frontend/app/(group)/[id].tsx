@@ -34,11 +34,13 @@ import {
 } from '../../service/shoppingList';
 import { searchIngredients } from '../../service/market';
 import { getAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern } from '../../utils/cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import GroupStatistics from '../../components/GroupStatistics';
-import { getChatMessages, sendChatMessage, type ChatMessage, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage } from '../../service/chat';
+import { getChatMessages, sendChatMessage, type ChatMessage, type ChatMessagesResponse, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage } from '../../service/chat';
 
 const defaultAvatar = require('../../assets/images/avatar.png');
 
@@ -227,13 +229,17 @@ export default function GroupDetailPage() {
   const [deletingFamily, setDeletingFamily] = useState<boolean>(false);
 
   // Chat states
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  // Extend ChatMessage with optional status for local state
+  type LocalChatMessage = ChatMessage & { status?: 'sending' | 'sent' | 'failed' };
+  const [chatMessages, setChatMessages] = useState<LocalChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const chatLastIdRef = useRef<number | null>(null);
+  const tempMessageIdRef = useRef<number>(-1); // Use negative IDs for temporary messages
+  const pendingTempMessagesRef = useRef<Map<number, { tempId: number; message: string; timestamp: number }>>(new Map()); // Track pending temp messages
 
   // Refs for scrolling
   const chatListRef = useRef<FlatList<ChatMessage>>(null);
@@ -262,72 +268,57 @@ export default function GroupDetailPage() {
       }
       setError(null);
 
-      // Fetch family details
-      const familyData = await getFamilyById(familyId);
-      // Cast to local Family type
-      setFamily({
-        id: familyData.id,
-        name: familyData.name,
-        owner_id: familyData.owner_id,
-        created_at: familyData.created_at,
-        invitation_code: (familyData as any).invitation_code || null,
-        members: familyData.members as any,
-      });
-
-      // Extract members from family object and transform to Member[] format
-      let membersData: Member[] = [];
-
-      if (familyData.members && Array.isArray(familyData.members)) {
-        membersData = familyData.members.map((member: any) => ({
-          id: member.id,
-          user_id: member.user_id,
-          role: member.role || 'member', // Đảm bảo có role, mặc định là 'member'
-          joined_at: member.joined_at,
-          user: {
-            id: member.user?.id || member.user_id,
-            full_name: member.user?.full_name || member.user?.fullname || '',
-            email: member.user?.email || '',
-            avatar_url: member.user?.avatar_url || null,
-          },
-        }));
-      }
-
-      // Đảm bảo owner có role đúng và được hiển thị
-      if (familyData.owner_id) {
-        const ownerMemberIndex = membersData.findIndex(m => m.user_id === familyData.owner_id);
-        if (ownerMemberIndex >= 0) {
-          // Owner đã có trong members, đảm bảo role là 'owner'
-          membersData[ownerMemberIndex].role = 'owner';
-        } else if (familyData.owner) {
-          // Owner chưa có trong members, thêm vào đầu danh sách
-          const ownerMember: Member = {
-            id: 0, // Temporary ID
-            user_id: familyData.owner_id,
-            role: 'owner', // Owner có role đặc biệt
-            joined_at: familyData.created_at || new Date().toISOString(),
-            user: {
-              id: familyData.owner.id || familyData.owner_id,
-              full_name: familyData.owner?.fullname || familyData.owner?.fullname || 'Người dùng',
-              email: familyData.owner.email || '',
-              avatar_url: familyData.owner.avatar_url || null,
-            },
-          };
-          membersData.unshift(ownerMember);
-        } else {
+      // Fetch family details with caching
+      let familyData: any;
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        const result = await refreshCachedAccess<any>(
+          `families/${familyId}`,
+          {},
+          {
+            ttl: CACHE_TTL.LONG,
+            cacheKey: `group:family:${familyId}`,
+            compareData: true,
+          }
+        );
+        familyData = result.data?.data || result.data;
+      } else {
+        // Normal fetch: use cache if available
+        const result = await getCachedAccess<any>(
+          `families/${familyId}`,
+          {},
+          {
+            ttl: CACHE_TTL.LONG,
+            cacheKey: `group:family:${familyId}`,
+            compareData: true,
+          }
+        );
+        familyData = result.data?.data || result.data;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<any>(
+            `families/${familyId}`,
+            {},
+            {
+              ttl: CACHE_TTL.LONG,
+              cacheKey: `group:family:${familyId}`,
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshData = freshResult.data?.data || freshResult.data;
+              // Process fresh data
+              processFamilyData(freshData);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
         }
       }
-
-
-      // Fetch shopping lists (handle error gracefully)
-      let shoppingListsData: ShoppingList[] = [];
-      try {
-        shoppingListsData = await getShoppingListsByFamily(familyId);
-      } catch (shoppingError: any) {
-        // Continue without shopping lists if endpoint fails
-      }
-
-      setMembers(membersData);
-      setShoppingLists(shoppingListsData);
+      
+      // Process family data
+      await processFamilyData(familyData);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -340,11 +331,153 @@ export default function GroupDetailPage() {
     }
   }, [familyId, handleSessionExpired]);
 
-  // Fetch only shopping lists (optimized for faster updates)
-  const fetchShoppingLists = useCallback(async () => {
+  // Process family data (extract members, shopping lists, etc.)
+  const processFamilyData = useCallback(async (familyData: any) => {
+    // Cast to local Family type
+    setFamily({
+      id: familyData.id,
+      name: familyData.name,
+      owner_id: familyData.owner_id,
+      created_at: familyData.created_at,
+      invitation_code: (familyData as any).invitation_code || null,
+      members: familyData.members as any,
+    });
+
+    // Extract members from family object and transform to Member[] format
+    let membersData: Member[] = [];
+
+    if (familyData.members && Array.isArray(familyData.members)) {
+      membersData = familyData.members.map((member: any) => ({
+        id: member.id,
+        user_id: member.user_id,
+        role: member.role || 'member', // Đảm bảo có role, mặc định là 'member'
+        joined_at: member.joined_at,
+        user: {
+          id: member.user?.id || member.user_id,
+          full_name: member.user?.full_name || member.user?.fullname || '',
+          email: member.user?.email || '',
+          avatar_url: member.user?.avatar_url || null,
+        },
+      }));
+    }
+
+    // Đảm bảo owner có role đúng và được hiển thị
+    if (familyData.owner_id) {
+      const ownerMemberIndex = membersData.findIndex(m => m.user_id === familyData.owner_id);
+      if (ownerMemberIndex >= 0) {
+        // Owner đã có trong members, đảm bảo role là 'owner'
+        membersData[ownerMemberIndex].role = 'owner';
+      } else if (familyData.owner) {
+        // Owner chưa có trong members, thêm vào đầu danh sách
+        const ownerMember: Member = {
+          id: 0, // Temporary ID
+          user_id: familyData.owner_id,
+          role: 'owner', // Owner có role đặc biệt
+          joined_at: familyData.created_at || new Date().toISOString(),
+          user: {
+            id: familyData.owner.id || familyData.owner_id,
+            full_name: familyData.owner?.fullname || familyData.owner?.fullname || 'Người dùng',
+            email: familyData.owner.email || '',
+            avatar_url: familyData.owner.avatar_url || null,
+          },
+        };
+        membersData.unshift(ownerMember);
+      } else {
+      }
+    }
+
+    // Fetch shopping lists with caching (handle error gracefully)
+    let shoppingListsData: ShoppingList[] = [];
     try {
-      const shoppingListsData = await getShoppingListsByFamily(familyId);
-      setShoppingLists(shoppingListsData);
+      const result = await getCachedAccess<ShoppingList[]>(
+        `shopping-lists/my-family-shared/${familyId}`,
+        {},
+        {
+          ttl: CACHE_TTL.MEDIUM,
+          cacheKey: `group:family:${familyId}:shopping-lists`,
+          compareData: true,
+        }
+      );
+      shoppingListsData = Array.isArray(result.data) ? result.data : [];
+      
+      // If we got data from cache, fetch fresh data in background
+      if (result.fromCache) {
+        refreshCachedAccess<ShoppingList[]>(
+          `shopping-lists/my-family-shared/${familyId}`,
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: `group:family:${familyId}:shopping-lists`,
+            compareData: true,
+          }
+        ).then((freshResult) => {
+          if (freshResult.updated) {
+            const freshData = Array.isArray(freshResult.data) ? freshResult.data : [];
+            setShoppingLists(freshData);
+          }
+        }).catch(() => {
+          // Silently fail background refresh
+        });
+      }
+    } catch (shoppingError: any) {
+      // Continue without shopping lists if endpoint fails
+    }
+
+    setMembers(membersData);
+    setShoppingLists(shoppingListsData);
+  }, [familyId]);
+
+  // Fetch only shopping lists (optimized for faster updates) with caching
+  const fetchShoppingLists = useCallback(async (isRefreshing = false) => {
+    try {
+      let result;
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        result = await refreshCachedAccess<ShoppingList[]>(
+          `shopping-lists/my-family-shared/${familyId}`,
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: `group:family:${familyId}:shopping-lists`,
+            compareData: true,
+          }
+        );
+        const shoppingListsData = Array.isArray(result.data) ? result.data : [];
+        setShoppingLists(shoppingListsData);
+      } else {
+        // Normal fetch: use cache if available
+        result = await getCachedAccess<ShoppingList[]>(
+          `shopping-lists/my-family-shared/${familyId}`,
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: `group:family:${familyId}:shopping-lists`,
+            compareData: true,
+          }
+        );
+        const shoppingListsData = Array.isArray(result.data) ? result.data : [];
+        setShoppingLists(shoppingListsData);
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<ShoppingList[]>(
+            `shopping-lists/my-family-shared/${familyId}`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `group:family:${familyId}:shopping-lists`,
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshData = Array.isArray(freshResult.data) ? freshResult.data : [];
+              setShoppingLists(freshData);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
     } catch (error) {
       // Don't show error to user, just log it
     }
@@ -405,6 +538,11 @@ export default function GroupDetailPage() {
     setLeavingFamily(true);
     try {
       await leaveFamily(family.id);
+      
+      // Invalidate cache when leaving family
+      await clearCacheByPattern('group:families');
+      await clearCacheByPattern(`group:family:${family.id}`);
+      
       Alert.alert(
         'Thành công',
         'Bạn đã rời khỏi nhóm thành công',
@@ -481,6 +619,11 @@ export default function GroupDetailPage() {
     setDeletingFamily(true);
     try {
       await deleteFamily(family.id);
+      
+      // Invalidate cache when deleting family
+      await clearCacheByPattern('group:families');
+      await clearCacheByPattern(`group:family:${family.id}`);
+      
       Alert.alert(
         'Thành công',
         'Nhóm đã được xóa thành công',
@@ -611,12 +754,27 @@ export default function GroupDetailPage() {
   const fetchMemberProfile = useCallback(async (userId: number) => {
     setLoadingMemberProfile(true);
     try {
-      const payload = await getAccess(`users/${userId}`);
+      // Use cached API for user profile
+      const result = await getCachedAccess<any>(
+        `users/${userId}`,
+        {},
+        {
+          ttl: CACHE_TTL.LONG,
+          cacheKey: `user:profile:${userId}`,
+          compareData: true,
+        }
+      );
+      
+      const payload = result.data;
       if (payload?.success !== false && payload?.data) {
         setMemberProfile(payload.data);
         setShowMemberProfileModal(true);
-      } else {
+      } else if (payload && !payload.success) {
         throw new Error(payload?.message || 'Không thể tải thông tin thành viên');
+      } else {
+        // Handle direct data response
+        setMemberProfile(payload);
+        setShowMemberProfileModal(true);
       }
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
@@ -733,21 +891,63 @@ export default function GroupDetailPage() {
     }
     try {
       const lastId = loadMore ? chatLastIdRef.current : undefined;
-      const response = await getChatMessages(familyId, 30, lastId ?? undefined);
-
+      
+      // For chat messages, use shorter TTL since they're real-time
+      // Only cache initial load, not pagination
       if (loadMore) {
+        // Load more: always fetch fresh (no cache for pagination)
+        const response = await getChatMessages(familyId, 10, lastId ?? undefined);
+        
         // Prepend older messages - don't scroll
         shouldScrollToEndRef.current = false;
-        setChatMessages(prev => [...response.data, ...prev]);
+        setChatMessages(prev => [
+          ...response.data.map((msg): LocalChatMessage => ({ ...msg, status: 'sent' })),
+          ...prev
+        ]);
+        setHasMoreMessages(response.pagination.hasMore);
+        chatLastIdRef.current = response.pagination.lastId;
       } else {
+        // Initial load: use cache with short TTL, only load 10 most recent messages
+        const cacheKey = `group:family:${familyId}:chat:messages`;
+        const result = await getCachedAccess<ChatMessagesResponse>(
+          `chat/family/${familyId}?limit=10`,
+          {},
+          {
+            ttl: CACHE_TTL.SHORT, // Short TTL for real-time chat
+            cacheKey,
+            compareData: true,
+          }
+        );
+        
+        const response = result.data;
         // Initial load - scroll to end
         shouldScrollToEndRef.current = true;
-        setChatMessages(response.data);
+        setChatMessages((response.data || []).map((msg): LocalChatMessage => ({ ...msg, status: 'sent' })));
+        setHasMoreMessages(response.pagination?.hasMore || false);
+        chatLastIdRef.current = response.pagination?.lastId || null;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<ChatMessagesResponse>(
+            `chat/family/${familyId}?limit=10`,
+            {},
+            {
+              ttl: CACHE_TTL.SHORT,
+              cacheKey,
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshResponse = freshResult.data;
+              setChatMessages((freshResponse.data || []).map((msg): LocalChatMessage => ({ ...msg, status: 'sent' })));
+              setHasMoreMessages(freshResponse.pagination?.hasMore || false);
+              chatLastIdRef.current = freshResponse.pagination?.lastId || null;
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
       }
-
-      setHasMoreMessages(response.pagination.hasMore);
-      // Update cursor ref
-      chatLastIdRef.current = response.pagination.lastId;
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -775,20 +975,89 @@ export default function GroupDetailPage() {
         unsubscribeNewMessage = onNewMessage((message) => {
           console.log('[Chat] New message received:', message);
           setChatMessages((prev) => {
-            // Avoid duplicates
-            if (prev.some((m) => m.id === message.id)) {
+            // Check if this is replacing a temporary message (sending status)
+            // Use currentUserId from closure - it will be the value when effect runs
+            const isOwnMessage = String(message.userId) === String(currentUserId);
+            
+            // First check: avoid duplicates by message ID
+            if (prev.some((m) => m.id === message.id && m.id > 0)) {
               return prev;
             }
-            return [...prev, {
-              id: message.id,
-              userId: message.userId,
-              title: message.title,
-              message: message.message,
-              data: message.data,
-              isRead: false,
-              familyId: message.familyId,
-              createdAt: message.createdAt,
-            }];
+            
+            if (isOwnMessage) {
+              // Try to find and replace temporary message
+              // Check pending temp messages first for more accurate matching
+              let tempMessageIndex = -1;
+              let matchedPendingEntry: { tempId: number; message: string; timestamp: number } | null = null;
+              
+              // Find matching pending temp message
+              for (const [timestamp, pending] of pendingTempMessagesRef.current.entries()) {
+                if (pending.message === message.message && pending.tempId < 0) {
+                  matchedPendingEntry = pending;
+                  // Find the temp message in the list
+                  tempMessageIndex = prev.findIndex((m) => m.id === pending.tempId);
+                  if (tempMessageIndex !== -1) {
+                    break;
+                  }
+                }
+              }
+              
+              // If not found via pending map, try fallback matching
+              if (tempMessageIndex === -1) {
+                tempMessageIndex = prev.findIndex(
+                  (m) => m.status === 'sending' && 
+                  m.userId === message.userId && 
+                  m.message === message.message &&
+                  m.id < 0 // Only match temporary messages (negative IDs)
+                );
+              }
+              
+              if (tempMessageIndex !== -1) {
+                // Replace the temporary message
+                const updated = [...prev];
+                updated[tempMessageIndex] = {
+                  id: message.id,
+                  userId: message.userId,
+                  title: message.title,
+                  message: message.message,
+                  data: message.data,
+                  isRead: false,
+                  familyId: message.familyId,
+                  createdAt: message.createdAt,
+                  status: 'sent',
+                };
+                
+                // Clean up pending temp message if found
+                if (matchedPendingEntry) {
+                  for (const [timestamp, pending] of pendingTempMessagesRef.current.entries()) {
+                    if (pending.tempId === matchedPendingEntry.tempId) {
+                      pendingTempMessagesRef.current.delete(timestamp);
+                      break;
+                    }
+                  }
+                }
+                
+                return updated;
+              }
+            }
+            
+            // If not own message or no temp message found, add as new message
+            // But double-check we don't already have it
+            if (!prev.some((m) => m.id === message.id)) {
+              return [...prev, {
+                id: message.id,
+                userId: message.userId,
+                title: message.title,
+                message: message.message,
+                data: message.data,
+                isRead: false,
+                familyId: message.familyId,
+                createdAt: message.createdAt,
+                status: 'sent',
+              }];
+            }
+            
+            return prev;
           });
         });
 
@@ -812,11 +1081,13 @@ export default function GroupDetailPage() {
       disconnectChatSocket();
       console.log('[Chat] Socket cleanup completed');
     };
-  }, [familyId]);
+  }, [familyId, currentUserId]);
 
   // Join/leave room when tab changes
   useEffect(() => {
     if (activeTab === 'chat') {
+      // Reset scroll position flag when switching to chat tab
+      shouldScrollToEndRef.current = true;
       fetchChatMessages();
       joinChatRoom(familyId);
     } else {
@@ -824,18 +1095,48 @@ export default function GroupDetailPage() {
     }
   }, [activeTab, familyId, fetchChatMessages]);
 
-  // Auto-scroll to bottom when chat messages are loaded
+  // Auto-scroll to bottom when chat messages are loaded or tab is opened
   useEffect(() => {
-    if (chatMessages.length > 0 && activeTab === 'chat' && !chatLoading) {
-      // Increase delay to ensure FlatList has rendered
-      setTimeout(() => {
-        chatListRef.current?.scrollToEnd({ animated: true });
-      }, 300); // Tăng từ 100ms lên 300ms để đảm bảo FlatList đã render xong
+    if (activeTab === 'chat' && chatMessages.length > 0 && !chatLoading) {
+      // Use requestAnimationFrame to ensure FlatList is fully rendered
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          chatListRef.current?.scrollToEnd({ animated: false });
+        }, 100);
+      });
     }
   }, [chatMessages, activeTab, chatLoading]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage) return;
+
+    const messageText = newMessage.trim();
+    const tempId = tempMessageIdRef.current--;
+    const timestamp = Date.now();
+    
+    // Track this temp message
+    pendingTempMessagesRef.current.set(timestamp, { tempId, message: messageText, timestamp });
+    
+    // Add message immediately with "sending" status
+    const tempMessage: LocalChatMessage = {
+      id: tempId,
+      userId: currentUserId!,
+      title: 'Tin nhắn',
+      message: messageText,
+      isRead: false,
+      familyId,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+    };
+
+    setChatMessages((prev) => [...prev, tempMessage]);
+    setNewMessage('');
+    
+    // Scroll to bottom immediately
+    shouldScrollToEndRef.current = true;
+    setTimeout(() => {
+      chatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
 
     setSendingMessage(true);
     try {
@@ -843,44 +1144,111 @@ export default function GroupDetailPage() {
       const result = await sendMessageWS({
         familyId,
         title: 'Tin nhắn',
-        message: newMessage.trim(),
+        message: messageText,
       });
 
       if (result.success) {
-        setNewMessage('');
-        // Message will be received via onNewMessage listener, no need to fetch
-        // Scroll to bottom after sending message
-        shouldScrollToEndRef.current = true;
+        // Message will be received via onNewMessage listener and replace the temp message
+        // Clean up after 5 seconds if message not received
         setTimeout(() => {
-          chatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+          const pending = pendingTempMessagesRef.current.get(timestamp);
+          if (pending) {
+            pendingTempMessagesRef.current.delete(timestamp);
+            setChatMessages((prev) => {
+              const tempIndex = prev.findIndex((m) => m.id === pending.tempId);
+              if (tempIndex !== -1 && prev[tempIndex].status === 'sending') {
+                // If still sending, update status to sent (message was sent successfully)
+                const updated = [...prev];
+                updated[tempIndex] = { ...updated[tempIndex], status: 'sent' };
+                return updated;
+              }
+              return prev;
+            });
+          }
+        }, 5000);
       } else {
         // Fallback to REST API if WebSocket fails
-        await sendChatMessage({
-          familyId,
-          title: 'Tin nhắn',
-          message: newMessage.trim(),
-        });
-        setNewMessage('');
-        shouldScrollToEndRef.current = true;
-        await fetchChatMessages();
-        // Scroll to bottom after sending message
-        setTimeout(() => {
-          chatListRef.current?.scrollToEnd({ animated: true });
-        }, 200);
+        try {
+          const sentMessage = await sendChatMessage({
+            familyId,
+            title: 'Tin nhắn',
+            message: messageText,
+          });
+          
+          // Replace temp message with real one
+          setChatMessages((prev) => {
+            const tempIndex = prev.findIndex((m) => m.id === tempId);
+            if (tempIndex !== -1) {
+              const updated = [...prev];
+              updated[tempIndex] = {
+                ...sentMessage,
+                status: 'sent',
+              };
+              return updated;
+            }
+            // If temp message not found, check if we already have this message (avoid duplicate)
+            if (!prev.some((m) => m.id === sentMessage.id)) {
+              return [...prev, { ...sentMessage, status: 'sent' }];
+            }
+            return prev;
+          });
+          
+          // Clean up pending temp message
+          for (const [ts, pending] of pendingTempMessagesRef.current.entries()) {
+            if (pending.tempId === tempId) {
+              pendingTempMessagesRef.current.delete(ts);
+              break;
+            }
+          }
+          
+          // Invalidate chat cache when sending message via REST API
+          await clearCacheByPattern(`group:family:${familyId}:chat:messages`);
+        } catch (restErr) {
+          // Mark as failed
+          setChatMessages((prev) => {
+            const tempIndex = prev.findIndex((m) => m.id === tempId);
+            if (tempIndex !== -1) {
+              const updated = [...prev];
+              updated[tempIndex] = { ...updated[tempIndex], status: 'failed' };
+              return updated;
+            }
+            return prev;
+          });
+          throw restErr;
+        }
       }
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
         return;
       }
+      // Mark message as failed
+      setChatMessages((prev) => {
+        const tempIndex = prev.findIndex((m) => m.id === tempId);
+        if (tempIndex !== -1) {
+          const updated = [...prev];
+          updated[tempIndex] = { ...updated[tempIndex], status: 'failed' };
+          return updated;
+        }
+        return prev;
+      });
       Alert.alert('Lỗi', 'Không thể gửi tin nhắn. Vui lòng thử lại.');
     } finally {
       setSendingMessage(false);
     }
   };
 
-  const formatChatTime = (dateString: string) => {
+  const formatChatTime = (dateString: string, status?: 'sending' | 'sent' | 'failed') => {
+    // Show "Đang gửi..." if message is still sending
+    if (status === 'sending') {
+      return 'Đang gửi...';
+    }
+    
+    // Show "Gửi thất bại" if message failed
+    if (status === 'failed') {
+      return 'Gửi thất bại';
+    }
+
     // Convert to Vietnam timezone (UTC+7)
     const utcDate = new Date(dateString);
     const vietnamOffset = 7 * 60 * 60 * 1000; // 7 hours in milliseconds
@@ -912,7 +1280,7 @@ export default function GroupDetailPage() {
     return members.find(m => String(m.user_id) === String(userId)) || null;
   }, [members]);
 
-  const renderChatMessage = ({ item }: { item: ChatMessage }) => {
+  const renderChatMessage = ({ item }: { item: LocalChatMessage }) => {
     const member = getMemberByUserId(item.userId);
     // Use == for type coercion or explicitly convert to same type
     const isOwnMessage = String(item.userId) === String(currentUserId);
@@ -942,7 +1310,7 @@ export default function GroupDetailPage() {
           )}
           <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
           <Text style={[groupStyles.chatMessageTime, { textAlign: 'right', marginTop: 6 }]}>
-            {formatChatTime(item.createdAt)}
+            {formatChatTime(item.createdAt, item.status)}
           </Text>
         </View>
       );
@@ -977,7 +1345,7 @@ export default function GroupDetailPage() {
               {senderName}
             </Text>
             <Text style={groupStyles.chatMessageTime}>
-              {formatChatTime(item.createdAt)}
+              {formatChatTime(item.createdAt, item.status)}
             </Text>
           </View>
         </View>
@@ -1003,7 +1371,7 @@ export default function GroupDetailPage() {
       <KeyboardAvoidingView
         style={groupStyles.chatContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={0}
       >
         {chatMessages.length === 0 ? (
           <View style={groupStyles.chatEmptyState}>
@@ -1018,13 +1386,13 @@ export default function GroupDetailPage() {
             </Text>
           </View>
         ) : (
-          <FlatList
+          <FlatList<LocalChatMessage>
             ref={chatListRef}
             data={[...chatMessages].sort((a, b) =>
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             )}
             renderItem={renderChatMessage}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => `${item.id}-${item.status || 'sent'}`}
             style={groupStyles.chatMessagesList}
             contentContainerStyle={groupStyles.chatMessagesContent}
             showsVerticalScrollIndicator={false}
@@ -1035,17 +1403,22 @@ export default function GroupDetailPage() {
             }}
             onContentSizeChange={(_, contentHeight) => {
               if (shouldScrollToEndRef.current && contentHeight > 0) {
-                chatListRef.current?.scrollToEnd({ animated: false });
-                // Reset after initial scroll
-                setTimeout(() => {
-                  shouldScrollToEndRef.current = false;
-                }, 100);
+                // Scroll to end immediately when content size changes
+                requestAnimationFrame(() => {
+                  chatListRef.current?.scrollToEnd({ animated: false });
+                  // Reset after initial scroll
+                  setTimeout(() => {
+                    shouldScrollToEndRef.current = false;
+                  }, 100);
+                });
               }
             }}
             onScroll={(event) => {
               const { contentOffset } = event.nativeEvent;
-              // Auto load more when scroll to top (< 50px from top)
-              if (contentOffset.y < 50 && hasMoreMessages && !loadingMoreMessages && !chatLoading) {
+              // Calculate distance from top
+              const scrollPosition = contentOffset.y;
+              // Auto load more when scroll near top (< 100px from top)
+              if (scrollPosition < 100 && hasMoreMessages && !loadingMoreMessages && !chatLoading) {
                 fetchChatMessages(true);
               }
             }}
@@ -1092,11 +1465,7 @@ export default function GroupDetailPage() {
             onPress={handleSendMessage}
             disabled={!newMessage.trim() || sendingMessage}
           >
-            {sendingMessage ? (
-              <ActivityIndicator size="small" color={COLORS.white} />
-            ) : (
-              <Ionicons name="send" size={20} color={COLORS.white} />
-            )}
+            <Ionicons name="send" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -1216,8 +1585,11 @@ export default function GroupDetailPage() {
     try {
       await createShoppingList(familyId, dateStr, ownerId);
       
+      // Invalidate cache when creating shopping list
+      await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+      
       // Fetch fresh data from API to ensure consistency
-      await fetchShoppingLists();
+      await fetchShoppingLists(true);
     } catch (error) {
       // Remove optimistic list on error
       setShoppingLists(prevLists => 
@@ -1254,8 +1626,12 @@ export default function GroupDetailPage() {
 
             try {
               await deleteShoppingList(listId);
+              
+              // Invalidate cache when deleting shopping list
+              await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+              
               // Only fetch shopping lists (much faster)
-              await fetchShoppingLists();
+              await fetchShoppingLists(true);
               Alert.alert('Thành công', 'Đã xóa danh sách mua sắm');
             } catch (error) {
               // Rollback on error
@@ -1356,7 +1732,20 @@ export default function GroupDetailPage() {
 
     // Create optimistic item with temporary negative ID
     const tempId = Date.now() * -1;
-    const itemCost = (price || ingredient.price || 0) * stock / 1000;
+    
+    // Calculate item cost: use newItemPrice (total price) if available, otherwise calculate from price per kg
+    let itemCost = 0;
+    if (newItemPrice && newItemPrice.trim() !== '') {
+      // Use the total price entered by user (remove any formatting, parse as number)
+      const cleanPrice = newItemPrice.replace(/[^\d.]/g, '');
+      itemCost = parseFloat(cleanPrice) || 0;
+    } else {
+      // Calculate from price per kg and stock
+      itemCost = (price || ingredient.price || 0) * stock / 1000;
+    }
+    
+    // Round to avoid floating point issues
+    itemCost = Math.round(itemCost);
     const optimisticItem: ShoppingItem = {
       id: tempId,
       list_id: listId,
@@ -1374,6 +1763,29 @@ export default function GroupDetailPage() {
       },
     };
 
+    // Update local state IMMEDIATELY before closing modal (optimistic update)
+    // This ensures cost updates instantly, just like delete does
+    // Force immediate update by using functional setState with explicit calculation
+    setShoppingLists(prevLists => {
+      const updatedLists = prevLists.map(list => {
+        if (Number(list.id) === Number(listId)) {
+          const currentCost = Number(list.cost) || 0;
+          const newCost = Math.round(currentCost + itemCost);
+          
+          // Return new object to force re-render
+          return {
+            ...list,
+            items: [...(list.items || []), optimisticItem],
+            cost: newCost,
+          };
+        }
+        return list;
+      });
+      
+      // Return new array reference to force React to re-render
+      return updatedLists;
+    });
+
     // Close modal immediately for better UX
     setShowAddItemModal(false);
 
@@ -1386,42 +1798,95 @@ export default function GroupDetailPage() {
     setIngredientSearchTerm('');
     setSearchedIngredients([]);
 
-    // Update local state immediately (optimistic update)
-    setShoppingLists(prevLists =>
-      prevLists.map(list =>
-        Number(list.id) === Number(listId)
-          ? {
-            ...list,
-            items: [...(list.items || []), optimisticItem],
-            cost: list.cost + itemCost,
-          }
-          : list
-      )
-    );
-
-    // Call API in background
-    try {
-      const newItem = await addItemToList(listId, ingredientId, stock, price);
-      
-      // Fetch fresh data from API to ensure consistency
-      await fetchShoppingLists();
-    } catch (error) {
-      // Rollback optimistic update on error
-      setShoppingLists(prevLists =>
-        prevLists.map(list =>
-          Number(list.id) === Number(listId)
-            ? {
-              ...list,
-              items: list.items.filter(item => item.id !== tempId),
-              cost: originalCost,
+    // Call API in background (don't await to keep UI responsive)
+    addItemToList(listId, ingredientId, stock, price)
+      .then((newItem) => {
+        // Invalidate cache when adding item
+        clearCacheByPattern(`group:family:${familyId}:shopping-lists`).catch(() => {});
+        
+        // Update optimistic item with real ID from server, but PRESERVE optimistic cost
+        // Don't let server data overwrite the cost that user just saw
+        if (newItem) {
+          setShoppingLists(prevLists =>
+            prevLists.map(list => {
+              if (Number(list.id) === Number(listId)) {
+                // Get current optimistic cost before updating
+                const optimisticCost = list.cost;
+                
+                return {
+                  ...list,
+                  items: list.items.map(item => 
+                    item.id === tempId 
+                      ? { ...newItem, ingredient: optimisticItem.ingredient }
+                      : item
+                  ),
+                  // CRITICAL: Keep the optimistic cost - don't let server overwrite it
+                  cost: optimisticCost,
+                };
+              }
+              return list;
+            })
+          );
+        }
+        
+        // Don't fetch all lists immediately - it would overwrite optimistic cost
+        // Only sync with server after a long delay, and only if user hasn't interacted
+        // The optimistic cost is already correct, server will sync eventually
+        setTimeout(() => {
+          // Silently sync in background without overwriting optimistic cost
+          refreshCachedAccess<ShoppingList[]>(
+            `shopping-lists/my-family-shared/${familyId}`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: `group:family:${familyId}:shopping-lists`,
+              compareData: true,
             }
-            : list
-        )
-      );
-      
-      // Show error notification
-      Alert.alert('Lỗi', 'Không thể thêm mặt hàng. Vui lòng thử lại.');
-    }
+          ).then((result) => {
+            const serverData = Array.isArray(result.data) ? result.data : [];
+            
+            // Merge: update items from server but preserve optimistic cost
+            setShoppingLists(prevLists => {
+              return prevLists.map(list => {
+                if (Number(list.id) === Number(listId)) {
+                  const serverList = serverData.find(sl => Number(sl.id) === Number(listId));
+                  if (serverList) {
+                    // Merge server items but keep optimistic cost
+                    return {
+                      ...serverList,
+                      cost: list.cost, // Preserve optimistic cost
+                      items: serverList.items || list.items,
+                    };
+                  }
+                  return list;
+                }
+                // For other lists, use server data
+                const serverList = serverData.find(sl => Number(sl.id) === Number(list.id));
+                return serverList || list;
+              });
+            });
+          }).catch(() => {
+            // Silently fail, optimistic update is already shown
+          });
+        }, 5000); // Long delay to ensure user sees immediate update
+      })
+      .catch((error) => {
+        // Rollback optimistic update on error
+        setShoppingLists(prevLists =>
+          prevLists.map(list =>
+            Number(list.id) === Number(listId)
+              ? {
+                  ...list,
+                  items: list.items.filter(item => item.id !== tempId),
+                  cost: originalCost,
+                }
+              : list
+          )
+        );
+        
+        // Show error notification
+        Alert.alert('Lỗi', 'Không thể thêm mặt hàng. Vui lòng thử lại.');
+      });
   };
 
   // Handle toggle item checked (optimized with optimistic update)
@@ -1443,8 +1908,12 @@ export default function GroupDetailPage() {
 
     try {
       await toggleItemChecked(itemId);
+      
+      // Invalidate cache when toggling item
+      await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+      
       // Only fetch shopping lists (much faster)
-      await fetchShoppingLists();
+      await fetchShoppingLists(true);
     } catch (error) {
       // Rollback on error
       await fetchShoppingLists();
@@ -1474,10 +1943,11 @@ export default function GroupDetailPage() {
                 if (item) {
                   deletedItem = item;
                   listId = list.id;
+                  const itemCost = (item.price || 0) * item.stock / 1000;
                   return {
                     ...list,
                     items: list.items?.filter(i => i.id !== itemId) || [],
-                    cost: list.cost - ((item.price || 0) * item.stock / 1000),
+                    cost: Math.round((list.cost || 0) - itemCost),
                   };
                 }
                 return list;
@@ -1486,8 +1956,12 @@ export default function GroupDetailPage() {
 
             try {
               await deleteShoppingItem(itemId);
+              
+              // Invalidate cache when deleting item
+              await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+              
               // Only fetch shopping lists (much faster)
-              await fetchShoppingLists();
+              await fetchShoppingLists(true);
             } catch (error) {
               // Rollback on error
               if (deletedItem && listId) {
@@ -1592,8 +2066,11 @@ export default function GroupDetailPage() {
         price: price,
       });
       
+      // Invalidate cache when updating item
+      await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+      
       // Fetch fresh data from API to ensure consistency
-      await fetchShoppingLists();
+      await fetchShoppingLists(true);
     } catch (error) {
       // Rollback optimistic update on error
       if (originalItem && listId) {
@@ -1898,7 +2375,14 @@ export default function GroupDetailPage() {
 
                 <View style={groupStyles.shoppingItemsContainer}>
                   {list.items && list.items.length > 0 ? (
-                    list.items.map(item => renderShoppingItem(item, list))
+                    // Sort items: oldest first (top), newest last (bottom)
+                    [...list.items]
+                      .sort((a, b) => {
+                        const dateA = new Date(a.created_at || 0).getTime();
+                        const dateB = new Date(b.created_at || 0).getTime();
+                        return dateA - dateB; // Ascending: older items first
+                      })
+                      .map(item => renderShoppingItem(item, list))
                   ) : (
                     <Text style={groupStyles.emptyShoppingText}>
                       Chưa có mặt hàng nào

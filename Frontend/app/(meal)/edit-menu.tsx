@@ -20,6 +20,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { mealStyles } from '../../styles/meal.styles';
 import { getAccess, postAccess, patchAccess, deleteAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern } from '../../utils/cache';
 
 interface Family {
   id: string;
@@ -84,8 +86,18 @@ export default function EditMenuPage() {
     if (!menuId) return;
     setLoadingMenu(true);
     try {
-      const payload = await getAccess(`menus/${menuId}`);
-
+      // Use cached API for menu details
+      const result = await getCachedAccess<any>(
+        `menus/${menuId}`,
+        {},
+        {
+          ttl: CACHE_TTL.MEDIUM,
+          cacheKey: `meal:menu:${menuId}`,
+          compareData: true,
+        }
+      );
+      
+      const payload = result.data;
       if (!payload?.success) {
         throw new Error(payload?.message || 'Không thể tải thông tin thực đơn');
       }
@@ -187,6 +199,8 @@ export default function EditMenuPage() {
       try {
         const payload = await deleteAccess(`menus/dishes/${selectedDish.menuDishId}`);
         if (payload?.success !== false) {
+          // Invalidate cache when deleting dish from menu
+          await clearCacheByPattern(`meal:menu:${menuId}`);
           setSelectedDishes(prev => prev.filter(sd => sd.dish.id !== selectedDish.dish.id));
         } else {
           throw new Error(payload?.message || 'Không thể xóa món ăn');
@@ -218,6 +232,9 @@ export default function EditMenuPage() {
         await patchAccess(`menus/dishes/${selectedDish.menuDishId}`, {
           [field]: value,
         });
+        
+        // Invalidate cache when updating dish in menu
+        await clearCacheByPattern(`meal:menu:${menuId}`);
       } catch (err: any) {
         if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
           handleSessionExpired();
@@ -271,6 +288,10 @@ export default function EditMenuPage() {
         );
         await Promise.all(addDishPromises);
       }
+
+      // Invalidate cache when updating menu
+      await clearCacheByPattern('meal:menus');
+      await clearCacheByPattern(`meal:menu:${menuId}`);
 
       Alert.alert('Thành công', 'Cập nhật thực đơn thành công', [
         {
