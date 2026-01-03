@@ -11,6 +11,8 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -723,116 +725,150 @@ export default function GroupPage() {
           setNewFamilyName('');
         }}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            justifyContent: 'flex-end',
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
         >
           <View
             style={{
-              backgroundColor: COLORS.white,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              padding: 20,
-              maxHeight: '50%',
+              flex: 1,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              justifyContent: 'flex-end',
             }}
           >
             <View
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 20,
+                backgroundColor: COLORS.white,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 24,
+                maxHeight: '50%',
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: -2,
+                },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                elevation: 10,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  color: COLORS.darkGrey,
-                }}
-              >
-                Tạo gia đình mới
-              </Text>
-              <TouchableOpacity onPress={() => {
-                setShowCreateModal(false);
-                setNewFamilyName('');
-              }}>
-                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ marginBottom: 20 }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: COLORS.darkGrey,
-                  marginBottom: 8,
-                }}
-              >
-                Tên gia đình <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
-              </Text>
-              <TextInput
-                style={{
-                  backgroundColor: COLORS.background || '#F5F5F5',
-                  borderRadius: 12,
-                  padding: 16,
-                  fontSize: 16,
-                  borderWidth: 1,
-                  borderColor: COLORS.background || '#E5E5E5',
-                }}
-                placeholder="Nhập tên gia đình"
-                value={newFamilyName}
-                onChangeText={setNewFamilyName}
-                placeholderTextColor={COLORS.grey}
-              />
-            </View>
-
-            <View
-              style={{
-                backgroundColor: '#E0F2FE',
-                borderRadius: 12,
-                padding: 12,
-                marginBottom: 20,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <Ionicons name="information-circle" size={18} color="#0EA5E9" style={{ marginRight: 8, marginTop: 2 }} />
-                <Text style={{ fontSize: 12, color: '#0369A1', flex: 1, lineHeight: 16 }}>
-                  Bạn sẽ trở thành chủ hộ của gia đình này
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={{
-                backgroundColor: COLORS.purple || '#A855F7',
-                borderRadius: 12,
-                padding: 16,
-                alignItems: 'center',
-              }}
-              onPress={handleCreateFamily}
-              disabled={creatingFamily}
-            >
-              {creatingFamily ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text
+                <View
                   style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: COLORS.white,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 24,
                   }}
                 >
-                  Tạo gia đình
-                </Text>
-              )}
-            </TouchableOpacity>
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 'bold',
+                      color: COLORS.darkGrey,
+                    }}
+                  >
+                    Tạo gia đình mới
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowCreateModal(false);
+                      setNewFamilyName('');
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      padding: 4,
+                      borderRadius: 20,
+                      backgroundColor: COLORS.lightGrey,
+                    }}
+                  >
+                    <Ionicons name="close" size={20} color={COLORS.darkGrey} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ marginBottom: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: COLORS.darkGrey,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Tên gia đình <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: COLORS.lightGrey || '#F5F5F5',
+                      borderRadius: 12,
+                      padding: 16,
+                      fontSize: 16,
+                      borderWidth: 1,
+                      borderColor: COLORS.lightGrey || '#E5E5E5',
+                      color: COLORS.darkGrey,
+                    }}
+                    placeholder="Nhập tên gia đình"
+                    value={newFamilyName}
+                    onChangeText={setNewFamilyName}
+                    placeholderTextColor={COLORS.grey}
+                  />
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: COLORS.lightBlue || '#E0F2FE',
+                    borderRadius: 12,
+                    padding: 14,
+                    marginBottom: 24,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#0EA5E9',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <Ionicons name="information-circle" size={18} color="#0EA5E9" style={{ marginRight: 10, marginTop: 2 }} />
+                    <Text style={{ fontSize: 13, color: '#0369A1', flex: 1, lineHeight: 18 }}>
+                      Bạn sẽ trở thành chủ hộ của gia đình này
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: COLORS.primary || COLORS.green || '#15803D',
+                    borderRadius: 12,
+                    padding: 16,
+                    alignItems: 'center',
+                    shadowColor: COLORS.primary || COLORS.green || '#15803D',
+                    shadowOffset: {
+                      width: 0,
+                      height: 4,
+                    },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 5,
+                  }}
+                  onPress={handleCreateFamily}
+                  disabled={creatingFamily}
+                  activeOpacity={0.8}
+                >
+                  {creatingFamily ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: COLORS.white,
+                      }}
+                    >
+                      Tạo gia đình
+                    </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

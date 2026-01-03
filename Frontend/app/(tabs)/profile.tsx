@@ -213,6 +213,13 @@ export default function ProfileScreen() {
             },
           },
           {
+            label: 'Debug Push Notification',
+            icon: 'bug-outline',
+            onPress: () => {
+              router.push('/(profile)/debug-push' as any);
+            },
+          },
+          {
             label: 'Đăng xuất',
             icon: 'log-out-outline',
             destructive: true,

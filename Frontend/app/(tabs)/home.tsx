@@ -116,25 +116,31 @@ export default function HomePage() {
     }, [fetchProfile, fetchTodayTasks, refreshNotifications])
   );
 
-  useEffect(() => {
-    const backAction = () => {
-      if (backPressCount.current === 0) {
-        backPressCount.current += 1;
-        ToastAndroid.show('Nhấn quay lại lần nữa để thoát ứng dụng', ToastAndroid.SHORT);
+  // Xử lý nút back - chỉ hoạt động khi đang ở trang home
+  useFocusEffect(
+    useCallback(() => {
+      const backAction = () => {
+        if (backPressCount.current === 0) {
+          backPressCount.current += 1;
+          ToastAndroid.show('Nhấn quay lại lần nữa để thoát ứng dụng', ToastAndroid.SHORT);
 
-        setTimeout(() => {
-          backPressCount.current = 0;
-        }, 2000);
-        return true;
-      } else {
-        BackHandler.exitApp();
-        return true;
-      }
-    };
+          setTimeout(() => {
+            backPressCount.current = 0;
+          }, 2000);
+          return true;
+        } else {
+          BackHandler.exitApp();
+          return true;
+        }
+      };
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-    return () => backHandler.remove();
-  }, []);
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      return () => {
+        backHandler.remove();
+        backPressCount.current = 0; // Reset counter khi rời khỏi trang
+      };
+    }, [])
+  );
 
   const handleNotificationPress = () => {
     router.push('/(notifications)' as any);
