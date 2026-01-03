@@ -11,6 +11,8 @@ import {
   Modal,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -549,15 +551,19 @@ export default function EditMenuPage() {
       {/* Modal chọn món ăn */}
       <Modal visible={showDishModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 0 }}
+          >
+            <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+              <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chọn món ăn</Text>
                 <TouchableOpacity onPress={() => setShowDishModal(false)}>
                   <Ionicons name="close" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
-              </View>
-              <TextInput
+                </View>
+                <TextInput
                 style={{
                   padding: 12,
                   borderWidth: 1,
@@ -574,8 +580,8 @@ export default function EditMenuPage() {
                   fetchDishes(1, true);
                 }}
               />
-            </View>
-            <FlatList
+              </View>
+              <FlatList
               data={dishes}
               keyExtractor={item => item.id}
               renderItem={({ item }) => {
@@ -649,13 +655,14 @@ export default function EditMenuPage() {
                   </View>
                 ) : null
               }
-            />
-            {loadingDishes && dishes.length === 0 && (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-              </View>
-            )}
-          </View>
+              />
+              {loadingDishes && dishes.length === 0 && (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={COLORS.purple} />
+                </View>
+              )}
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>

@@ -156,25 +156,48 @@ export class FirebaseService implements OnModuleInit {
             dataPayload.image = image;
         }
 
-        // Data-only message: không có notification payload
-        // Frontend sẽ nhận message và tự tạo notification với Notifee
+        // Hybrid message: có cả notification và data payload
+        // Notification payload: đảm bảo notification hiển thị khi app ở background
+        // Data payload: cho phép frontend customize notification khi app ở foreground
         const message: any = {
             token,
+            // Notification payload để đảm bảo hiển thị khi app ở background
+            notification: {
+                title,
+                body,
+                ...(image && { imageUrl: image }),
+            },
+            // Data payload để frontend có thể customize
             data: this.convertDataToString(dataPayload),
-            // Android config cho data-only message
+            // Android config
             android: {
                 priority: 'high' as const,
-                // Không có notification config - data-only message
+                notification: {
+                    title,
+                    body,
+                    channelId: 'chat_messages_v2', // Channel ID phải match với frontend
+                    sound: 'default',
+                    ...(image && { imageUrl: image }),
+                },
             },
-            // APNS config cho iOS (data-only với content-available)
+            // APNS config cho iOS
             apns: {
                 payload: {
                     aps: {
-                        contentAvailable: true,
+                        alert: {
+                            title,
+                            body,
+                        },
+                        sound: 'default',
+                        badge: 1,
+                        contentAvailable: true, // Cho phép xử lý data khi app ở background
                     },
                 },
                 headers: {
-                    'apns-priority': '5',
+                    'apns-priority': '10', // High priority để đảm bảo delivery
+                },
+                fcmOptions: {
+                    imageUrl: image,
                 },
             },
         };

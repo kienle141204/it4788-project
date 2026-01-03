@@ -82,8 +82,8 @@ export default function FridgeDetailPage() {
 
   const [activeTab, setActiveTab] = useState<'dishes' | 'ingredients' | 'suggestions'>('dishes');
   const [refrigerator, setRefrigerator] = useState<Refrigerator | null>(null);
-  const [dishes, setDishes] = useState<FridgeDish[]>([]);
-  const [ingredients, setIngredients] = useState<FridgeIngredient[]>([]);
+  const [fridgeDishes, setFridgeDishes] = useState<FridgeDish[]>([]);
+  const [fridgeIngredients, setFridgeIngredients] = useState<FridgeIngredient[]>([]);
   const [suggestions, setSuggestions] = useState<DishSuggestion[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -162,8 +162,8 @@ export default function FridgeDetailPage() {
         ingredientsData = [];
       }
 
-      setDishes(dishesData);
-      setIngredients(ingredientsData);
+      setFridgeDishes(dishesData);
+      setFridgeIngredients(ingredientsData);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -230,6 +230,7 @@ export default function FridgeDetailPage() {
   const handleAddIngredient = () => {
     router.push(`/(fridge)/add-ingredient?refrigeratorId=${refrigeratorId}` as any);
   };
+
 
   const handleDeleteDish = async (dishId: number) => {
     Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn xóa món ăn này?', [
@@ -551,7 +552,7 @@ export default function FridgeDetailPage() {
     if (activeTab === 'dishes') {
       return (
         <>
-          {dishes.length === 0 ? (
+          {fridgeDishes.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Ionicons name="restaurant-outline" size={64} color={COLORS.grey} />
               <Text style={{ marginTop: 16, fontSize: 16, color: COLORS.grey }}>
@@ -560,7 +561,7 @@ export default function FridgeDetailPage() {
             </View>
           ) : (
             <FlatList
-              data={dishes}
+              data={fridgeDishes}
               renderItem={renderDishItem}
               keyExtractor={item => item.id.toString()}
               scrollEnabled={false}
@@ -588,7 +589,7 @@ export default function FridgeDetailPage() {
     if (activeTab === 'ingredients') {
       return (
         <>
-          {ingredients.length === 0 ? (
+          {fridgeIngredients.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Ionicons name="leaf-outline" size={64} color={COLORS.grey} />
               <Text style={{ marginTop: 16, fontSize: 16, color: COLORS.grey }}>
@@ -597,7 +598,7 @@ export default function FridgeDetailPage() {
             </View>
           ) : (
             <FlatList
-              data={ingredients}
+              data={fridgeIngredients}
               renderItem={renderIngredientItem}
               keyExtractor={item => item.id.toString()}
               scrollEnabled={false}
@@ -832,4 +833,3 @@ export default function FridgeDetailPage() {
     </SafeAreaView>
   );
 }
-
