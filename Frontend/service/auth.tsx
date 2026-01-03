@@ -15,7 +15,8 @@ export interface LoginResponse {
 
 export interface RegisterResponse{
   message?: string,
-  statusCode: number
+  note?: string,
+  statusCode?: number
 }
 
 export interface OTPResponse{

@@ -17,6 +17,7 @@ import { COLORS } from '@/constants/themes';
 import { createRefrigerator } from '@/service/fridge';
 import { getMyFamilies, type Family } from '@/service/family';
 import { getAccess } from '@/utils/api';
+import { clearCacheByPattern } from '@/utils/cache';
 
 export default function CreateFridgePage() {
   const router = useRouter();
@@ -149,6 +150,9 @@ export default function CreateFridgePage() {
       }
 
       await createRefrigerator(data);
+
+      // Invalidate cache when creating refrigerator
+      await clearCacheByPattern('fridge:');
 
       Alert.alert('Thành công', 'Đã tạo tủ lạnh thành công!', [
         {

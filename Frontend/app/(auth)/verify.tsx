@@ -1,5 +1,5 @@
 import OTPTextView from 'react-native-otp-textinput';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { styles } from '@/styles/auth.styles';
 import { COLORS } from '@/constants/themes';
 import { useState, useEffect } from 'react';
@@ -37,26 +37,56 @@ export default function Verify() {
   }, [counter]);
 
   const handleSendOTP = async () => {
-    const data = {
-      email: email,
-      otp_code: otp
+    if (!otp || otp.length !== 6) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ mã OTP (6 số)');
+      return;
     }
+
     setLoadingValidate(true)
     try {
+      const data = {
+        email: email,
+        otp_code: otp
+      }
       const res = await OTPValidate(data)
-      // if(res?.statusCode !=='200'){
-      //   Alert.alert(res.message)
-      // }
+      
+      // Check if response exists and has error
+      if (!res) {
+        Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+        return;
+      }
+      
+      // Check for error status code
+      if (res?.statusCode) {
+        let message = res?.message;
+        if (Array.isArray(message)) {
+          message = message.join('\n');
+        }
+        Alert.alert('Lỗi', message || 'Xác thực OTP thất bại');
+        return;
+      }
+
       const access = res.access_token
       const refresh = res.refresh_token
 
-      await AsyncStorage.setItem('access_key', access as any)
-      await AsyncStorage.setItem('refresh_key', refresh as any)
-      const key = await AsyncStorage.getAllKeys()
+      if (!access || !refresh) {
+        Alert.alert('Lỗi', 'Không nhận được token từ server');
+        return;
+      }
+
+      await AsyncStorage.setItem('access_token', access as any)
+      await AsyncStorage.setItem('refresh_token', refresh as any)
+      
       route.push('/(auth)/updata_profile')
 
-    } catch (e) {
-      throw e
+    } catch (e: any) {
+      let errorMessage = 'Xác thực OTP thất bại, vui lòng thử lại.';
+      if (e?.response?.data?.message) {
+        errorMessage = e.response.data.message;
+      } else if (e?.message) {
+        errorMessage = e.message;
+      }
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoadingValidate(false)
     }
@@ -65,13 +95,37 @@ export default function Verify() {
   const handleResend = async () => {
     setLoading(true)
     try {
-      await resendEmail({ email: email })
-    } catch (e) {
-      throw e
-    } finally {
-      setLoading(false)
+      const res = await resendEmail({ email: email })
+      
+      // Check if response exists and has error
+      if (!res) {
+        Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+        return;
+      }
+      
+      // Check for error status code
+      if (res?.statusCode) {
+        let message = res?.message;
+        if (Array.isArray(message)) {
+          message = message.join('\n');
+        }
+        Alert.alert('Lỗi', message || 'Gửi lại OTP thất bại');
+        return;
+      }
+
+      Alert.alert('Thành công', 'Đã gửi lại mã OTP. Vui lòng kiểm tra email.');
       setCounter(60);
       setCanResend(false);
+    } catch (e: any) {
+      let errorMessage = 'Gửi lại OTP thất bại, vui lòng thử lại.';
+      if (e?.response?.data?.message) {
+        errorMessage = e.response.data.message;
+      } else if (e?.message) {
+        errorMessage = e.message;
+      }
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setLoading(false)
     }
 
   };

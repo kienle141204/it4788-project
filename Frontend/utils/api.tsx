@@ -259,6 +259,16 @@ export const decodeJWT = (token: string) => {
 export const logoutUser = async () => {
   await AsyncStorage.removeItem('access_token');
   await AsyncStorage.removeItem('refresh_token');
+  
+  // Clear all cache on logout
+  try {
+    const cacheModule = await import('./cache') as { clearCache?: () => Promise<void> };
+    if (cacheModule.clearCache) {
+      await cacheModule.clearCache();
+    }
+  } catch (error) {
+    // Silently fail if cache module not available
+  }
 };
 
 const getTokenHeader = async () => {

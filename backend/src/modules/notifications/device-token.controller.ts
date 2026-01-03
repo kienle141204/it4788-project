@@ -58,19 +58,40 @@ export class DeviceTokenController {
         @Body() registerDto: RegisterDeviceTokenDto,
         @User() user: JwtUser,
     ) {
-        console.log(`[DeviceTokenController] 📥 Received token registration request from user ${user.id}`);
-        const deviceToken = await this.deviceTokenService.registerToken(
-            user.id,
-            registerDto.deviceToken,
-            registerDto.platform,
-        );
+        try {
+            console.log(`[DeviceTokenController] 📥 Received token registration request from user ${user.id}`);
+            console.log(`[DeviceTokenController] 📱 Platform: ${registerDto.platform}`);
+            console.log(`[DeviceTokenController] 🔑 Token: ${registerDto.deviceToken.substring(0, 30)}...`);
+            
+            if (!registerDto.deviceToken || registerDto.deviceToken.length < 10) {
+                console.error(`[DeviceTokenController] ❌ Invalid token received (too short)`);
+                return {
+                    success: false,
+                    message: 'Device token không hợp lệ',
+                    statusCode: 400,
+                };
+            }
+            
+            const deviceToken = await this.deviceTokenService.registerToken(
+                user.id,
+                registerDto.deviceToken,
+                registerDto.platform,
+            );
 
-        console.log(`[DeviceTokenController] ✅ Token registration completed for user ${user.id}`);
-        return {
-            success: true,
-            message: 'Device token đã được đăng ký thành công',
-            data: deviceToken,
-        };
+            console.log(`[DeviceTokenController] ✅ Token registration completed for user ${user.id}, token ID: ${deviceToken.id}`);
+            return {
+                success: true,
+                message: 'Device token đã được đăng ký thành công',
+                data: deviceToken,
+            };
+        } catch (error: any) {
+            console.error(`[DeviceTokenController] ❌ Error registering token:`, error?.message || error);
+            return {
+                success: false,
+                message: error?.message || 'Lỗi khi đăng ký device token',
+                statusCode: 500,
+            };
+        }
     }
 
     /**

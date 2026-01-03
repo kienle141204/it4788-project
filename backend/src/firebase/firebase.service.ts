@@ -22,40 +22,73 @@ export class FirebaseService implements OnModuleInit {
     }
 
     onModuleInit() {
-        const serviceAccountB64 = process.env.FIREBASE_ACCOUNT_B64;
-        const serviceAccountJsonEnv = process.env.FIREBASE_ACCOUNT_JSON;
-        const serviceAccountKeyPath = process.env.FIREBASE_ACCOUNT_KEY;
-
-        // Ưu tiên: B64 -> JSON env -> đọc file path (giữ backward-compatible)
-        let serviceAccountJson: string | undefined;
-        if (serviceAccountB64) {
-            serviceAccountJson = Buffer.from(serviceAccountB64, 'base64').toString('utf8');
-        } else if (serviceAccountJsonEnv) {
-            serviceAccountJson = serviceAccountJsonEnv;
-        } else if (serviceAccountKeyPath) {
-            // Cho phép dùng đường dẫn (relative hoặc absolute)
-            const absolutePath = serviceAccountKeyPath.startsWith('/')
-                ? serviceAccountKeyPath
-                : join(process.cwd(), serviceAccountKeyPath);
-            serviceAccountJson = readFileSync(absolutePath, 'utf8');
-        }
-
-        if (!serviceAccountJson) {
-            throw new Error('❌ FIREBASE_ACCOUNT_JSON/FIREBASE_ACCOUNT_B64/FIREBASE_ACCOUNT_KEY not found');
-        }
-
-        let serviceAccount: admin.ServiceAccount;
         try {
-            serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
-        } catch (err) {
-            throw new Error(
-                '❌ Invalid Firebase service account JSON. Kiểm tra giá trị env (nếu dùng base64 phải decode đúng, JSON phải đầy đủ ngoặc kép).',
-            );
-        }
+            const serviceAccountB64 = process.env.FIREBASE_ACCOUNT_B64;
+            const serviceAccountJsonEnv = process.env.FIREBASE_ACCOUNT_JSON;
+            const serviceAccountKeyPath = process.env.FIREBASE_ACCOUNT_KEY;
 
-        // Khởi tạo Firebase app nếu chưa có
-        if (!admin.apps.length) {
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+            // Ưu tiên: B64 -> JSON env -> đọc file path (giữ backward-compatible)
+            let serviceAccountJson: string | undefined;
+            if (serviceAccountB64) {
+                console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_B64');
+                serviceAccountJson = Buffer.from(serviceAccountB64, 'base64').toString('utf8');
+            } else if (serviceAccountJsonEnv) {
+                console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_JSON');
+                serviceAccountJson = serviceAccountJsonEnv;
+            } else if (serviceAccountKeyPath) {
+                console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_KEY:', serviceAccountKeyPath);
+                // Cho phép dùng đường dẫn (relative hoặc absolute)
+                const absolutePath = serviceAccountKeyPath.startsWith('/')
+                    ? serviceAccountKeyPath
+                    : join(process.cwd(), serviceAccountKeyPath);
+                try {
+                    serviceAccountJson = readFileSync(absolutePath, 'utf8');
+                } catch (fileError: any) {
+                    throw new Error(`❌ Cannot read Firebase service account file: ${fileError.message}`);
+                }
+            }
+
+            if (!serviceAccountJson) {
+                throw new Error('❌ FIREBASE_ACCOUNT_JSON/FIREBASE_ACCOUNT_B64/FIREBASE_ACCOUNT_KEY not found in environment variables');
+            }
+
+            let serviceAccount: admin.ServiceAccount;
+            try {
+                serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
+                
+                // Validate required fields (ServiceAccount uses camelCase in TypeScript, but JSON may use snake_case)
+                const parsedJson = JSON.parse(serviceAccountJson) as any;
+                const projectId = serviceAccount.projectId || parsedJson.project_id;
+                const privateKey = serviceAccount.privateKey || parsedJson.private_key;
+                const clientEmail = serviceAccount.clientEmail || parsedJson.client_email;
+                
+                if (!projectId) {
+                    throw new Error('❌ Firebase service account missing project_id/projectId');
+                }
+                if (!privateKey) {
+                    throw new Error('❌ Firebase service account missing private_key/privateKey');
+                }
+                if (!clientEmail) {
+                    throw new Error('❌ Firebase service account missing client_email/clientEmail');
+                }
+                
+                console.log(`[FirebaseService] ✅ Firebase service account loaded for project: ${projectId}`);
+            } catch (err: any) {
+                throw new Error(
+                    `❌ Invalid Firebase service account JSON: ${err.message}. Kiểm tra giá trị env (nếu dùng base64 phải decode đúng, JSON phải đầy đủ ngoặc kép).`,
+                );
+            }
+
+            // Khởi tạo Firebase app nếu chưa có
+            if (!admin.apps.length) {
+                admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+                console.log('[FirebaseService] ✅ Firebase Admin SDK initialized successfully');
+            } else {
+                console.log('[FirebaseService] ℹ️ Firebase Admin SDK already initialized');
+            }
+        } catch (error: any) {
+            console.error('[FirebaseService] ❌ Failed to initialize Firebase:', error.message);
+            throw error;
         }
     }
 
@@ -101,6 +134,7 @@ export class FirebaseService implements OnModuleInit {
 
     /**
      * Gửi notification đến 1 thiết bị
+     * Sử dụng data-only message để frontend control UI hoàn toàn bằng Notifee
      */
     async sendNotification(
         token: string,
@@ -110,45 +144,79 @@ export class FirebaseService implements OnModuleInit {
         image?: string,
         icon?: string,
     ) {
-        const notification: any = { title, body };
-        
-        // Thêm image (large icon/avatar) nếu có
+        // Chuẩn bị data payload (bao gồm title, body, image để frontend tự tạo notification)
+        const dataPayload: Record<string, string> = {
+            title,
+            body,
+            ...(data || {}),
+        };
+
+        // Thêm image vào data để frontend có thể lấy
         if (image) {
-            notification.image = image;
-        }
-        
-        // Thêm icon (small icon/logo) nếu có
-        if (icon) {
-            notification.icon = icon;
+            dataPayload.image = image;
         }
 
+        // Hybrid message: có cả notification và data payload
+        // Notification payload: đảm bảo notification hiển thị khi app ở background
+        // Data payload: cho phép frontend customize notification khi app ở foreground
         const message: any = {
-            notification,
             token,
-            data: data ? this.convertDataToString(data) : undefined,
-        };
-
-        // Thêm Android config để sử dụng notification channel
-        const androidNotification: any = {
-            channelId: 'chat_messages', // Channel ID phải khớp với channel được tạo trong app
-            sound: 'default',
-            priority: 'high' as const,
-        };
-
-        // Thêm image vào Android notification nếu có (để hiển thị BigPicture style)
-        if (image) {
-            androidNotification.imageUrl = image;
-        }
-
-        message.android = {
-            priority: 'high' as const,
-            notification: androidNotification,
+            // Notification payload để đảm bảo hiển thị khi app ở background
+            notification: {
+                title,
+                body,
+                ...(image && { imageUrl: image }),
+            },
+            // Data payload để frontend có thể customize
+            data: this.convertDataToString(dataPayload),
+            // Android config
+            android: {
+                priority: 'high' as const,
+                notification: {
+                    title,
+                    body,
+                    channelId: 'chat_messages_v2', // Channel ID phải match với frontend
+                    sound: 'default',
+                    ...(image && { imageUrl: image }),
+                },
+            },
+            // APNS config cho iOS
+            apns: {
+                payload: {
+                    aps: {
+                        alert: {
+                            title,
+                            body,
+                        },
+                        sound: 'default',
+                        badge: 1,
+                        contentAvailable: true, // Cho phép xử lý data khi app ở background
+                    },
+                },
+                headers: {
+                    'apns-priority': '10', // High priority để đảm bảo delivery
+                },
+                fcmOptions: {
+                    imageUrl: image,
+                },
+            },
         };
 
         try {
-            const response = await getMessaging().send(message);
+            const messagingInstance = getMessaging();
+            if (!messagingInstance) {
+                throw new Error('Firebase Messaging instance is not available');
+            }
+            
+            console.log(`[FirebaseService] 📤 Sending notification to token: ${token.substring(0, 20)}...`);
+            console.log(`[FirebaseService] 📝 Title: ${title}, Body: ${body.substring(0, 50)}...`);
+            
+            const response = await messagingInstance.send(message);
+            console.log(`[FirebaseService] ✅ Notification sent successfully: ${response}`);
             return response;
-        } catch (error) {
+        } catch (error: any) {
+            console.error(`[FirebaseService] ❌ Error sending notification:`, error.message || error);
+            console.error(`[FirebaseService] ❌ Error code:`, error.code || 'unknown');
             await this.handleTokenError(error, token);
             throw error;
         }

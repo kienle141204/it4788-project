@@ -78,12 +78,13 @@
     },
     "extra": {
       "router": {},
-      "eas": {
-        "projectId": "ff8e0c76-2a5e-4584-96ac-2fc3601efb53"
-      },
       "firebase": {
         "projectId": "push-notification-it4788"
+      },
+      "eas": {
+        "projectId": "efe28e7c-f9b9-4f3d-8cdc-ce3c7ee6958c"
       }
-    }
+    },
+    "owner": "vuongthanh"
   }
 }

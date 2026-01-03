@@ -11,6 +11,8 @@ import {
   Modal,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +20,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { mealStyles } from '../../styles/meal.styles';
 import { getAccess, postAccess, patchAccess, deleteAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern } from '../../utils/cache';
 
 interface Family {
   id: string;
@@ -82,8 +86,18 @@ export default function EditMenuPage() {
     if (!menuId) return;
     setLoadingMenu(true);
     try {
-      const payload = await getAccess(`menus/${menuId}`);
-
+      // Use cached API for menu details
+      const result = await getCachedAccess<any>(
+        `menus/${menuId}`,
+        {},
+        {
+          ttl: CACHE_TTL.MEDIUM,
+          cacheKey: `meal:menu:${menuId}`,
+          compareData: true,
+        }
+      );
+      
+      const payload = result.data;
       if (!payload?.success) {
         throw new Error(payload?.message || 'Không thể tải thông tin thực đơn');
       }
@@ -185,6 +199,8 @@ export default function EditMenuPage() {
       try {
         const payload = await deleteAccess(`menus/dishes/${selectedDish.menuDishId}`);
         if (payload?.success !== false) {
+          // Invalidate cache when deleting dish from menu
+          await clearCacheByPattern(`meal:menu:${menuId}`);
           setSelectedDishes(prev => prev.filter(sd => sd.dish.id !== selectedDish.dish.id));
         } else {
           throw new Error(payload?.message || 'Không thể xóa món ăn');
@@ -216,6 +232,9 @@ export default function EditMenuPage() {
         await patchAccess(`menus/dishes/${selectedDish.menuDishId}`, {
           [field]: value,
         });
+        
+        // Invalidate cache when updating dish in menu
+        await clearCacheByPattern(`meal:menu:${menuId}`);
       } catch (err: any) {
         if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
           handleSessionExpired();
@@ -269,6 +288,10 @@ export default function EditMenuPage() {
         );
         await Promise.all(addDishPromises);
       }
+
+      // Invalidate cache when updating menu
+      await clearCacheByPattern('meal:menus');
+      await clearCacheByPattern(`meal:menu:${menuId}`);
 
       Alert.alert('Thành công', 'Cập nhật thực đơn thành công', [
         {
@@ -549,15 +572,19 @@ export default function EditMenuPage() {
       {/* Modal chọn món ăn */}
       <Modal visible={showDishModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 0 }}
+          >
+            <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+              <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chọn món ăn</Text>
                 <TouchableOpacity onPress={() => setShowDishModal(false)}>
                   <Ionicons name="close" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
-              </View>
-              <TextInput
+                </View>
+                <TextInput
                 style={{
                   padding: 12,
                   borderWidth: 1,
@@ -574,8 +601,8 @@ export default function EditMenuPage() {
                   fetchDishes(1, true);
                 }}
               />
-            </View>
-            <FlatList
+              </View>
+              <FlatList
               data={dishes}
               keyExtractor={item => item.id}
               renderItem={({ item }) => {
@@ -649,13 +676,14 @@ export default function EditMenuPage() {
                   </View>
                 ) : null
               }
-            />
-            {loadingDishes && dishes.length === 0 && (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-              </View>
-            )}
-          </View>
+              />
+              {loadingDishes && dishes.length === 0 && (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={COLORS.purple} />
+                </View>
+              )}
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>

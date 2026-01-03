@@ -3,6 +3,7 @@ import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import io, { Socket } from 'socket.io-client';
 import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
 import {
   NotificationItem,
@@ -58,7 +59,75 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     } catch (error) {
       console.error('[Notifications] Error fetching notifications:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+      
+      // Kiểm tra permission notification trước khi hiển thị lỗi
+      try {
+        // Kiểm tra permission mà không tự động request (chỉ check)
+        let hasPermission = false;
+        
+        if (Platform.OS !== 'web' && Device.isDevice) {
+          if (Platform.OS === 'ios') {
+            const { status } = await Notifications.getPermissionsAsync();
+            hasPermission = status === 'granted';
+          } else {
+            // Android: kiểm tra qua Firebase Messaging nếu có
+            try {
+              const messaging = require('@react-native-firebase/messaging').default;
+              const authStatus = await messaging().hasPermission();
+              hasPermission =
+                authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+                authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+            } catch (e) {
+              // Nếu không có Firebase, dùng expo-notifications
+              const { status } = await Notifications.getPermissionsAsync();
+              hasPermission = status === 'granted';
+            }
+          }
+        }
+        
+        if (!hasPermission) {
+          // Nếu chưa có permission, hỏi người dùng có muốn cấp quyền không
+          Alert.alert(
+            'Cấp quyền thông báo',
+            'Để nhận thông báo từ ứng dụng, bạn cần cấp quyền thông báo. Bạn có muốn cấp quyền ngay bây giờ không?',
+            [
+              {
+                text: 'Không',
+                style: 'cancel',
+                onPress: () => {
+                  // Vẫn hiển thị thông báo lỗi nếu người dùng từ chối
+                  Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+                },
+              },
+              {
+                text: 'Cấp quyền',
+                onPress: async () => {
+                  // Request permission và đăng ký token
+                  const granted = await pushNotificationService.checkAndRequestNotificationPermission();
+                  if (granted) {
+                    // Đăng ký token với backend
+                    await pushNotificationService.registerTokenWithBackend();
+                    // Thử tải lại notifications
+                    setTimeout(() => {
+                      fetchNotifications(page);
+                    }, 1000);
+                  } else {
+                    Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+                  }
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        } else {
+          // Đã có permission nhưng vẫn lỗi, hiển thị thông báo lỗi như cũ
+          Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+        }
+      } catch (permissionError) {
+        // Nếu kiểm tra permission fail, hiển thị thông báo lỗi như cũ
+        console.error('[Notifications] Error checking permission:', permissionError);
+        Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

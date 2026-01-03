@@ -12,6 +12,7 @@ import NotificationCard from '@/components/NotificationCard';
 import FeatureGrid from '@/components/FeatureGrid';
 import { COLORS } from '@/constants/themes';
 import { getAccess } from '@/utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getMyShoppingLists } from '@/service/shopping';
 import { LogViewer } from '@/utils/logger';
@@ -42,9 +43,55 @@ export default function HomePage() {
   const { unreadCount, refreshNotifications } = useNotifications();
 
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (isRefreshing = false) => {
     try {
-      const response = await getAccess('auth/profile');
+      let response: any;
+      if (isRefreshing) {
+        // Force refresh
+        const result = await refreshCachedAccess<any>(
+          'auth/profile',
+          {},
+          {
+            ttl: CACHE_TTL.SHORT,
+            cacheKey: 'home:profile',
+            compareData: true,
+          }
+        );
+        response = result.data;
+      } else {
+        // Use cache if available
+        const result = await getCachedAccess<any>(
+          'auth/profile',
+          {},
+          {
+            ttl: CACHE_TTL.SHORT,
+            cacheKey: 'home:profile',
+            compareData: true,
+          }
+        );
+        response = result.data;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<any>(
+            'auth/profile',
+            {},
+            {
+              ttl: CACHE_TTL.SHORT,
+              cacheKey: 'home:profile',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const userData = freshResult.data?.data || freshResult.data;
+              setProfile(userData);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
+      
       // API response có cấu trúc: { success, message, data: { ...userInfo } }
       const userData = response?.data || response;
       setProfile(userData);
@@ -110,42 +157,37 @@ export default function HomePage() {
   // Refresh data khi màn hình được focus
   useFocusEffect(
     useCallback(() => {
-      fetchProfile();
+      fetchProfile(true); // Refresh profile on focus
       fetchTodayTasks();
       refreshNotifications();
     }, [fetchProfile, fetchTodayTasks, refreshNotifications])
   );
 
-  useEffect(() => {
-    const backAction = () => {
-      if (backPressCount.current === 0) {
-        backPressCount.current += 1;
-        ToastAndroid.show('Nhấn quay lại lần nữa để thoát ứng dụng', ToastAndroid.SHORT);
+  // Xử lý nút back - chỉ hoạt động khi đang ở trang home
+  useFocusEffect(
+    useCallback(() => {
+      const backAction = () => {
+        if (backPressCount.current === 0) {
+          backPressCount.current += 1;
+          ToastAndroid.show('Nhấn quay lại lần nữa để thoát ứng dụng', ToastAndroid.SHORT);
 
-        setTimeout(() => {
-          backPressCount.current = 0;
-        }, 2000);
-        return true;
-      } else {
-        BackHandler.exitApp();
-        return true;
-      }
-    };
+          setTimeout(() => {
+            backPressCount.current = 0;
+          }, 2000);
+          return true;
+        } else {
+          BackHandler.exitApp();
+          return true;
+        }
+      };
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-    return () => backHandler.remove();
-  }, []);
-
-  const features = [
-    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: '#A855F7', bgColor: '#F3E8FF', onPress: () => router.push('/(group)') },
-    { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
-    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
-    // { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
-    { id: 'fridge', name: 'Tủ lạnh', icon: 'snow' as const, color: COLORS.green, bgColor: COLORS.greenLight, onPress: () => router.push('/(fridge)') },
-    { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
-    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
-    { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
-  ];
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      return () => {
+        backHandler.remove();
+        backPressCount.current = 0; // Reset counter khi rời khỏi trang
+      };
+    }, [])
+  );
 
   const handleNotificationPress = () => {
     router.push('/(notifications)' as any);
@@ -159,6 +201,17 @@ export default function HomePage() {
     // Chuyển đến trang Nhiệm vụ của tôi (calendar)
     router.push('/(tabs)/calendar' as any);
   };
+
+  const features = [
+    { id: 'group', name: 'Nhóm', icon: 'people' as const, color: '#A855F7', bgColor: '#F3E8FF', onPress: () => router.push('/(group)') },
+    { id: 'shopping', name: 'Mua sắm', icon: 'cart' as const, color: '#3B82F6', bgColor: '#DBEAFE', onPress: () => router.push('/(market)/market_screen') },
+    { id: 'meals', name: 'Bữa ăn', icon: 'restaurant' as const, color: '#F97316', bgColor: '#FFEDD5', onPress: () => router.push('/(meal)') },
+    // { id: 'nutrition', name: 'Dinh dưỡng', icon: 'shield' as const, color: '#EF4444', bgColor: '#FEE2E2', onPress: () => Alert.alert('Dinh dưỡng', 'Chức năng dinh dưỡng') },
+    { id: 'fridge', name: 'Tủ lạnh', icon: 'snow' as const, color: COLORS.green, bgColor: COLORS.greenLight, onPress: () => router.push('/(fridge)') },
+    { id: 'recipes', name: 'Công thức', icon: 'book' as const, color: '#6366F1', bgColor: '#E0E7FF', onPress: () => router.push('/(food)' as any) },
+    { id: 'statistics', name: 'Thống kê', icon: 'stats-chart' as const, color: '#EC4899', bgColor: '#FCE7F3', onPress: () => router.push('/(statistics)' as any) },
+    { id: 'nearest-market', name: 'Chợ gần đây', icon: 'location' as const, color: '#1565C0', bgColor: '#E3F2FD', onPress: () => router.push('/(market)/nearest-market') }
+  ];
 
   return (
     <View style={styles.container}>

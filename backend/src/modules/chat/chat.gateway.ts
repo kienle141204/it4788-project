@@ -229,8 +229,8 @@ export class ChatGateway extends BaseGateway {
                         notificationTitle,
                         notificationBody,
                         pushData,
-                        avatarUrl, // image (avatar - large image trong notification)
-                        undefined, // icon - không cần vì hệ thống tự dùng app icon
+                        avatarUrl ?? undefined, // image (avatar - large image trong notification)
+                        undefined,      // icon - không cần vì hệ thống tự dùng app icon
                     );
 
                     this.logger.log(

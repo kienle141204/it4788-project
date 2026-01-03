@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { mealStyles } from '../../styles/meal.styles';
 import { COLORS } from '../../constants/themes';
 import { getAccess, deleteAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern, getCache } from '../../utils/cache';
 
 interface Family {
   id: string;
@@ -114,15 +116,106 @@ export default function MealPage() {
   }, [router]);
 
   const fetchMenus = useCallback(
-    async (pageNumber = 1, reset = false) => {
-      if (reset) {
+    async (pageNumber = 1, reset = false, isRefreshing = false) => {
+      const cacheKey = `meal:menus:page:${pageNumber}`;
+      
+      if (reset && !isRefreshing) {
+        // Check cache first for initial load
+        const cachedData = await getCache<any>(cacheKey);
+        
+        if (cachedData && cachedData.success) {
+          // We have cache, show it immediately without loading
+          const newMenus: Menu[] = cachedData.data || [];
+          const pagination = cachedData.pagination || {};
+          
+          setMenus(newMenus);
+          setHasNextPage(Boolean(pagination.hasNextPage));
+          setPage(pagination.currentPage || pageNumber);
+          setError(null);
+          setLoading(false);
+          
+          // Fetch fresh data in background
+          refreshCachedAccess<any>(
+            `menus?page=${pageNumber}&limit=${PAGE_LIMIT}`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey,
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated && freshResult.data?.success) {
+              const freshMenus: Menu[] = freshResult.data.data || [];
+              const freshPagination = freshResult.data.pagination || {};
+              setMenus(freshMenus);
+              setHasNextPage(Boolean(freshPagination.hasNextPage));
+              setPage(freshPagination.currentPage || pageNumber);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+          
+          return;
+        }
+        
         setLoading(true);
+      } else if (reset && isRefreshing) {
+        setRefreshing(true);
       } else {
         setLoadingMore(true);
       }
 
       try {
-        const payload = await getAccess(`menus?page=${pageNumber}&limit=${PAGE_LIMIT}`);
+        let payload: any;
+        
+        if (isRefreshing) {
+          // Force refresh: always fetch from API
+          const result = await refreshCachedAccess<any>(
+            `menus?page=${pageNumber}&limit=${PAGE_LIMIT}`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey,
+              compareData: true,
+            }
+          );
+          payload = result.data;
+        } else {
+          // Normal fetch: use cache if available
+          const result = await getCachedAccess<any>(
+            `menus?page=${pageNumber}&limit=${PAGE_LIMIT}`,
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey,
+              compareData: true,
+            }
+          );
+          payload = result.data;
+          
+          // If we got data from cache, fetch fresh data in background
+          if (result.fromCache && reset) {
+            refreshCachedAccess<any>(
+              `menus?page=${pageNumber}&limit=${PAGE_LIMIT}`,
+              {},
+              {
+                ttl: CACHE_TTL.MEDIUM,
+                cacheKey,
+                compareData: true,
+              }
+            ).then((freshResult) => {
+              if (freshResult.updated && freshResult.data?.success) {
+                const freshMenus: Menu[] = freshResult.data.data || [];
+                const freshPagination = freshResult.data.pagination || {};
+                setMenus(freshMenus);
+                setHasNextPage(Boolean(freshPagination.hasNextPage));
+                setPage(freshPagination.currentPage || pageNumber);
+              }
+            }).catch(() => {
+              // Silently fail background refresh
+            });
+          }
+        }
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải danh sách thực đơn');
@@ -184,7 +277,7 @@ export default function MealPage() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchMenus(1, true);
+    fetchMenus(1, true, true); // Pass isRefreshing flag
   };
 
   const handleLoadMore = () => {
@@ -244,10 +337,13 @@ export default function MealPage() {
 
               // Kiểm tra response - backend trả về { success: true, message: '...' }
               if (payload?.success === true) {
+                // Invalidate cache when deleting menu
+                await clearCacheByPattern('meal:menus');
+                
                 Alert.alert('Thành công', payload?.message || 'Đã xóa thực đơn thành công');
                 setSelectedMenu(null);
                 // Refresh danh sách
-                fetchMenus(1, true);
+                fetchMenus(1, true, true);
               } else {
                 throw new Error(payload?.message || payload?.error || 'Không thể xóa thực đơn');
               }

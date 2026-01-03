@@ -11,6 +11,8 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +22,8 @@ import { COLORS } from '../../constants/themes';
 import { getMyFamilies, getFamilyInvitationCode, joinFamilyByCode, createFamily, leaveFamily, deleteFamily, type Family } from '../../service/family';
 import { getFamilySharedLists } from '../../service/shopping';
 import { getAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern, getCache } from '../../utils/cache';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import JoinFamilyModal from '../../components/JoinFamilyModal';
@@ -76,6 +80,7 @@ export default function GroupPage() {
   const [families, setFamilies] = useState<FamilyWithStats[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [initialLoadDone, setInitialLoadDone] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showFamilyMenu, setShowFamilyMenu] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<FamilyWithStats | null>(null);
@@ -102,72 +107,158 @@ export default function GroupPage() {
     );
   }, [router]);
 
+  // Process families data with shopping list stats
+  const processFamiliesData = useCallback(async (familiesData: Family[]) => {
+    // Fetch shopping list statistics for each family
+    const familiesWithStats: FamilyWithStats[] = await Promise.all(
+      familiesData.map(async (family) => {
+        const memberCount = family.members?.length || 0;
+
+        // Get shopping lists for this family
+        let shoppingListInfo = {};
+        try {
+          const sharedLists = await getFamilySharedLists(family.id);
+
+          // Calculate this week's items
+          const now = new Date();
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay());
+          startOfWeek.setHours(0, 0, 0, 0);
+
+          const thisWeekLists = (sharedLists || []).filter((list: any) => {
+            const listDate = new Date(list.created_at || list.shopping_date);
+            return listDate >= startOfWeek;
+          });
+
+          const thisWeekItems = thisWeekLists.reduce((total: number, list: any) => {
+            return total + (list.items?.length || 0);
+          }, 0);
+
+          // Calculate bought items from all lists
+          const allItems = sharedLists.reduce((total: number, list: any) => {
+            return total + (list.items?.length || 0);
+          }, 0);
+
+          const boughtItems = sharedLists.reduce((total: number, list: any) => {
+            const checked = list.items?.filter((item: any) => item.is_checked) || [];
+            return total + checked.length;
+          }, 0);
+
+          shoppingListInfo = {
+            thisWeekItems,
+            boughtItems,
+            totalItems: allItems,
+          };
+        } catch (error) {
+        }
+
+        return {
+          ...family,
+          memberCount,
+          shoppingListInfo,
+        };
+      })
+    );
+
+    setFamilies(familiesWithStats);
+  }, []);
+
   const fetchFamilies = useCallback(async (isRefreshing = false) => {
     try {
-      if (isRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
       setError(null);
 
-      const response = await getMyFamilies();
-
-      // getMyFamilies always returns an array
-      const familiesData = Array.isArray(response) ? response : [];
-
-      // Fetch shopping list statistics for each family
-      const familiesWithStats: FamilyWithStats[] = await Promise.all(
-        familiesData.map(async (family) => {
-          const memberCount = family.members?.length || 0;
-
-          // Get shopping lists for this family
-          let shoppingListInfo = {};
-          try {
-            const sharedLists = await getFamilySharedLists(family.id);
-
-            // Calculate this week's items
-            const now = new Date();
-            const startOfWeek = new Date(now);
-            startOfWeek.setDate(now.getDate() - now.getDay());
-            startOfWeek.setHours(0, 0, 0, 0);
-
-            const thisWeekLists = (sharedLists || []).filter((list: any) => {
-              const listDate = new Date(list.created_at || list.shopping_date);
-              return listDate >= startOfWeek;
-            });
-
-            const thisWeekItems = thisWeekLists.reduce((total: number, list: any) => {
-              return total + (list.items?.length || 0);
-            }, 0);
-
-            // Calculate bought items from all lists
-            const allItems = sharedLists.reduce((total: number, list: any) => {
-              return total + (list.items?.length || 0);
-            }, 0);
-
-            const boughtItems = sharedLists.reduce((total: number, list: any) => {
-              const checked = list.items?.filter((item: any) => item.is_checked) || [];
-              return total + checked.length;
-            }, 0);
-
-            shoppingListInfo = {
-              thisWeekItems,
-              boughtItems,
-              totalItems: allItems,
-            };
-          } catch (error) {
+      // Use cached API for better performance
+      let response: Family[];
+      let fromCache = false;
+      let skipLoading = false;
+      
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        setRefreshing(true);
+        const result = await refreshCachedAccess<Family[] | { data: Family[] }>(
+          'families/my-family',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'group:families:list',
+            compareData: true,
           }
-
-          return {
+        );
+        const data = result.data;
+        response = Array.isArray(data) ? data : (data?.data || []);
+      } else {
+        // Normal fetch: check cache first, only show loading if no cache
+        const cacheKey = 'group:families:list';
+        const cachedData = await getCache<Family[] | { data: Family[] }>(cacheKey);
+        
+        if (cachedData) {
+          // We have cache, show it immediately without loading
+          fromCache = true;
+          const data = cachedData;
+          response = Array.isArray(data) ? data : (data?.data || []);
+          
+          // Set loading to false immediately before processing
+          setLoading(false);
+          setInitialLoadDone(true);
+          
+          // Set basic families data immediately (without shopping stats) to avoid showing "empty"
+          // This gives instant feedback while processing shopping stats in background
+          const basicFamilies: FamilyWithStats[] = response.map((family: Family) => ({
             ...family,
-            memberCount,
-            shoppingListInfo,
-          };
-        })
-      );
+            memberCount: family.members?.length || 0,
+            shoppingListInfo: {},
+          }));
+          setFamilies(basicFamilies);
+          
+          // Then process cached data with shopping stats (don't await - let it run in background)
+          // This way UI shows immediately
+          processFamiliesData(response).catch(() => {
+            // Silently handle errors
+          });
+          
+          // Fetch fresh data in background
+          refreshCachedAccess<Family[] | { data: Family[] }>(
+            'families/my-family',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'group:families:list',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            // Only update if data actually changed (compareData handles this)
+            if (freshResult.updated) {
+              const freshData = freshResult.data;
+              const freshFamilies = Array.isArray(freshData) ? freshData : (freshData?.data || []);
+              processFamiliesData(freshFamilies);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+          
+          // Don't continue to finally block since we already set loading = false
+          return;
+        } else {
+          // No cache, show loading and fetch from API
+          if (!initialLoadDone) {
+            setLoading(true);
+          }
+          const result = await getCachedAccess<Family[] | { data: Family[] }>(
+            'families/my-family',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'group:families:list',
+              compareData: true,
+            }
+          );
+          const data = result.data;
+          response = Array.isArray(data) ? data : (data?.data || []);
+        }
+      }
 
-      setFamilies(familiesWithStats);
+      // Process families data
+      await processFamiliesData(response);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -179,11 +270,44 @@ export default function GroupPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [handleSessionExpired]);
+  }, [handleSessionExpired, processFamiliesData]);
 
   useEffect(() => {
-    fetchFamilies();
-  }, [fetchFamilies]);
+    // Check cache first before showing loading
+    const checkCacheAndLoad = async () => {
+      const cacheKey = 'group:families:list';
+      const cachedData = await getCache<Family[] | { data: Family[] }>(cacheKey);
+      
+      if (cachedData) {
+        // We have cache, set loading to false immediately
+        setLoading(false);
+        setInitialLoadDone(true);
+        
+        // Process and display cached data immediately
+        const data = cachedData;
+        const response = Array.isArray(data) ? data : (data?.data || []);
+        
+        // Set basic families data immediately (without shopping stats) to avoid showing "empty"
+        // This gives instant feedback while processing shopping stats in background
+        const basicFamilies: FamilyWithStats[] = response.map((family: Family) => ({
+          ...family,
+          memberCount: family.members?.length || 0,
+          shoppingListInfo: {},
+        }));
+        setFamilies(basicFamilies);
+        
+        // Then process with shopping stats in background
+        processFamiliesData(response).catch(() => {
+          // Silently handle errors
+        });
+      }
+      
+      // Always fetch (will use cache if available, or fetch fresh)
+      fetchFamilies();
+    };
+    
+    checkCacheAndLoad();
+  }, [fetchFamilies, processFamiliesData]);
 
   // Load current user ID
   useEffect(() => {
@@ -240,6 +364,11 @@ export default function GroupPage() {
     setLeavingFamilyId(familyId);
     try {
       await leaveFamily(familyId);
+      
+      // Invalidate cache when leaving family
+      await clearCacheByPattern('group:families');
+      await clearCacheByPattern(`group:family:${familyId}`);
+      
       Alert.alert(
         'Thành công',
         'Bạn đã rời khỏi nhóm thành công',
@@ -248,7 +377,7 @@ export default function GroupPage() {
             text: 'OK',
             onPress: () => {
               setShowFamilyMenu(false);
-              fetchFamilies();
+              fetchFamilies(true); // Force refresh
             },
           },
         ]
@@ -315,6 +444,11 @@ export default function GroupPage() {
     setDeletingFamilyId(familyId);
     try {
       await deleteFamily(familyId);
+      
+      // Invalidate cache when deleting family
+      await clearCacheByPattern('group:families');
+      await clearCacheByPattern(`group:family:${familyId}`);
+      
       Alert.alert(
         'Thành công',
         'Nhóm đã được xóa thành công',
@@ -323,7 +457,7 @@ export default function GroupPage() {
             text: 'OK',
             onPress: () => {
               setShowFamilyMenu(false);
-              fetchFamilies();
+              fetchFamilies(true); // Force refresh
             },
           },
         ]
@@ -463,13 +597,16 @@ export default function GroupPage() {
 
       await createFamily(data);
 
+      // Invalidate cache when creating new family
+      await clearCacheByPattern('group:families');
+
       Alert.alert('Thành công', 'Đã tạo gia đình thành công!', [
         {
           text: 'OK',
           onPress: () => {
             setShowCreateModal(false);
             setNewFamilyName('');
-            fetchFamilies();
+            fetchFamilies(true); // Force refresh
           },
         },
       ]);
@@ -491,6 +628,9 @@ export default function GroupPage() {
       // Handle both direct object and wrapped response
       const result = response?.data || response;
 
+      // Invalidate cache when joining family
+      await clearCacheByPattern('group:families');
+      
       if (result?.message || result?.family) {
         Alert.alert(
           'Thành công',
@@ -500,7 +640,7 @@ export default function GroupPage() {
               text: 'OK',
               onPress: () => {
                 // Refresh families list
-                fetchFamilies();
+                fetchFamilies(true); // Force refresh
               },
             },
           ]
@@ -510,7 +650,7 @@ export default function GroupPage() {
           {
             text: 'OK',
             onPress: () => {
-              fetchFamilies();
+              fetchFamilies(true); // Force refresh
             },
           },
         ]);
@@ -641,6 +781,12 @@ export default function GroupPage() {
                 <Text style={groupStyles.retryButtonText}>Thử lại</Text>
               </TouchableOpacity>
             </View>
+          ) : !initialLoadDone && families.length === 0 ? (
+            // Don't show "empty" state if we're still loading initial data
+            <View style={groupStyles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={groupStyles.loadingText}>Đang tải...</Text>
+            </View>
           ) : families.length === 0 ? (
             <View style={groupStyles.emptyState}>
               <Ionicons name="people-outline" size={48} color={COLORS.grey} />
@@ -724,116 +870,150 @@ export default function GroupPage() {
           setNewFamilyName('');
         }}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            justifyContent: 'flex-end',
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
         >
           <View
             style={{
-              backgroundColor: COLORS.white,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              padding: 20,
-              maxHeight: '50%',
+              flex: 1,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              justifyContent: 'flex-end',
             }}
           >
             <View
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 20,
+                backgroundColor: COLORS.white,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 24,
+                maxHeight: '50%',
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: -2,
+                },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                elevation: 10,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  color: COLORS.darkGrey,
-                }}
-              >
-                Tạo gia đình mới
-              </Text>
-              <TouchableOpacity onPress={() => {
-                setShowCreateModal(false);
-                setNewFamilyName('');
-              }}>
-                <Ionicons name="close" size={24} color={COLORS.darkGrey} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ marginBottom: 20 }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: COLORS.darkGrey,
-                  marginBottom: 8,
-                }}
-              >
-                Tên gia đình <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
-              </Text>
-              <TextInput
-                style={{
-                  backgroundColor: COLORS.background || '#F5F5F5',
-                  borderRadius: 12,
-                  padding: 16,
-                  fontSize: 16,
-                  borderWidth: 1,
-                  borderColor: COLORS.background || '#E5E5E5',
-                }}
-                placeholder="Nhập tên gia đình"
-                value={newFamilyName}
-                onChangeText={setNewFamilyName}
-                placeholderTextColor={COLORS.grey}
-              />
-            </View>
-
-            <View
-              style={{
-                backgroundColor: '#E0F2FE',
-                borderRadius: 12,
-                padding: 12,
-                marginBottom: 20,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <Ionicons name="information-circle" size={18} color="#0EA5E9" style={{ marginRight: 8, marginTop: 2 }} />
-                <Text style={{ fontSize: 12, color: '#0369A1', flex: 1, lineHeight: 16 }}>
-                  Bạn sẽ trở thành chủ hộ của gia đình này
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={{
-                backgroundColor: COLORS.purple || '#A855F7',
-                borderRadius: 12,
-                padding: 16,
-                alignItems: 'center',
-              }}
-              onPress={handleCreateFamily}
-              disabled={creatingFamily}
-            >
-              {creatingFamily ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text
+                <View
                   style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: COLORS.white,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 24,
                   }}
                 >
-                  Tạo gia đình
-                </Text>
-              )}
-            </TouchableOpacity>
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 'bold',
+                      color: COLORS.darkGrey,
+                    }}
+                  >
+                    Tạo gia đình mới
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowCreateModal(false);
+                      setNewFamilyName('');
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      padding: 4,
+                      borderRadius: 20,
+                      backgroundColor: COLORS.lightGrey,
+                    }}
+                  >
+                    <Ionicons name="close" size={20} color={COLORS.darkGrey} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ marginBottom: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: COLORS.darkGrey,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Tên gia đình <Text style={{ color: COLORS.red || '#EF4444' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: COLORS.lightGrey || '#F5F5F5',
+                      borderRadius: 12,
+                      padding: 16,
+                      fontSize: 16,
+                      borderWidth: 1,
+                      borderColor: COLORS.lightGrey || '#E5E5E5',
+                      color: COLORS.darkGrey,
+                    }}
+                    placeholder="Nhập tên gia đình"
+                    value={newFamilyName}
+                    onChangeText={setNewFamilyName}
+                    placeholderTextColor={COLORS.grey}
+                  />
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: COLORS.lightBlue || '#E0F2FE',
+                    borderRadius: 12,
+                    padding: 14,
+                    marginBottom: 24,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#0EA5E9',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <Ionicons name="information-circle" size={18} color="#0EA5E9" style={{ marginRight: 10, marginTop: 2 }} />
+                    <Text style={{ fontSize: 13, color: '#0369A1', flex: 1, lineHeight: 18 }}>
+                      Bạn sẽ trở thành chủ hộ của gia đình này
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: COLORS.primary || COLORS.green || '#15803D',
+                    borderRadius: 12,
+                    padding: 16,
+                    alignItems: 'center',
+                    shadowColor: COLORS.primary || COLORS.green || '#15803D',
+                    shadowOffset: {
+                      width: 0,
+                      height: 4,
+                    },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 5,
+                  }}
+                  onPress={handleCreateFamily}
+                  disabled={creatingFamily}
+                  activeOpacity={0.8}
+                >
+                  {creatingFamily ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: COLORS.white,
+                      }}
+                    >
+                      Tạo gia đình
+                    </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
