@@ -12,7 +12,7 @@ export const groupStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   headerIcon: {
     padding: 4,
@@ -168,7 +168,7 @@ export const groupStyles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 10,
     paddingVertical: 12,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
     // justifyContent: 'space-evenly', // Removed to allow scrolling
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGrey,

@@ -38,6 +38,7 @@ export const foodDetailStyles = StyleSheet.create({
   },
   headerTitleGroup: {
     flex: 1,
+    alignItems: 'center',
   },
   eyebrowLabel: {
     fontSize: 12,

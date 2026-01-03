@@ -213,18 +213,14 @@ export default function CreateMenuPage() {
 
       await Promise.all(addDishPromises);
 
-      Alert.alert('Thành công', 'Tạo thực đơn thành công', [
-        {
-          text: 'OK',
-          onPress: () => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(tabs)/home' as any);
-            }
-          },
-        },
-      ]);
+      // Back trước, rồi mới hiện thông báo
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(meal)' as any);
+      }
+
+      Alert.alert('Thành công', 'Tạo thực đơn thành công');
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
@@ -411,7 +407,7 @@ export default function CreateMenuPage() {
                       </TouchableOpacity>
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {/* <View style={{ flexDirection: 'row', gap: 12 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 12, color: COLORS.grey, marginBottom: 4 }}>Số lượng</Text>
                         <TextInput
@@ -455,7 +451,7 @@ export default function CreateMenuPage() {
                           keyboardType="numeric"
                         />
                       </View>
-                    </View>
+                    </View> */}
                   </View>
                 </View>
               ))}
@@ -499,7 +495,7 @@ export default function CreateMenuPage() {
             <ScrollView style={{ maxHeight: 400 }}>
               {loadingFamilies ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color={COLORS.purple} />
+                  <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
               ) : families.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
@@ -521,7 +517,7 @@ export default function CreateMenuPage() {
                   >
                     <Text style={{ fontSize: 16, color: COLORS.darkGrey }}>{family.name}</Text>
                     {selectedFamilyId === family.id && (
-                      <Ionicons name="checkmark-circle" size={24} color={COLORS.purple} />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
                     )}
                   </TouchableOpacity>
                 ))
@@ -612,7 +608,7 @@ export default function CreateMenuPage() {
                         </Text>
                       )}
                     </View>
-                    {isSelected && <Ionicons name="checkmark-circle" size={24} color={COLORS.purple} />}
+                    {isSelected && <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />}
                   </TouchableOpacity>
                 );
               }}
@@ -624,7 +620,7 @@ export default function CreateMenuPage() {
                     style={{ padding: 16, alignItems: 'center' }}
                   >
                     {loadingDishes ? (
-                      <ActivityIndicator size="small" color={COLORS.purple} />
+                      <ActivityIndicator size="small" color={COLORS.primary} />
                     ) : (
                       <Text style={{ color: COLORS.purple, fontWeight: '600' }}>Tải thêm</Text>
                     )}
@@ -641,7 +637,7 @@ export default function CreateMenuPage() {
             />
             {loadingDishes && dishes.length === 0 && (
               <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={COLORS.purple} />
+                <ActivityIndicator size="large" color={COLORS.primary} />
               </View>
             )}
           </View>

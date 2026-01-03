@@ -95,7 +95,7 @@ export default function EditMenuPage() {
         setFamily(menu.family || null);
         setDescription(menu.description || '');
         setTime(menu.time || 'breakfast');
-        
+
         // Chuyển đổi menuDishes thành SelectedDish
         const menuDishes: SelectedDish[] = (menu.menuDishes || []).map((md: MenuDish) => ({
           menuDishId: md.id,
@@ -300,7 +300,7 @@ export default function EditMenuPage() {
       <SafeAreaView style={mealStyles.container} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={mealStyles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.purple} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={mealStyles.loaderText}>Đang tải thông tin thực đơn...</Text>
         </View>
       </SafeAreaView>
@@ -476,7 +476,7 @@ export default function EditMenuPage() {
                       </TouchableOpacity>
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {/* <View style={{ flexDirection: 'row', gap: 12 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 12, color: COLORS.grey, marginBottom: 4 }}>Số lượng</Text>
                         <TextInput
@@ -520,7 +520,7 @@ export default function EditMenuPage() {
                           keyboardType="numeric"
                         />
                       </View>
-                    </View>
+                    </View> */}
                   </View>
                 </View>
               ))}
@@ -629,7 +629,7 @@ export default function EditMenuPage() {
                         </Text>
                       )}
                     </View>
-                    {isSelected && <Ionicons name="checkmark-circle" size={24} color={COLORS.purple} />}
+                    {isSelected && <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />}
                   </TouchableOpacity>
                 );
               }}
@@ -641,7 +641,7 @@ export default function EditMenuPage() {
                     style={{ padding: 16, alignItems: 'center' }}
                   >
                     {loadingDishes ? (
-                      <ActivityIndicator size="small" color={COLORS.purple} />
+                      <ActivityIndicator size="small" color={COLORS.primary} />
                     ) : (
                       <Text style={{ color: COLORS.purple, fontWeight: '600' }}>Tải thêm</Text>
                     )}

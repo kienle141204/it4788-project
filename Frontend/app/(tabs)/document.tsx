@@ -53,11 +53,11 @@ export default function ExploreScreen() {
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth() + 1; // 1-12
       const currentYear = currentDate.getFullYear();
-      
+
       const payload = await getAccess(
         `dishes/top-rated?top=10&minRating=4&month=${currentMonth}&year=${currentYear}`
       );
-      
+
       if (payload?.success !== false && payload?.data) {
         const dishes: Dish[] = payload.data.map((item: any) => ({
           id: String(item.id || item.dish_id),
@@ -91,11 +91,11 @@ export default function ExploreScreen() {
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth() + 1; // 1-12
       const currentYear = currentDate.getFullYear();
-      
+
       const payload = await getAccess(
         `dishes/top-menu?top=10&month=${currentMonth}&year=${currentYear}`
       );
-      
+
       if (payload?.success !== false && payload?.data) {
         const dishes: Dish[] = payload.data.map((item: any) => ({
           id: String(item.id || item.dish_id),
@@ -126,11 +126,11 @@ export default function ExploreScreen() {
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth() + 1;
       const currentYear = currentDate.getFullYear();
-      
+
       const payload = await getAccess(
         `dishes/top-rated?top=20&minRating=1&month=${currentMonth}&year=${currentYear}`
       );
-      
+
       if (payload?.success !== false && payload?.data) {
         const dishes: Dish[] = payload.data.map((item: any) => ({
           id: String(item.id || item.dish_id),
@@ -232,7 +232,7 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || '#F5F5F5' }}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -269,7 +269,7 @@ export default function ExploreScreen() {
 
           {rankingLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.purple} />
+              <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
           ) : rankingDishes.length === 0 ? (
             <View style={styles.emptyRankingContainer}>
@@ -284,7 +284,7 @@ export default function ExploreScreen() {
               {rankingDishes.length >= 3 && (
                 <View style={styles.podiumContainer}>
                   {/* 2nd Place */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.podiumItem}
                     onPress={() => handleFoodPress(rankingDishes[1].id)}
                     activeOpacity={0.7}
@@ -316,7 +316,7 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
 
                   {/* 1st Place */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.podiumItem}
                     onPress={() => handleFoodPress(rankingDishes[0].id)}
                     activeOpacity={0.7}
@@ -348,7 +348,7 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
 
                   {/* 3rd Place */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.podiumItem}
                     onPress={() => handleFoodPress(rankingDishes[2].id)}
                     activeOpacity={0.7}
@@ -499,13 +499,13 @@ export default function ExploreScreen() {
               <Text style={styles.seeAllText}>
                 Xem tất cả
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.purple} />
+              <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
 
           {topRatedLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.purple} />
+              <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
           ) : topRatedDishes.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -550,13 +550,13 @@ export default function ExploreScreen() {
               <Text style={styles.seeAllText}>
                 Xem tất cả
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.purple} />
+              <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
 
           {topMenuLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.purple} />
+              <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
           ) : topMenuDishes.length === 0 ? (
             <View style={styles.emptyContainer}>

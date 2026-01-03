@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
@@ -113,45 +114,45 @@ export default function GroupPage() {
       setError(null);
 
       const response = await getMyFamilies();
-      
+
       // getMyFamilies always returns an array
       const familiesData = Array.isArray(response) ? response : [];
-      
+
       // Fetch shopping list statistics for each family
       const familiesWithStats: FamilyWithStats[] = await Promise.all(
         familiesData.map(async (family) => {
           const memberCount = family.members?.length || 0;
-          
+
           // Get shopping lists for this family
           let shoppingListInfo = {};
           try {
             const sharedLists = await getFamilySharedLists(family.id);
-            
+
             // Calculate this week's items
             const now = new Date();
             const startOfWeek = new Date(now);
             startOfWeek.setDate(now.getDate() - now.getDay());
             startOfWeek.setHours(0, 0, 0, 0);
-            
+
             const thisWeekLists = (sharedLists || []).filter((list: any) => {
               const listDate = new Date(list.created_at || list.shopping_date);
               return listDate >= startOfWeek;
             });
-            
+
             const thisWeekItems = thisWeekLists.reduce((total: number, list: any) => {
               return total + (list.items?.length || 0);
             }, 0);
-            
+
             // Calculate bought items from all lists
             const allItems = sharedLists.reduce((total: number, list: any) => {
               return total + (list.items?.length || 0);
             }, 0);
-            
+
             const boughtItems = sharedLists.reduce((total: number, list: any) => {
               const checked = list.items?.filter((item: any) => item.is_checked) || [];
               return total + checked.length;
             }, 0);
-            
+
             shoppingListInfo = {
               thisWeekItems,
               boughtItems,
@@ -159,7 +160,7 @@ export default function GroupPage() {
             };
           } catch (error) {
           }
-          
+
           return {
             ...family,
             memberCount,
@@ -167,7 +168,7 @@ export default function GroupPage() {
           };
         })
       );
-      
+
       setFamilies(familiesWithStats);
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
@@ -260,24 +261,24 @@ export default function GroupPage() {
           handleSessionExpired();
           return;
         }
-        
+
         // Extract error message from backend response
         // Backend returns: { statusCode, message, resultMessage: { vn, en } }
         const errorData = err?.response?.data || {};
         let errorMessage = 'Không thể rời khỏi nhóm. Vui lòng thử lại.';
-        
+
         if (errorData && Object.keys(errorData).length > 0) {
           // Try resultMessage.vn first (Vietnamese message), then message, then resultMessage.en
           errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
         } else if (err?.message) {
           errorMessage = err.message;
         }
-        
+
         // Check if it's an owner error (400 Bad Request from backend)
         const resultCode = errorData.resultCode || errorData.code;
         const statusCode = err?.response?.status;
         const isOwnerError = statusCode === 400 && (
-          errorMessage.includes('chuyển quyền') || 
+          errorMessage.includes('chuyển quyền') ||
           errorMessage.includes('owner') ||
           errorMessage.includes('chủ nhóm') ||
           resultCode === '00196' || // ResponseCode for owner must transfer ownership
@@ -285,7 +286,7 @@ export default function GroupPage() {
           resultCode === 'C00196' ||
           resultCode === 'C00195'
         );
-        
+
         if (isOwnerError) {
           // Show specific message based on resultCode
           if (resultCode === '00195' || resultCode === 'C00195') {
@@ -335,17 +336,17 @@ export default function GroupPage() {
           handleSessionExpired();
           return;
         }
-        
+
         // Extract error message from backend response
         const errorData = err?.response?.data || {};
         let errorMessage = 'Không thể xóa nhóm. Vui lòng thử lại.';
-        
+
         if (errorData && Object.keys(errorData).length > 0) {
           errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
         } else if (err?.message) {
           errorMessage = err.message;
         }
-        
+
         Alert.alert('Lỗi', errorMessage);
       } catch (alertError) {
       }
@@ -356,21 +357,21 @@ export default function GroupPage() {
 
   const getFamilyMenuOptions = () => {
     if (!selectedFamily) return [];
-    
+
     // Kiểm tra xem user có phải owner không
     const isOwner = currentUserId && selectedFamily.owner_id && Number(currentUserId) === Number(selectedFamily.owner_id);
-    
+
     // Kiểm tra xem user có phải manager không
     let isManager = false;
     if (currentUserId && selectedFamily.members && Array.isArray(selectedFamily.members)) {
-      isManager = selectedFamily.members.some((member: any) => 
+      isManager = selectedFamily.members.some((member: any) =>
         member && Number(member.user_id) === Number(currentUserId) && member.role === 'manager'
       );
     }
-    
+
     // Cho phép cả owner và manager xem mã mời và xóa nhóm
     const canViewInvitation = isOwner || isManager;
-    
+
     return [
       {
         label: 'Xem chi tiết',
@@ -446,11 +447,11 @@ export default function GroupPage() {
       const response = await getAccess('auth/profile');
       // API response có cấu trúc: { success, message, data: { ...userInfo } }
       const userProfile = response?.data || response;
-      
-      const ownerId = typeof userProfile.id === 'string' 
-        ? parseInt(userProfile.id, 10) 
+
+      const ownerId = typeof userProfile.id === 'string'
+        ? parseInt(userProfile.id, 10)
         : Number(userProfile.id);
-      
+
       if (isNaN(ownerId)) {
         Alert.alert('Lỗi', 'ID người dùng không hợp lệ');
         setCreatingFamily(false);
@@ -488,10 +489,10 @@ export default function GroupPage() {
   const handleJoinFamily = async (invitationCode: string) => {
     try {
       const response = await joinFamilyByCode(invitationCode);
-      
+
       // Handle both direct object and wrapped response
       const result = response?.data || response;
-      
+
       if (result?.message || result?.family) {
         Alert.alert(
           'Thành công',
@@ -517,15 +518,15 @@ export default function GroupPage() {
         ]);
       }
     } catch (error: any) {
-      
+
       let errorMessage = 'Không thể tham gia nhóm. Vui lòng thử lại.';
-      
+
       if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error?.message) {
         errorMessage = error.message;
       }
-      
+
       Alert.alert('Lỗi', errorMessage);
       throw error;
     }
@@ -540,7 +541,7 @@ export default function GroupPage() {
   const renderFamilyCard = (family: FamilyWithStats) => {
     const avatar = getFamilyAvatar(family);
     const shoppingInfo = family.shoppingListInfo;
-    
+
     return (
       <TouchableOpacity
         key={family.id}
@@ -562,7 +563,7 @@ export default function GroupPage() {
         {/* Family Info */}
         <View style={groupStyles.familyInfo}>
           <Text style={groupStyles.familyName}>{family.name}</Text>
-          
+
           {shoppingInfo?.thisWeekItems !== undefined ? (
             <Text style={groupStyles.familyDetails}>
               Danh sách tuần này: {shoppingInfo.thisWeekItems} món đồ
@@ -572,7 +573,7 @@ export default function GroupPage() {
               Đã mua {shoppingInfo.boughtItems}/{shoppingInfo.totalItems} món
             </Text>
           ) : null}
-          
+
           <Text style={groupStyles.familyMembers}>
             {family.memberCount} thành viên
           </Text>
@@ -595,7 +596,7 @@ export default function GroupPage() {
   };
 
   return (
-    <View style={groupStyles.container}>
+    <SafeAreaView style={groupStyles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
@@ -614,7 +615,7 @@ export default function GroupPage() {
       {/* Family List */}
       {loading ? (
         <View style={groupStyles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.purple} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={groupStyles.loadingText}>Đang tải...</Text>
         </View>
       ) : (
@@ -870,6 +871,6 @@ export default function GroupPage() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
