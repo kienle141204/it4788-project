@@ -9,7 +9,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +38,7 @@ interface Refrigerator {
 
 export default function FridgeListPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [refrigerators, setRefrigerators] = useState<Refrigerator[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -404,8 +405,9 @@ export default function FridgeListPage() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || COLORS.white }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
 
       {/* Header */}
       <View
@@ -414,8 +416,9 @@ export default function FridgeListPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
-          paddingVertical: 16,
-          backgroundColor: COLORS.white,
+          paddingTop: 10,
+          paddingBottom: 16,
+          backgroundColor: COLORS.background,
           borderBottomWidth: 1,
           borderBottomColor: COLORS.background || '#F5F5F5',
         }}
@@ -603,7 +606,8 @@ export default function FridgeListPage() {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 

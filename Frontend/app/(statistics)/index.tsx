@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/themes';
@@ -11,12 +11,13 @@ import { safeGoBack } from '@/utils/navigation';
 
 export default function StatisticsScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [activeTab, setActiveTab] = useState<'details' | 'charts'>('details');
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: 10 }]}>
                 <TouchableOpacity onPress={() => safeGoBack(router)} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>

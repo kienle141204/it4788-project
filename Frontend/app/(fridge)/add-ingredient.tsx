@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -36,6 +36,7 @@ const PAGE_LIMIT = 20;
 
 export default function AddIngredientPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { refrigeratorId } = useLocalSearchParams();
   const fridgeId = parseInt(refrigeratorId as string);
   const sessionExpiredRef = useRef(false);
@@ -242,7 +243,7 @@ export default function AddIngredientPage() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || COLORS.white }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
       {/* Header */}
       <View
@@ -251,7 +252,8 @@ export default function AddIngredientPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
-          paddingVertical: 16,
+          paddingTop: Math.max(insets.top, 16) + 10,
+          paddingBottom: 16,
           backgroundColor: COLORS.white,
           borderBottomWidth: 1,
           borderBottomColor: COLORS.background || '#F5F5F5',

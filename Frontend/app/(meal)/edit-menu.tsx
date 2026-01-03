@@ -319,7 +319,7 @@ export default function EditMenuPage() {
   if (loadingMenu) {
     return (
       <SafeAreaView style={mealStyles.container} edges={['top']}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={mealStyles.loaderContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={mealStyles.loaderText}>Đang tải thông tin thực đơn...</Text>

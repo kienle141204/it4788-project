@@ -10,7 +10,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/themes';
@@ -21,6 +21,7 @@ import { clearCacheByPattern } from '@/utils/cache';
 
 export default function CreateFridgePage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const sessionExpiredRef = useRef(false);
   const [refrigeratorType, setRefrigeratorType] = useState<'personal' | 'family'>('personal');
   const [selectedFamilyId, setSelectedFamilyId] = useState<number | null>(null);
@@ -177,7 +178,7 @@ export default function CreateFridgePage() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || COLORS.white }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
       {/* Header */}
       <View
@@ -186,7 +187,8 @@ export default function CreateFridgePage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
-          paddingVertical: 16,
+          paddingTop: Math.max(insets.top, 16) + 10,
+          paddingBottom: 16,
           backgroundColor: COLORS.white,
           borderBottomWidth: 1,
           borderBottomColor: COLORS.background || '#F5F5F5',

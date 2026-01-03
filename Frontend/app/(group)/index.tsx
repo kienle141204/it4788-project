@@ -14,7 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
@@ -733,12 +733,14 @@ export default function GroupPage() {
     fetchFamilies(true);
   };
 
-  return (
-    <SafeAreaView style={groupStyles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+  const insets = useSafeAreaInsets();
 
-      {/* Header */}
-      <View style={groupStyles.header}>
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+      <SafeAreaView style={[groupStyles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
+        {/* Header */}
+        <View style={[groupStyles.header, { paddingTop: 10, backgroundColor: COLORS.background }]}>
         <TouchableOpacity onPress={handleBack} style={groupStyles.headerIcon}>
           <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
         </TouchableOpacity>
@@ -1015,6 +1017,7 @@ export default function GroupPage() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { taskStyles } from '../styles/task.styles';
 import { COLORS } from '../constants/themes';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface NavbarProps {
   title: string;
@@ -23,8 +24,10 @@ const Navbar: React.FC<NavbarProps> = ({
   showMenu = false,
   onMenuPress,
 }) => {
+  const insets = useSafeAreaInsets();
+  
   return (
-    <View style={taskStyles.header}>
+    <View style={[taskStyles.header, { paddingTop: insets.top + 10 }]}>
       {/* Back Button */}
       <TouchableOpacity 
         onPress={onBack} 

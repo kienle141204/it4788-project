@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Linking, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -94,9 +94,11 @@ export default function NearestMarketScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header */}
-            <View style={styles.header}>
+        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+            <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
+                {/* Header */}
+                <View style={[styles.header, { backgroundColor: COLORS.background }]}>
                 <TouchableOpacity onPress={() => {
                     if (router.canGoBack()) {
                         router.back();
@@ -152,7 +154,8 @@ export default function NearestMarketScreen() {
                     }
                 />
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 }
 

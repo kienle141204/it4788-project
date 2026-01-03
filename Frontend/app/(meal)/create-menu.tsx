@@ -252,7 +252,7 @@ export default function CreateMenuPage() {
 
   return (
     <SafeAreaView style={mealStyles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
       <View style={mealStyles.header}>
         <TouchableOpacity onPress={handleBack} style={mealStyles.backButton}>

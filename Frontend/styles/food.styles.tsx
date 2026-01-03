@@ -93,8 +93,9 @@ export const foodStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 20,
+    paddingTop: 8,
   },
   sectionTitle: {
     fontSize: 18,
@@ -105,6 +106,7 @@ export const foodStyles = StyleSheet.create({
   },
   foodList: {
     gap: 16,
+    marginBottom: 8,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -114,15 +116,16 @@ export const foodStyles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     minHeight: 104,
-    maxHeight: 104,
+    marginHorizontal: 4,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   cardImageContainer: {
     marginRight: 12,

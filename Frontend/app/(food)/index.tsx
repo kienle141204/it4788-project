@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
@@ -186,12 +186,15 @@ export default function FoodPage() {
     }
   }, [activeTab, fetchFavoriteDishes]);
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={foodStyles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.darkGrey} />
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+      <SafeAreaView style={[foodStyles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
 
       {/* Header */}
-      <View style={foodStyles.header}>
+      <View style={[foodStyles.header, { paddingTop: 10, backgroundColor: COLORS.background }]}>
         <TouchableOpacity onPress={handleBack} style={foodStyles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
         </TouchableOpacity>
@@ -351,7 +354,8 @@ export default function FoodPage() {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 

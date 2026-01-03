@@ -230,11 +230,11 @@ export default function ExploreScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || '#F5F5F5' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-      {/* Header */}
-      <View style={styles.header}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: 10, backgroundColor: COLORS.background }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerIconContainer}>
             <Ionicons name="compass" size={28} color={COLORS.purple} />
@@ -587,7 +587,8 @@ export default function ExploreScreen() {
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 

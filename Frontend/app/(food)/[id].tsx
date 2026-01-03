@@ -700,7 +700,7 @@ export default function FoodDetailPage() {
   if (loading) {
     return (
       <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={foodDetailStyles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
           <Text style={foodDetailStyles.loadingText}>Đang tải...</Text>
@@ -712,7 +712,7 @@ export default function FoodDetailPage() {
   if (!dish) {
     return (
       <SafeAreaView style={foodDetailStyles.container} edges={['top']}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={foodDetailStyles.headerWrapper}>
           <View style={foodDetailStyles.header}>
             <TouchableOpacity onPress={handleBack} style={foodDetailStyles.headerButton}>

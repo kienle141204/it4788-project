@@ -576,10 +576,10 @@ export default function MealPage() {
   };
 
   return (
-    <SafeAreaView style={mealStyles.container} edges={['top']}>
-      <StatusBar barStyle='dark-content' backgroundColor='#FFFFFF' />
-
-      <View style={mealStyles.header}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle='dark-content' backgroundColor={COLORS.background} translucent={false} />
+      <SafeAreaView style={[mealStyles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
+        <View style={[mealStyles.header, { backgroundColor: COLORS.background }]}>
         <TouchableOpacity onPress={handleBack} style={mealStyles.backButton}>
           <Ionicons name='arrow-back' size={24} color={COLORS.darkGrey} />
         </TouchableOpacity>
@@ -717,7 +717,8 @@ export default function MealPage() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 

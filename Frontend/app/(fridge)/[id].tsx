@@ -14,7 +14,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -109,6 +109,7 @@ const PAGE_LIMIT = 20;
 
 export default function FridgeDetailPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
   const refrigeratorId = parseInt(id as string);
   const sessionExpiredRef = useRef(false);
@@ -1512,7 +1513,7 @@ export default function FridgeDetailPage() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || COLORS.white }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
       {/* Header */}
       <View
@@ -1521,7 +1522,8 @@ export default function FridgeDetailPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
-          paddingVertical: 16,
+          paddingTop: Math.max(insets.top, 16) + 10,
+          paddingBottom: 16,
           backgroundColor: COLORS.white,
           borderBottomWidth: 1,
           borderBottomColor: COLORS.background || '#F5F5F5',

@@ -66,7 +66,7 @@ export function LogViewer() {
         style={styles.toggleButton}
         onPress={() => setVisible(true)}
       >
-        <Text style={styles.toggleButtonText}>📋 Logs</Text>
+        <Text style={styles.toggleButtonText}></Text>
       </TouchableOpacity>
     );
   }

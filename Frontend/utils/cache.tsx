@@ -254,11 +254,12 @@ const clearOldestCaches = async (requiredSize: number): Promise<void> => {
 
 /**
  * Cache TTL constants (in milliseconds)
+ * Increased for better offline support
  */
 export const CACHE_TTL = {
-  SHORT: 5 * 60 * 1000,      // 5 minutes
-  MEDIUM: 15 * 60 * 1000,    // 15 minutes
-  LONG: 30 * 60 * 1000,       // 30 minutes
-  STATIC: 60 * 60 * 1000,    // 1 hour
+  SHORT: 30 * 60 * 1000,      // 30 minutes (increased from 5 minutes)
+  MEDIUM: 2 * 60 * 60 * 1000, // 2 hours (increased from 15 minutes)
+  LONG: 4 * 60 * 60 * 1000,   // 4 hours (increased from 30 minutes)
+  STATIC: 24 * 60 * 60 * 1000, // 24 hours (increased from 1 hour)
 };
 
