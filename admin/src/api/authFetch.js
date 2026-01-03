@@ -2,7 +2,7 @@
 // Handles authentication, token refresh, and common API request patterns
 
 // const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
-const API_BASE_URL = 'https://it4788-project-ttac.onrender.com/api/';
+const API_BASE_URL = 'https://it4788-project-ttac.onrender.com/api';
 
 // Main auth fetch function with token refresh logic
 export const authFetch = async (endpoint, options = {}) => {
