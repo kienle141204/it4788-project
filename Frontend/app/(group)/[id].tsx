@@ -15,11 +15,13 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupStyles } from '../../styles/group.styles';
 import { COLORS } from '../../constants/themes';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFamilyById, getFamilyInvitationCode, leaveFamily, deleteFamily } from '../../service/family';
 import {
   getShoppingListsByFamily,
@@ -171,6 +173,7 @@ export default function GroupDetailPage() {
   const router = useRouter();
   const { id, tab } = useLocalSearchParams();
   const familyId = parseInt(id as string);
+  const insets = useSafeAreaInsets();
 
   // Đọc query param 'tab' để hỗ trợ deep linking từ notification
   const initialTab = (tab === 'chat' ? 'chat' : tab === 'statistics' ? 'statistics' : 'shopping') as 'shopping' | 'chat' | 'statistics';
@@ -237,6 +240,7 @@ export default function GroupDetailPage() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const chatLastIdRef = useRef<number | null>(null);
   const tempMessageIdRef = useRef<number>(-1); // Use negative IDs for temporary messages
   const pendingTempMessagesRef = useRef<Map<number, { tempId: number; message: string; timestamp: number }>>(new Map()); // Track pending temp messages
@@ -1107,6 +1111,27 @@ export default function GroupDetailPage() {
     }
   }, [chatMessages, activeTab, chatLoading]);
 
+  // Listen to keyboard show/hide events
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage) return;
 
@@ -1367,12 +1392,13 @@ export default function GroupDetailPage() {
       );
     }
 
+    const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+    const containerProps = Platform.OS === 'ios' 
+      ? { style: groupStyles.chatContainer, behavior: 'padding' as const, keyboardVerticalOffset: 0 }
+      : { style: groupStyles.chatContainer };
+
     return (
-      <KeyboardAvoidingView
-        style={groupStyles.chatContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
+      <Container {...containerProps}>
         {chatMessages.length === 0 ? (
           <View style={groupStyles.chatEmptyState}>
             <View style={groupStyles.chatEmptyIcon}>
@@ -1444,7 +1470,7 @@ export default function GroupDetailPage() {
           />
         )}
 
-        <View style={groupStyles.chatInputContainer}>
+        <View style={[groupStyles.chatInputContainer, { paddingBottom: 0, marginBottom: 0 }]}>
           <View style={groupStyles.chatInputWrapper}>
             <TextInput
               style={groupStyles.chatInput}
@@ -1468,15 +1494,16 @@ export default function GroupDetailPage() {
             <Ionicons name="send" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </Container>
     );
   };
 
-  // Generate date range for carousel (5 dates: 2 before, current, 2 after based on offset)
+  // Generate date range for carousel (4 dates: 1 before, current, 2 after based on offset)
   const dateRange = useMemo(() => {
     const dates = [];
     const today = new Date();
-    for (let i = -2; i <= 2; i++) {
+    // Generate 4 days: 1 day before, today, and 2 days after
+    for (let i = -1; i <= 2; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + dateOffset + i);
       dates.push(date);
@@ -2194,6 +2221,14 @@ export default function GroupDetailPage() {
   };
 
   const renderDateCarousel = () => {
+    const screenWidth = Dimensions.get('window').width;
+    // Calculate width for each date item: screen width - nav buttons - gaps
+    const navButtonWidth = 40; // Approximate width of nav buttons
+    const gapBetweenItems = 6;
+    const totalGaps = gapBetweenItems * (dateRange.length - 1);
+    const availableWidth = screenWidth - (navButtonWidth * 2) - totalGaps;
+    const itemWidth = availableWidth / dateRange.length;
+
     return (
       <View style={groupStyles.dateCarouselContainer}>
         <TouchableOpacity
@@ -2203,11 +2238,7 @@ export default function GroupDetailPage() {
           <Ionicons name="chevron-back" size={20} color={COLORS.darkGrey} />
         </TouchableOpacity>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={groupStyles.dateCarousel}
-        >
+        <View style={groupStyles.dateCarousel}>
           {dateRange.map((date, index) => {
             const { day, weekday, isToday } = formatDate(date);
             const isActive = isSameDay(date, selectedDate);
@@ -2217,6 +2248,7 @@ export default function GroupDetailPage() {
                 key={index}
                 style={[
                   groupStyles.dateItem,
+                  { width: itemWidth },
                   isActive && groupStyles.dateItemActive,
                 ]}
                 onPress={() => setSelectedDate(date)}
@@ -2236,7 +2268,7 @@ export default function GroupDetailPage() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         <TouchableOpacity
           style={groupStyles.dateNavButton}
@@ -2421,11 +2453,11 @@ export default function GroupDetailPage() {
   };
 
   return (
-    <View style={groupStyles.container}>
-      <StatusBar barStyle='dark-content' backgroundColor='#FFFFFF' />
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle='dark-content' backgroundColor={COLORS.background} translucent={false} />
 
       {/* Header */}
-      <View style={groupStyles.header}>
+      <View style={[groupStyles.header, { paddingTop: insets.top + 10, backgroundColor: COLORS.background }]}>
         <TouchableOpacity onPress={handleBack} style={groupStyles.headerIcon}>
           <Ionicons name='arrow-back' size={24} color={COLORS.darkGrey} />
         </TouchableOpacity>

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getIngredientById } from "@/service/market";
 import { COLORS } from "@/constants/themes";
 
@@ -18,6 +19,7 @@ export default function IngredientDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const ingredientId = params.id ? parseInt(params.id as string) : null;
+  const insets = useSafeAreaInsets();
 
   const [ingredient, setIngredient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +107,7 @@ export default function IngredientDetailScreen() {
     <View style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header với nút back */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity 
             style={styles.backButtonHeader}
             onPress={() => {

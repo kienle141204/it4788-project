@@ -3,6 +3,7 @@ const { withAndroidManifest } = require('@expo/config-plugins');
 /**
  * Fix manifest merger conflict between expo-notifications and react-native-firebase
  * Both try to set com.google.firebase.messaging.default_notification_color
+ * Also sets windowSoftInputMode to adjustResize for better keyboard handling
  */
 const withAndroidManifestFix = (config) => {
   return withAndroidManifest(config, async (config) => {
@@ -14,6 +15,23 @@ const withAndroidManifestFix = (config) => {
     }
 
     const application = manifest.application[0];
+    
+    // Set windowSoftInputMode to adjustResize for better keyboard handling
+    if (!application.activity) {
+      application.activity = [];
+    }
+    
+    // Find the main activity and set windowSoftInputMode
+    application.activity = application.activity.map((activity) => {
+      if (activity.$ && activity.$['android:name'] === '.MainActivity') {
+        if (!activity.$) {
+          activity.$ = {};
+        }
+        activity.$['android:windowSoftInputMode'] = 'adjustResize';
+      }
+      return activity;
+    });
+
     if (!application['meta-data']) {
       return config;
     }

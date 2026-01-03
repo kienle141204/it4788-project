@@ -4,6 +4,11 @@ import { BackHandler, ToastAndroid } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 
 // Import components
 import Header from '@/components/Header';
@@ -15,7 +20,6 @@ import { getAccess } from '@/utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getMyShoppingLists } from '@/service/shopping';
-import { LogViewer } from '@/utils/logger';
 
 type UserProfile = {
   id: number;
@@ -35,6 +39,8 @@ interface TodayTasks {
   completedItems: number;
 }
 
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
 export default function HomePage() {
   const router = useRouter();
   const backPressCount = useRef(0);
@@ -42,6 +48,13 @@ export default function HomePage() {
   const [todayTasks, setTodayTasks] = useState<TodayTasks>({ totalItems: 0, completedItems: 0 });
   const { unreadCount, refreshNotifications } = useNotifications();
 
+  // Animation value for content fade-in - start with visible to avoid flicker
+  const contentOpacity = useSharedValue(1);
+
+  const animateContentIn = () => {
+    contentOpacity.value = 0;
+    contentOpacity.value = withTiming(1, { duration: 400 });
+  };
 
   const fetchProfile = useCallback(async (isRefreshing = false) => {
     try {
@@ -152,7 +165,13 @@ export default function HomePage() {
     fetchProfile();
     fetchTodayTasks();
     refreshNotifications();
+    animateContentIn();
   }, [fetchProfile, fetchTodayTasks, refreshNotifications]);
+
+  // Animated style for content
+  const contentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
 
   // Refresh data khi màn hình được focus
   useFocusEffect(
@@ -160,6 +179,7 @@ export default function HomePage() {
       fetchProfile(true); // Refresh profile on focus
       fetchTodayTasks();
       refreshNotifications();
+      animateContentIn(); // Re-animate content when screen is focused
     }, [fetchProfile, fetchTodayTasks, refreshNotifications])
   );
 
@@ -215,48 +235,49 @@ export default function HomePage() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
+      <AnimatedScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <Header
-          userName={profile?.full_name || profile?.fullname || 'Người dùng'}
-          avatarUrl={profile?.avatar_url}
-          onNotificationPress={handleNotificationPress}
-          onMenuPress={handleMenuPress}
-        />
-
-        <TaskSummaryCard
-          totalTasks={todayTasks.totalItems}
-          completedTasks={todayTasks.completedItems}
-          onViewTasks={handleViewTasks}
-        />
-
-        {/* <View style={styles.notificationSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Thông báo</Text>
-            <Ionicons name="sparkles" size={20} color={COLORS.purple} />
-          </View>
-
-          <NotificationCard
-            title="Thực phẩm sắp hết hạn"
-            message="Kiểm tra tủ lạnh của bạn ngay!"
-            type="warning"
+        <Animated.View style={contentAnimatedStyle}>
+          <Header
+            userName={profile?.full_name || profile?.fullname || 'Người dùng'}
+            avatarUrl={profile?.avatar_url}
+            onNotificationPress={handleNotificationPress}
+            onMenuPress={handleMenuPress}
           />
-        </View> */}
 
-        {/* Features Grid */}
-        <View style={styles.featuresSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Chức năng</Text>
-            {/* <Ionicons name="sparkles" size={20} color={COLORS.purple} /> */}
+          <TaskSummaryCard
+            totalTasks={todayTasks.totalItems}
+            completedTasks={todayTasks.completedItems}
+            onViewTasks={handleViewTasks}
+          />
+
+          {/* <View style={styles.notificationSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Thông báo</Text>
+              <Ionicons name="sparkles" size={20} color={COLORS.purple} />
+            </View>
+
+            <NotificationCard
+              title="Thực phẩm sắp hết hạn"
+              message="Kiểm tra tủ lạnh của bạn ngay!"
+              type="warning"
+            />
+          </View> */}
+
+          {/* Features Grid */}
+          <View style={styles.featuresSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Chức năng</Text>
+              {/* <Ionicons name="sparkles" size={20} color={COLORS.purple} /> */}
+            </View>
+            <FeatureGrid features={features} />
           </View>
-          <FeatureGrid features={features} />
-        </View>
+        </Animated.View>
 
-      </ScrollView>
-      <LogViewer />
+      </AnimatedScrollView>
     </View>
   );
 }

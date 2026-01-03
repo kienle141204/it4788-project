@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, ScrollView, Alert, Text, ActivityIndicator, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateSelector from '@/components/DateSelector';
 import { taskStyles } from '@/styles/task.styles';
 import { groupStyles } from '@/styles/group.styles';
@@ -26,6 +27,7 @@ interface ShoppingList {
 
 export default function TaskPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<number>(today.getDate());
   const [selectedDateFull, setSelectedDateFull] = useState<Date>(today);
@@ -384,7 +386,7 @@ export default function TaskPage() {
         showsVerticalScrollIndicator={false}
       >
         {/* Page Header */}
-        <View style={styles.pageHeader}>
+        <View style={[styles.pageHeader, { paddingTop: insets.top + 20 }]}>
           <Text style={styles.pageTitle}>Nhiệm vụ của tôi</Text>
         </View>
 
@@ -458,7 +460,6 @@ export default function TaskPage() {
 const styles = StyleSheet.create({
   pageHeader: {
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 16,
     backgroundColor: COLORS.background,
     alignItems: 'center',

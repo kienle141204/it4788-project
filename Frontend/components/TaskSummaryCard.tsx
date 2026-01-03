@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+} from 'react-native-reanimated';
 import { COLORS } from '../constants/themes';
 
 type CompletionStatus = 'incomplete' | 'partial' | 'complete';
@@ -46,23 +53,51 @@ export default function TaskSummaryCard({ totalTasks, completedTasks, onViewTask
   const statusText = getStatusText(totalTasks, completedTasks);
   const remaining = totalTasks - completedTasks;
 
+  // Animation values - start with visible to avoid flicker
+  const opacity = useSharedValue(1);
+  const translateX = useSharedValue(0);
+
+  const animateIn = () => {
+    opacity.value = 0;
+    translateX.value = -30;
+    opacity.value = withTiming(1, { duration: 500 });
+    translateX.value = withSpring(0, { damping: 15, stiffness: 100 });
+  };
+
+  useEffect(() => {
+    animateIn();
+  }, []);
+
+  // Re-animate when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      animateIn();
+    }, [])
+  );
+
+  // Animated style
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
   return (
-    <View style={{
+    <Animated.View style={[{
       marginHorizontal: 20,
       marginBottom: 20,
       backgroundColor: backgroundColor,
-      borderRadius: 16,
+      borderRadius: 20,
       padding: 20,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       position: 'relative',
       shadowColor: backgroundColor,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 5,
-    }}>
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      elevation: 8,
+    }, animatedStyle]}>
 
       <View style={{ flex: 1, marginRight: 20 }}>
         <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: 'bold', marginBottom: 6 }}>
@@ -75,13 +110,18 @@ export default function TaskSummaryCard({ totalTasks, completedTasks, onViewTask
           onPress={onViewTasks}
           style={{
             backgroundColor: COLORS.white,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 20,
+            paddingHorizontal: 18,
+            paddingVertical: 10,
+            borderRadius: 24,
             alignSelf: 'flex-start',
             flexDirection: 'row',
             alignItems: 'center',
             gap: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3,
           }}
         >
           <Ionicons name="calendar-outline" size={16} color={backgroundColor} />
@@ -108,7 +148,7 @@ export default function TaskSummaryCard({ totalTasks, completedTasks, onViewTask
           Hoàn thành
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

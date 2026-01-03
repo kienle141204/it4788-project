@@ -69,31 +69,35 @@ export const taskStyles = StyleSheet.create({
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 16,
-    backgroundColor: COLORS.background,
-    gap: 8,
+    backgroundColor: COLORS.white,
+    gap: 6,
+    overflow: 'hidden',
   },
   
   dateNavButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    padding: 6,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   
   dateScrollContent: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 4,
+    gap: 6,
+    paddingHorizontal: 2,
   },
   
   dateItem: {
-    minWidth: 70,
+    minWidth: 68,
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: COLORS.backgroundLight,
+    backgroundColor: COLORS.lightGrey,
   },
   
   dateItemSelected: {

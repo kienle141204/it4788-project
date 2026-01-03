@@ -4,9 +4,12 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/themes';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tabs
       screenOptions={{
@@ -15,8 +18,8 @@ export default function TabsLayout() {
           backgroundColor: COLORS.backgroundLight || COLORS.white,
           paddingHorizontal: 5,
           paddingVertical: 5,
-          paddingBottom: 5,
-          height: 60,
+          paddingBottom: Math.max(insets.bottom, 5),
+          height: 60 + Math.max(insets.bottom - 5, 0),
           borderTopWidth: 0,
           shadowColor: COLORS.shadow || '#000',
           shadowOffset: { width: 0, height: -2 },

@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { StatusBar } from "react-native";
 import { commonStyles } from "@/styles/common.styles";
 import { marketStyles } from "@/styles/market.styles";
 import { ingredientPagination, searchIngredients } from "@/service/market";
@@ -166,11 +167,13 @@ export default function MarketScreen() {
   };
 
   return (
-    <SafeAreaView style={marketStyles.safeArea}>
-      <View style={marketStyles.container}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+      <SafeAreaView style={[marketStyles.safeArea, { backgroundColor: COLORS.background }]}>
+        <View style={[marketStyles.container, { backgroundColor: COLORS.background }]}>
 
-        {/* Header */}
-        <View style={marketStyles.header}>
+          {/* Header */}
+          <View style={[marketStyles.header, { backgroundColor: COLORS.background }]}>
           <TouchableOpacity
             style={marketStyles.backButton}
             onPress={() => {
@@ -393,7 +396,8 @@ export default function MarketScreen() {
             )}
           </View>
         )}
-      </View>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }

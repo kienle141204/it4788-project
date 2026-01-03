@@ -1,6 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { isNetworkAvailable } from './network';
+import { addToQueue } from './requestQueue';
+import { getCache, generateCacheKey } from './cache';
 
 // Tự động phát hiện môi trường để chọn API domain phù hợp
 // Web: localhost, Android emulator: 10.0.2.2, iOS simulator: localhost
@@ -271,7 +274,7 @@ export const logoutUser = async () => {
   }
 };
 
-const getTokenHeader = async () => {
+export const getTokenHeader = async () => {
   const token = await AsyncStorage.getItem('access_token');
   if (!token) {
     return {};
@@ -323,7 +326,7 @@ const refreshAccessToken = async (): Promise<boolean> => {
   }
 };
 
-const ensureTokenValid = async (): Promise<boolean> => {
+export const ensureTokenValid = async (): Promise<boolean> => {
   const token = await AsyncStorage.getItem('access_token');
   if (!token) {
     await logoutUser();
@@ -353,6 +356,24 @@ const ensureTokenValid = async (): Promise<boolean> => {
 };
 
 export const getAccess = async (path: string, params: object = {}, retryCount = 0): Promise<any> => {
+  const networkAvailable = isNetworkAvailable();
+  
+  // If offline, try to get from cache first
+  if (!networkAvailable) {
+    try {
+      const cacheKey = generateCacheKey(path, params);
+      const cachedData = await getCache(cacheKey);
+      if (cachedData !== null) {
+        console.log(`[API] Offline: Returning cached data for ${path}`);
+        return cachedData;
+      }
+    } catch (cacheError) {
+      console.warn(`[API] Error reading cache for ${path}:`, cacheError);
+    }
+    // If no cache available, throw error with clear message
+    throw new Error('OFFLINE_NO_CACHE: Không có kết nối mạng và không có dữ liệu trong cache');
+  }
+
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -382,6 +403,29 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
       }
       if (error.response?.status === 401) {
       }
+      
+      // If network error (no response), try cache as fallback
+      const isNetworkError = 
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('Network') ||
+        error.message?.includes('network') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('timeout') ||
+        !error.response;
+      
+      if (isNetworkError && retryCount === 0) {
+        try {
+          const cacheKey = generateCacheKey(path, params);
+          const cachedData = await getCache(cacheKey);
+          if (cachedData !== null) {
+            console.log(`[API] Network error: Returning cached data for ${path}`);
+            return cachedData;
+          }
+        } catch (cacheError) {
+          console.warn(`[API] Error reading cache for ${path}:`, cacheError);
+        }
+      }
+      
       throw error;
     } else {
       throw error;
@@ -390,6 +434,9 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
 };
 
 export const postAccess = async (path: string, data: object, retryCount = 0): Promise<any> => {
+  // Check network availability before making request
+  const networkAvailable = isNetworkAvailable();
+  
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -401,12 +448,47 @@ export const postAccess = async (path: string, data: object, retryCount = 0): Pr
       throw error;
     }
     if (axios.isAxiosError(error)) {
+      // Handle 401 Unauthorized
       if (error.response?.status === 401 && retryCount === 0) {
         await refreshAccessToken();
         return postAccess(path, data, retryCount + 1);
       }
       if (error.response?.status === 401) {
+        throw error;
       }
+      
+      // Handle network errors - queue request if offline
+      const isNetworkError = 
+        !networkAvailable ||
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('Network') ||
+        error.message?.includes('network') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('timeout') ||
+        !error.response; // No response usually means network issue
+      
+      if (isNetworkError && retryCount === 0) {
+        // Queue the request for later
+        try {
+          const requestId = await addToQueue('POST', path, data, tokenHeader as Record<string, string>);
+          console.log(`[API] Network error, queued POST ${path} (ID: ${requestId})`);
+          
+          // Return optimistic response to prevent UI errors
+          // The actual data will be synced when network is back
+          return {
+            success: true,
+            message: 'Request queued for offline sync',
+            queued: true,
+            requestId,
+            data: data, // Return the data that was sent
+          };
+        } catch (queueError) {
+          console.error('[API] Error queueing request:', queueError);
+          // If queueing fails, throw original error
+          throw error;
+        }
+      }
+      
       throw error;
     } else {
       throw error;
@@ -415,6 +497,9 @@ export const postAccess = async (path: string, data: object, retryCount = 0): Pr
 };
 
 export const patchAccess = async (path: string, data: object, retryCount = 0): Promise<any> => {
+  // Check network availability before making request
+  const networkAvailable = isNetworkAvailable();
+  
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -426,12 +511,45 @@ export const patchAccess = async (path: string, data: object, retryCount = 0): P
       throw error;
     }
     if (axios.isAxiosError(error)) {
+      // Handle 401 Unauthorized
       if (error.response?.status === 401 && retryCount === 0) {
         await refreshAccessToken();
         return patchAccess(path, data, retryCount + 1);
       }
       if (error.response?.status === 401) {
+        throw error;
       }
+      
+      // Handle network errors - queue request if offline
+      const isNetworkError = 
+        !networkAvailable ||
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('Network') ||
+        error.message?.includes('network') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('timeout') ||
+        !error.response; // No response usually means network issue
+      
+      if (isNetworkError && retryCount === 0) {
+        // Queue the request for later
+        try {
+          const requestId = await addToQueue('PATCH', path, data, tokenHeader as Record<string, string>);
+          console.log(`[API] Network error, queued PATCH ${path} (ID: ${requestId})`);
+          
+          // Return optimistic response to prevent UI errors
+          return {
+            success: true,
+            message: 'Request queued for offline sync',
+            queued: true,
+            requestId,
+            data: data, // Return the data that was sent
+          };
+        } catch (queueError) {
+          console.error('[API] Error queueing request:', queueError);
+          throw error;
+        }
+      }
+      
       throw error;
     } else {
       throw error;
@@ -440,6 +558,9 @@ export const patchAccess = async (path: string, data: object, retryCount = 0): P
 };
 
 export const deleteAccess = async (path: string, retryCount = 0): Promise<any> => {
+  // Check network availability before making request
+  const networkAvailable = isNetworkAvailable();
+  
   let tokenHeader = {};
   try {
     await ensureTokenValid();
@@ -451,12 +572,44 @@ export const deleteAccess = async (path: string, retryCount = 0): Promise<any> =
       throw error;
     }
     if (axios.isAxiosError(error)) {
+      // Handle 401 Unauthorized
       if (error.response?.status === 401 && retryCount === 0) {
         await refreshAccessToken();
         return deleteAccess(path, retryCount + 1);
       }
       if (error.response?.status === 401) {
+        throw error;
       }
+      
+      // Handle network errors - queue request if offline
+      const isNetworkError = 
+        !networkAvailable ||
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('Network') ||
+        error.message?.includes('network') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('timeout') ||
+        !error.response; // No response usually means network issue
+      
+      if (isNetworkError && retryCount === 0) {
+        // Queue the request for later
+        try {
+          const requestId = await addToQueue('DELETE', path, undefined, tokenHeader as Record<string, string>);
+          console.log(`[API] Network error, queued DELETE ${path} (ID: ${requestId})`);
+          
+          // Return optimistic response to prevent UI errors
+          return {
+            success: true,
+            message: 'Request queued for offline sync',
+            queued: true,
+            requestId,
+          };
+        } catch (queueError) {
+          console.error('[API] Error queueing request:', queueError);
+          throw error;
+        }
+      }
+      
       throw error;
     } else {
       throw error;

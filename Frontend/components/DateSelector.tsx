@@ -28,8 +28,8 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
     const today = new Date();
     const result: DateItem[] = [];
     
-    // Generate dates: 2 days before, today, and 2 days after (based on offset)
-    for (let i = -2; i <= 2; i++) {
+    // Generate dates: 1 day before, today, and 2 days after (4 days total, based on offset)
+    for (let i = -1; i <= 2; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + dateOffset + i);
       
@@ -74,6 +74,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
         horizontal 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={taskStyles.dateScrollContent}
+        style={{ flex: 1 }}
       >
         {dates.map((date, index) => {
           const isSelected = selectedDate === date.day;
