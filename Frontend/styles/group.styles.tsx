@@ -539,6 +539,12 @@ export const groupStyles = StyleSheet.create({
   modalBody: {
     gap: 16,
   },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.darkGrey,
+    marginBottom: 8,
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: COLORS.lightGrey,
@@ -945,7 +951,7 @@ export const groupStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
-    paddingBottom: 20,
+    paddingBottom: 12,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGrey,

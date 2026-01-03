@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/themes';
 import { getMyRefrigerators } from '@/service/fridge';
 import { getAccess } from '@/utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
+import { clearCacheByPattern } from '@/utils/cache';
 import NotificationCard from '@/components/NotificationCard';
 
 interface Refrigerator {
@@ -63,7 +65,61 @@ export default function FridgeListPage() {
       }
       setError(null);
 
-      const response = await getMyRefrigerators();
+      // Use cached API for better performance
+      let response: Refrigerator[] | { data: Refrigerator[] } | Refrigerator;
+      if (isRefreshing) {
+        // Force refresh: always fetch from API
+        const result = await refreshCachedAccess<Refrigerator[] | { data: Refrigerator[] } | Refrigerator>(
+          'fridge/my-frifge',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'fridge:list',
+            compareData: true,
+          }
+        );
+        response = result.data;
+      } else {
+        // Normal fetch: use cache if available
+        const result = await getCachedAccess<Refrigerator[] | { data: Refrigerator[] } | Refrigerator>(
+          'fridge/my-frifge',
+          {},
+          {
+            ttl: CACHE_TTL.MEDIUM,
+            cacheKey: 'fridge:list',
+            compareData: true,
+          }
+        );
+        response = result.data;
+        
+        // If we got data from cache, fetch fresh data in background
+        if (result.fromCache) {
+          refreshCachedAccess<Refrigerator[] | { data: Refrigerator[] } | Refrigerator>(
+            'fridge/my-frifge',
+            {},
+            {
+              ttl: CACHE_TTL.MEDIUM,
+              cacheKey: 'fridge:list',
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshData = freshResult.data;
+              let freshRefrigerators: Refrigerator[] = [];
+              if (Array.isArray(freshData)) {
+                freshRefrigerators = freshData;
+              } else if (freshData?.data && Array.isArray(freshData.data)) {
+                freshRefrigerators = freshData.data;
+              } else if (freshData && typeof freshData === 'object' && (freshData as any).id) {
+                freshRefrigerators = [freshData as Refrigerator];
+              }
+              setRefrigerators(freshRefrigerators);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+        }
+      }
 
       // getMyRefrigerators now returns array directly
       let refrigeratorsData: Refrigerator[] = [];
@@ -71,9 +127,9 @@ export default function FridgeListPage() {
         refrigeratorsData = response;
       } else if (response?.data && Array.isArray(response.data)) {
         refrigeratorsData = response.data;
-      } else if (response && typeof response === 'object' && response.id) {
+      } else if (response && typeof response === 'object' && (response as any).id) {
         // Backend returns single refrigerator object, wrap it in array
-        refrigeratorsData = [response];
+        refrigeratorsData = [response as Refrigerator];
       }
 
       setRefrigerators(refrigeratorsData);
@@ -151,7 +207,19 @@ export default function FridgeListPage() {
     let expiringIngredients = 0;
     let expiredIngredients = 0;
 
+    // Lưu thông tin chi tiết theo từng tủ lạnh
+    const fridgeDetails: Array<{
+      fridgeName: string;
+      expiredCount: number;
+      expiringCount: number;
+    }> = [];
+
     refrigerators.forEach((fridge) => {
+      let fridgeExpiredDishes = 0;
+      let fridgeExpiringDishes = 0;
+      let fridgeExpiredIngredients = 0;
+      let fridgeExpiringIngredients = 0;
+
       // Kiểm tra món ăn
       const dishes = fridge.fridgeDishes || fridge.dishes || [];
       dishes.forEach((dish: any) => {
@@ -162,8 +230,10 @@ export default function FridgeListPage() {
 
           if (expiryDate < today) {
             expiredDishes++;
+            fridgeExpiredDishes++;
           } else if (expiryDate <= threeDaysLater) {
             expiringDishes++;
+            fridgeExpiringDishes++;
           }
         }
       });
@@ -178,11 +248,29 @@ export default function FridgeListPage() {
 
           if (expiryDate < today) {
             expiredIngredients++;
+            fridgeExpiredIngredients++;
           } else if (expiryDate <= threeDaysLater) {
             expiringIngredients++;
+            fridgeExpiringIngredients++;
           }
         }
       });
+
+      // Lưu thông tin tủ lạnh nếu có sản phẩm hết hạn hoặc sắp hết hạn
+      const totalFridgeExpired = fridgeExpiredDishes + fridgeExpiredIngredients;
+      const totalFridgeExpiring = fridgeExpiringDishes + fridgeExpiringIngredients;
+      if (totalFridgeExpired > 0 || totalFridgeExpiring > 0) {
+        const isFamily = fridge.family_id !== null && fridge.family_id !== undefined;
+        const fridgeName = isFamily && fridge.family?.name
+          ? fridge.family.name
+          : (fridge.name || 'Tủ lạnh Cá nhân');
+        
+        fridgeDetails.push({
+          fridgeName,
+          expiredCount: totalFridgeExpired,
+          expiringCount: totalFridgeExpiring,
+        });
+      }
     });
 
     return {
@@ -192,6 +280,7 @@ export default function FridgeListPage() {
       expiredIngredients,
       totalExpiring: expiringDishes + expiringIngredients,
       totalExpired: expiredDishes + expiredIngredients,
+      fridgeDetails, // Thêm thông tin chi tiết theo tủ lạnh
     };
   }, [refrigerators]);
 
@@ -453,9 +542,32 @@ export default function FridgeListPage() {
                   <NotificationCard
                     title="Cảnh báo hết hạn"
                     message={
-                      expiringItems.totalExpired > 0
-                        ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày). Vui lòng kiểm tra ngay!`
-                        : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn trong vòng 3 ngày tới. Vui lòng kiểm tra!`
+                      (() => {
+                        const fridgeDetails = expiringItems.fridgeDetails || [];
+                        if (fridgeDetails.length === 0) {
+                          return expiringItems.totalExpired > 0
+                            ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày). Vui lòng kiểm tra ngay!`
+                            : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn trong vòng 3 ngày tới. Vui lòng kiểm tra!`;
+                        }
+
+                        // Tạo thông báo chi tiết với tên tủ lạnh
+                        const fridgeMessages = fridgeDetails.map((fridge) => {
+                          const parts: string[] = [];
+                          if (fridge.expiredCount > 0) {
+                            parts.push(`${fridge.expiredCount} đã hết hạn`);
+                          }
+                          if (fridge.expiringCount > 0) {
+                            parts.push(`${fridge.expiringCount} sắp hết hạn`);
+                          }
+                          return `${fridge.fridgeName} (${parts.join(', ')})`;
+                        });
+
+                        const summary = expiringItems.totalExpired > 0
+                          ? `Có ${expiringItems.totalExpired} sản phẩm đã hết hạn và ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày)`
+                          : `Có ${expiringItems.totalExpiring} sản phẩm sắp hết hạn (≤ 3 ngày)`;
+
+                        return `${summary} tại: ${fridgeMessages.join('; ')}. Vui lòng kiểm tra ngay!`;
+                      })()
                     }
                     type="warning"
                   />

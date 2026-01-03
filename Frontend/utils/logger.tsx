@@ -48,9 +48,8 @@ export function LogViewer() {
   const [logs, setLogs] = useState<string[]>([]);
   const [visible, setVisible] = useState(false);
 
+  // Luôn subscribe để cập nhật logs, không chỉ khi visible
   useEffect(() => {
-    if (!visible) return;
-    
     const unsubscribe = inAppLogger.subscribe(() => {
       setLogs(inAppLogger.getLogs());
     });
@@ -59,7 +58,7 @@ export function LogViewer() {
     setLogs(inAppLogger.getLogs());
     
     return unsubscribe;
-  }, [visible]);
+  }, []); // Chạy một lần khi mount
 
   if (!visible) {
     return (

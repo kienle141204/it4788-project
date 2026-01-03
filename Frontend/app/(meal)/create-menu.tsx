@@ -11,6 +11,8 @@ import {
   Modal,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +20,8 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/themes';
 import { mealStyles } from '../../styles/meal.styles';
 import { getAccess, postAccess } from '../../utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import { clearCacheByPattern } from '../../utils/cache';
 
 interface Family {
   id: string;
@@ -73,7 +77,18 @@ export default function CreateMenuPage() {
   const fetchFamilies = useCallback(async () => {
     setLoadingFamilies(true);
     try {
-      const payload = await getAccess('families/my-family');
+      // Use cached API for families list
+      const result = await getCachedAccess<any>(
+        'families/my-family',
+        {},
+        {
+          ttl: CACHE_TTL.LONG,
+          cacheKey: 'meal:families:list',
+          compareData: true,
+        }
+      );
+      
+      const payload = result.data;
       if (Array.isArray(payload)) {
         setFamilies(payload as Family[]);
       } else if (payload?.success !== false) {
@@ -210,6 +225,9 @@ export default function CreateMenuPage() {
       );
 
       await Promise.all(addDishPromises);
+
+      // Invalidate cache when creating menu
+      await clearCacheByPattern('meal:menus');
 
       // Back trước, rồi mới hiện thông báo
       if (router.canGoBack()) {
@@ -528,7 +546,11 @@ export default function CreateMenuPage() {
       {/* Modal chọn món ăn */}
       <Modal visible={showDishModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 0 }}
+          >
+            <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
             <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Chọn món ăn</Text>
@@ -635,6 +657,7 @@ export default function CreateMenuPage() {
               </View>
             )}
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>

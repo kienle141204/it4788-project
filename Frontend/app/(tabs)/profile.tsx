@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { COLORS } from '@/constants/themes';
 import { getAccess, logoutUser } from '@/utils/api';
+import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import ActionMenu from '@/components/ActionMenu';
 
 type UserProfile = {
@@ -32,17 +33,93 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const fetchProfile = useCallback(async (silent = false) => {
+  const fetchProfile = useCallback(async (silent = false, forceRefresh = false, skipCache = false) => {
     if (!silent) {
       setLoading(true);
     }
     setError(null);
     try {
-      const response = await getAccess('auth/profile');
+      let response: any;
+      
+      if (forceRefresh || skipCache) {
+        // Force refresh - always fetch from API, skip cache
+        try {
+          // Use getAccess directly to skip cache
+          response = await getAccess('auth/profile');
+        } catch (err: any) {
+          // Only try cache as last resort if not skipping cache
+          if (!skipCache) {
+            const { getCache } = await import('@/utils/cache');
+            const cached = await getCache<any>('profile:user');
+            if (cached) {
+              response = cached;
+            } else {
+              throw err;
+            }
+          } else {
+            throw err;
+          }
+        }
+        
+        // Save to cache after successful fetch
+        if (response && !skipCache) {
+          const { setCache, CACHE_TTL } = await import('@/utils/cache');
+          await setCache('profile:user', response, CACHE_TTL.SHORT);
+        }
+      } else {
+        // Normal fetch - use cache if available
+        try {
+          const result = await getCachedAccess<any>(
+            'auth/profile',
+            {},
+            {
+              ttl: CACHE_TTL.SHORT,
+              cacheKey: 'profile:user',
+              compareData: true,
+            }
+          );
+          response = result.data;
+          
+          // If we got data from cache, fetch fresh data in background
+          if (result.fromCache && !silent) {
+            refreshCachedAccess<any>(
+              'auth/profile',
+              {},
+              {
+                ttl: CACHE_TTL.SHORT,
+                cacheKey: 'profile:user',
+                compareData: true,
+              }
+            ).then((freshResult) => {
+              if (freshResult.updated) {
+                const userData = freshResult.data?.data || freshResult.data;
+                setProfile(userData);
+              }
+            }).catch(() => {
+              // Silently fail background refresh
+            });
+          }
+        } catch (err: any) {
+          // If API fails, try to get from cache
+          const { getCache } = await import('@/utils/cache');
+          const cached = await getCache<any>('profile:user');
+          if (cached) {
+            response = cached;
+          } else {
+            throw err;
+          }
+        }
+      }
+      
       // API response có cấu trúc: { success, message, data: { ...userInfo } }
       const userData = response?.data || response;
-      setProfile(userData);
+      if (userData && (userData.id || userData.email)) {
+        setProfile(userData);
+      } else {
+        throw new Error('Invalid profile data');
+      }
     } catch (err: any) {
+      console.error('[Profile] Fetch error:', err);
       const message =
         err instanceof Error && err.message === 'SESSION_EXPIRED'
           ? 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
@@ -64,13 +141,13 @@ export default function ProfileScreen() {
   // Khi màn hình được focus lại (khi chuyển tab)
   useFocusEffect(
     useCallback(() => {
-      fetchProfile(true);
+      fetchProfile(true, false); // Silent refresh, use cache
     }, [fetchProfile])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchProfile(true);
+    fetchProfile(true, true); // Force refresh
   };
 
   const handleLogout = () => {
@@ -127,7 +204,13 @@ export default function ProfileScreen() {
         <View style={styles.centered}>
           <Ionicons name="alert-circle" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchProfile()}>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={() => {
+              // Force refresh and skip cache when retrying
+              fetchProfile(false, true, true);
+            }}
+          >
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
@@ -210,6 +293,13 @@ export default function ProfileScreen() {
                 'Khóa bảo vệ',
                 'Tính năng khóa bảo vệ tài khoản sẽ được triển khai.',
               );
+            },
+          },
+          {
+            label: 'Debug Push Notification',
+            icon: 'bug-outline',
+            onPress: () => {
+              router.push('/(profile)/debug-push' as any);
             },
           },
           {
