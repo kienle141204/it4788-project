@@ -67,7 +67,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
         style={taskStyles.dateNavButton}
         onPress={handlePrevious}
       >
-        <Ionicons name="chevron-back" size={20} color={COLORS.darkGrey} />
+        <Ionicons name="chevron-back" size={18} color={COLORS.darkGrey} />
       </TouchableOpacity>
       
       <ScrollView 
@@ -108,7 +108,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
         style={taskStyles.dateNavButton}
         onPress={handleNext}
       >
-        <Ionicons name="chevron-forward" size={20} color={COLORS.darkGrey} />
+        <Ionicons name="chevron-forward" size={18} color={COLORS.darkGrey} />
       </TouchableOpacity>
     </View>
   );

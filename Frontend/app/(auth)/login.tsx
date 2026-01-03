@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator } from 'react-native'
+import { View, Text, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import React from 'react'
 import { styles } from '@/styles/auth.styles'
 import { TextInput } from 'react-native'
@@ -85,8 +85,18 @@ export default function login() {
 
 
   return (
-    <View style={styles.container}>
-      <View style={styles.brandSection}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
+          <View style={styles.brandSection}>
         <View>
             <Text style={styles.appName}>Đăng nhập</Text>
         </View>
@@ -173,7 +183,9 @@ export default function login() {
                 <Text style={styles.facebookButtonText}>Continue with Facebook</Text>
             </TouchableOpacity>
         </View>
-      </View>
-    </View>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

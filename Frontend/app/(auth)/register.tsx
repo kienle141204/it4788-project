@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator } from 'react-native'
+import { View, Text, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import React from 'react'
 import { styles } from '@/styles/auth.styles'
 import { TextInput, TouchableOpacity, Alert } from 'react-native'
@@ -86,8 +86,18 @@ export default function register() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.brandSection}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
+          <View style={styles.brandSection}>
         <View>
               <Text style={styles.appNameRegister}>Đăng ký tài khoản </Text>
         </View>
@@ -171,7 +181,9 @@ export default function register() {
             )}
           </TouchableOpacity>
         </View>
-      </View>
-    </View>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

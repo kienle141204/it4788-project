@@ -84,3 +84,43 @@ export const getUserProfile = async (): Promise<UserProfile> => {
     throw error;
   }
 }
+
+export interface LockAccountResponse {
+  success: boolean;
+  message: string;
+  data?: UserProfile;
+}
+
+export const lockAccount = async (userId: number): Promise<LockAccountResponse> => {
+  try {
+    const { patchAccess } = await import('../utils/api');
+    const res = await patchAccess(`users/${userId}`, { profile_status: 'private' });
+    return {
+      success: true,
+      message: res?.message || 'Khóa bảo vệ tài khoản thành công',
+      data: res?.data,
+    };
+  } catch (error: any) {
+    const errorMessage = error?.response?.data?.message || 
+                        error?.message || 
+                        'Không thể khóa bảo vệ tài khoản, vui lòng thử lại.';
+    throw new Error(errorMessage);
+  }
+}
+
+export const unlockAccount = async (userId: number): Promise<LockAccountResponse> => {
+  try {
+    const { patchAccess } = await import('../utils/api');
+    const res = await patchAccess(`users/${userId}`, { profile_status: 'public' });
+    return {
+      success: true,
+      message: res?.message || 'Mở khóa bảo vệ tài khoản thành công',
+      data: res?.data,
+    };
+  } catch (error: any) {
+    const errorMessage = error?.response?.data?.message || 
+                        error?.message || 
+                        'Không thể mở khóa bảo vệ tài khoản, vui lòng thử lại.';
+    throw new Error(errorMessage);
+  }
+}

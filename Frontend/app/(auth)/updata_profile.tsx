@@ -8,7 +8,10 @@ import {
   TouchableWithoutFeedback,
   TextInput, 
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -200,8 +203,18 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-     <View  style ={styles.brandSection}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
+          <View style={styles.brandSection}>
        <Text style={styles.header}>Cập nhật thông tin</Text>
 
       <View style={styles.avatarContainer}>
@@ -315,6 +328,8 @@ export default function ProfileScreen() {
       </Modal>
      </View>
     </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
