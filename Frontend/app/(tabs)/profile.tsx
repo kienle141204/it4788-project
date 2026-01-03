@@ -9,6 +9,7 @@ import { COLORS } from '@/constants/themes';
 import { getAccess, logoutUser } from '@/utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import ActionMenu from '@/components/ActionMenu';
+import { lockAccount, unlockAccount } from '@/service/auth';
 
 type UserProfile = {
   id: number;
@@ -19,6 +20,7 @@ type UserProfile = {
   address: string | null;
   phone: string | null;
   role: string;
+  profile_status?: 'public' | 'private';
   created_at: string;
   updated_at: string;
 };
@@ -32,6 +34,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [lockingAccount, setLockingAccount] = useState(false);
 
   const fetchProfile = useCallback(async (silent = false, forceRefresh = false, skipCache = false) => {
     if (!silent) {
@@ -176,6 +179,82 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleLockAccount = async () => {
+    if (lockingAccount) {
+      return; // Đang xử lý, không cho phép gọi lại
+    }
+    
+    if (!profile?.id) {
+      Alert.alert('Lỗi', 'Không tìm thấy thông tin tài khoản.');
+      return;
+    }
+
+    const isLocked = profile.profile_status === 'private';
+    const actionText = isLocked ? 'mở khóa' : 'khóa bảo vệ';
+    
+    Alert.alert(
+      isLocked ? 'Mở khóa bảo vệ' : 'Khóa bảo vệ tài khoản',
+      isLocked 
+        ? 'Bạn có muốn mở khóa bảo vệ tài khoản? Tài khoản của bạn sẽ hiển thị công khai.'
+        : 'Bạn có muốn khóa bảo vệ tài khoản? Tài khoản của bạn sẽ được bảo vệ và chỉ bạn mới có thể xem thông tin.',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: isLocked ? 'Mở khóa' : 'Khóa bảo vệ',
+          style: isLocked ? 'default' : 'destructive',
+          onPress: async () => {
+            setLockingAccount(true);
+            try {
+              if (isLocked) {
+                await unlockAccount(profile.id);
+                Alert.alert(
+                  'Thành công',
+                  'Đã mở khóa bảo vệ tài khoản thành công.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Refresh profile để cập nhật trạng thái
+                        fetchProfile(false, true, true);
+                      },
+                    },
+                  ]
+                );
+              } else {
+                await lockAccount(profile.id);
+                Alert.alert(
+                  'Thành công',
+                  'Đã khóa bảo vệ tài khoản thành công. Tài khoản của bạn đã được bảo vệ.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Refresh profile để cập nhật trạng thái
+                        fetchProfile(false, true, true);
+                      },
+                    },
+                  ]
+                );
+              }
+            } catch (error: any) {
+              Alert.alert(
+                'Lỗi',
+                error?.message || `Không thể ${actionText} tài khoản, vui lòng thử lại.`
+              );
+            } finally {
+              setLockingAccount(false);
+              setMenuVisible(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   const formatDate = (value: string | undefined) => {
     if (!value) return '—';
     const date = new Date(value);
@@ -286,21 +365,13 @@ export default function ProfileScreen() {
             },
           },
           {
-            label: 'Khóa bảo vệ tài khoản',
-            icon: 'lock-closed-outline',
-            onPress: () => {
-              Alert.alert(
-                'Khóa bảo vệ',
-                'Tính năng khóa bảo vệ tài khoản sẽ được triển khai.',
-              );
-            },
-          },
-          {
-            label: 'Debug Push Notification',
-            icon: 'bug-outline',
-            onPress: () => {
-              router.push('/(profile)/debug-push' as any);
-            },
+            label: profile?.profile_status === 'private' 
+              ? 'Mở khóa bảo vệ tài khoản' 
+              : 'Khóa bảo vệ tài khoản',
+            icon: profile?.profile_status === 'private' 
+              ? 'lock-open-outline' 
+              : 'lock-closed-outline',
+            onPress: handleLockAccount,
           },
           {
             label: 'Đăng xuất',

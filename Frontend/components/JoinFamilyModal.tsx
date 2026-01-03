@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/themes';
 import QRScannerModal from './QRScannerModal';
@@ -27,6 +28,7 @@ export default function JoinFamilyModal({
   onClose,
   onJoin,
 }: JoinFamilyModalProps) {
+  const insets = useSafeAreaInsets();
   const [invitationCode, setInvitationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -78,9 +80,10 @@ export default function JoinFamilyModal({
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           >
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalContainer}>
+              <View style={[styles.modalContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                 {/* Header */}
                 <View style={styles.header}>
                   <Text style={styles.title}>Tham gia nhóm</Text>

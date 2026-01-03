@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { isNetworkAvailable } from './network';
 import { addToQueue } from './requestQueue';
-import { getCache, generateCacheKey } from './cache';
+// import { getCache , generateCacheKey } from './cache';
 
 // Tự động phát hiện môi trường để chọn API domain phù hợp
 // Web: localhost, Android emulator: 10.0.2.2, iOS simulator: localhost
@@ -361,8 +361,8 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
   // If offline, try to get from cache first
   if (!networkAvailable) {
     try {
-      const cacheKey = generateCacheKey(path, params);
-      const cachedData = await getCache(cacheKey);
+      const cacheKey = 1
+      const cachedData = 1
       if (cachedData !== null) {
         console.log(`[API] Offline: Returning cached data for ${path}`);
         return cachedData;
@@ -415,8 +415,8 @@ export const getAccess = async (path: string, params: object = {}, retryCount = 
       
       if (isNetworkError && retryCount === 0) {
         try {
-          const cacheKey = generateCacheKey(path, params);
-          const cachedData = await getCache(cacheKey);
+          const cacheKey = 1
+          const cachedData = 1
           if (cachedData !== null) {
             console.log(`[API] Network error: Returning cached data for ${path}`);
             return cachedData;

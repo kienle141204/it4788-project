@@ -83,6 +83,7 @@ export const taskStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
   },
   
   dateScrollContent: {

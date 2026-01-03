@@ -156,11 +156,11 @@ export const getFamilyInvitationCode = async (familyId: number) => {
 
 /**
  * Tham gia gia đình bằng mã mời
- * POST /families/join
+ * POST /families/join-by-code
  */
 export const joinFamilyByCode = async (invitationCode: string) => {
   try {
-    const res = await postAccess('families/join', { invitation_code: invitationCode });
+    const res = await postAccess('families/join-by-code', { invitation_code: invitationCode });
     return res;
   } catch (error) {
     throw error;

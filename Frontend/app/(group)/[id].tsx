@@ -37,7 +37,7 @@ import {
 import { searchIngredients } from '../../service/market';
 import { getAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
-import { clearCacheByPattern } from '../../utils/cache';
+import { clearCacheByPattern, clearCache } from '../../utils/cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
@@ -758,18 +758,12 @@ export default function GroupDetailPage() {
   const fetchMemberProfile = useCallback(async (userId: number) => {
     setLoadingMemberProfile(true);
     try {
-      // Use cached API for user profile
-      const result = await getCachedAccess<any>(
-        `users/${userId}`,
-        {},
-        {
-          ttl: CACHE_TTL.LONG,
-          cacheKey: `user:profile:${userId}`,
-          compareData: true,
-        }
-      );
+      // Use getAccess directly (skip cache) to ensure we get fresh data
+      // This prevents showing cached profile data when user has locked their account
+      const { getAccess } = await import('@/utils/api');
+      const response = await getAccess(`users/${userId}`);
       
-      const payload = result.data;
+      const payload = response?.data || response;
       if (payload?.success !== false && payload?.data) {
         setMemberProfile(payload.data);
         setShowMemberProfileModal(true);
@@ -785,8 +779,31 @@ export default function GroupDetailPage() {
         handleSessionExpired();
         return;
       }
-      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin thành viên';
-      Alert.alert('Lỗi', errorMessage);
+      
+      // Check if it's a 403 Forbidden error (profile is private)
+      if (err?.response?.status === 403 || err?.response?.statusCode === 403) {
+        const errorMessage = err?.response?.data?.message || 
+                           err?.response?.data?.resultMessage?.vn || 
+                           'Tài khoản này đang ở trạng thái riêng tư';
+        Alert.alert(
+          'Không thể xem thông tin',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
+        
+        // Clear cache for this user profile to prevent showing old data
+        try {
+          await clearCache(`user:profile:${userId}`);
+        } catch (cacheError) {
+          // Silently fail cache deletion
+        }
+      } else {
+        const errorMessage = err?.response?.data?.message || 
+                           err?.response?.data?.resultMessage?.vn ||
+                           err?.message || 
+                           'Không thể tải thông tin thành viên';
+        Alert.alert('Lỗi', errorMessage);
+      }
     } finally {
       setLoadingMemberProfile(false);
     }
@@ -1392,13 +1409,12 @@ export default function GroupDetailPage() {
       );
     }
 
-    const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-    const containerProps = Platform.OS === 'ios' 
-      ? { style: groupStyles.chatContainer, behavior: 'padding' as const, keyboardVerticalOffset: 0 }
-      : { style: groupStyles.chatContainer };
-
     return (
-      <Container {...containerProps}>
+      <KeyboardAvoidingView
+        style={groupStyles.chatContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         {chatMessages.length === 0 ? (
           <View style={groupStyles.chatEmptyState}>
             <View style={groupStyles.chatEmptyIcon}>
@@ -1449,6 +1465,7 @@ export default function GroupDetailPage() {
               }
             }}
             scrollEventThrottle={100}
+            keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               loadingMoreMessages ? (
                 <View style={{ padding: 12, alignItems: 'center' }}>
@@ -1470,7 +1487,7 @@ export default function GroupDetailPage() {
           />
         )}
 
-        <View style={[groupStyles.chatInputContainer, { paddingBottom: 0, marginBottom: 0 }]}>
+        <View style={[groupStyles.chatInputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <View style={groupStyles.chatInputWrapper}>
             <TextInput
               style={groupStyles.chatInput}
@@ -1494,7 +1511,7 @@ export default function GroupDetailPage() {
             <Ionicons name="send" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
-      </Container>
+      </KeyboardAvoidingView>
     );
   };
 
@@ -2222,20 +2239,23 @@ export default function GroupDetailPage() {
 
   const renderDateCarousel = () => {
     const screenWidth = Dimensions.get('window').width;
-    // Calculate width for each date item: screen width - nav buttons - gaps
-    const navButtonWidth = 40; // Approximate width of nav buttons
+    // Calculate width for each date item to fill the entire screen width
+    const navButtonWidth = 36; // Width of nav buttons
+    const containerPadding = 0; // No padding on container
+    const gapBetweenNavAndCarousel = 6 * 2; // gap between nav buttons and carousel (both sides)
     const gapBetweenItems = 6;
     const totalGaps = gapBetweenItems * (dateRange.length - 1);
-    const availableWidth = screenWidth - (navButtonWidth * 2) - totalGaps;
-    const itemWidth = availableWidth / dateRange.length;
+    // Calculate available width to fill entire screen
+    const availableWidth = screenWidth - containerPadding - navButtonWidth * 2 - gapBetweenNavAndCarousel - totalGaps;
+    const itemWidth = Math.floor(availableWidth / dateRange.length);
 
     return (
       <View style={groupStyles.dateCarouselContainer}>
         <TouchableOpacity
-          style={groupStyles.dateNavButton}
+          style={[groupStyles.dateNavButton, { paddingLeft: 8 }]}
           onPress={handlePreviousDate}
         >
-          <Ionicons name="chevron-back" size={20} color={COLORS.darkGrey} />
+          <Ionicons name="chevron-back" size={18} color={COLORS.darkGrey} />
         </TouchableOpacity>
 
         <View style={groupStyles.dateCarousel}>
@@ -2271,10 +2291,10 @@ export default function GroupDetailPage() {
         </View>
 
         <TouchableOpacity
-          style={groupStyles.dateNavButton}
+          style={[groupStyles.dateNavButton, { paddingRight: 8 }]}
           onPress={handleNextDate}
         >
-          <Ionicons name="chevron-forward" size={20} color={COLORS.darkGrey} />
+          <Ionicons name="chevron-forward" size={18} color={COLORS.darkGrey} />
         </TouchableOpacity>
       </View>
     );
@@ -2357,10 +2377,7 @@ export default function GroupDetailPage() {
 
   const renderShoppingList = () => {
     return (
-      <>
-        {renderDateCarousel()}
-
-        <View style={groupStyles.shoppingListsContainer}>
+      <View style={groupStyles.shoppingListsContainer}>
           {filteredShoppingLists.length === 0 ? (
             <View style={groupStyles.emptyState}>
               <Ionicons name='cart-outline' size={48} color={COLORS.grey} />
@@ -2448,7 +2465,6 @@ export default function GroupDetailPage() {
             ))
           )}
         </View>
-      </>
     );
   };
 
@@ -2543,7 +2559,7 @@ export default function GroupDetailPage() {
       ) : (
         <ScrollView
           style={groupStyles.scrollView}
-          contentContainerStyle={groupStyles.scrollContent}
+          contentContainerStyle={activeTab === 'shopping' ? { paddingBottom: 100 } : groupStyles.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -2567,7 +2583,12 @@ export default function GroupDetailPage() {
             </View>
           ) : (
             <>
-              {activeTab === 'shopping' && renderShoppingList()}
+              {activeTab === 'shopping' && (
+                <>
+                  {renderDateCarousel()}
+                  {renderShoppingList()}
+                </>
+              )}
               {activeTab === 'statistics' && <GroupStatistics familyId={familyId} />}
             </>
           )}

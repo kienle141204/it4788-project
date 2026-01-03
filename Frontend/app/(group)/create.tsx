@@ -8,6 +8,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,43 +117,48 @@ export default function CreateFamilyPage() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || COLORS.white }}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingTop: Math.max(insets.top, 16) + 10,
-          paddingBottom: 16,
-          backgroundColor: COLORS.white,
-          borderBottomWidth: 1,
-          borderBottomColor: COLORS.background || '#F5F5F5',
-        }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <TouchableOpacity onPress={handleBack}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
-        </TouchableOpacity>
-
-        <Text
+        {/* Header */}
+        <View
           style={{
-            fontSize: 20,
-            fontWeight: 'bold',
-            color: COLORS.darkGrey,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingTop: Math.max(insets.top, 16) + 10,
+            paddingBottom: 16,
+            backgroundColor: COLORS.white,
+            borderBottomWidth: 1,
+            borderBottomColor: COLORS.background || '#F5F5F5',
           }}
         >
-          Tạo gia đình mới
-        </Text>
+          <TouchableOpacity onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.darkGrey} />
+          </TouchableOpacity>
 
-        <View style={{ width: 24 }} />
-      </View>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: COLORS.darkGrey,
+            }}
+          >
+            Tạo gia đình mới
+          </Text>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20 }}
-        showsVerticalScrollIndicator={false}
-      >
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Name Input */}
         <View style={{ marginBottom: 24 }}>
           <Text
@@ -229,6 +236,7 @@ export default function CreateFamilyPage() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
