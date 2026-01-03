@@ -209,7 +209,7 @@ export class ChatGateway extends BaseGateway {
                     const notificationBody = `${senderName}\n${chatContent}`;
 
                     // Lấy avatar URL từ sender
-                    const avatarUrl = sender?.avatar_url || null;
+                    const avatarUrl = sender?.avatar_url || undefined;
 
                     // Không cần set icon vì hệ thống tự động dùng app icon từ manifest
                     const pushData: Record<string, string> = {
@@ -230,7 +230,7 @@ export class ChatGateway extends BaseGateway {
                         notificationBody,
                         pushData,
                         avatarUrl, // image (avatar - large image trong notification)
-                        null,      // icon - không cần vì hệ thống tự dùng app icon
+                        undefined, // icon - không cần vì hệ thống tự dùng app icon
                     );
 
                     this.logger.log(

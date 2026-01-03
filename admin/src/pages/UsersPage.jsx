@@ -106,7 +106,18 @@ const UsersPage = () => {
     { header: 'Họ tên', key: 'full_name' },
     { header: 'Email', key: 'email' },
     { header: 'Số điện thoại', key: 'phone' },
-    { header: 'Nhóm', key: 'role' },
+    {
+      header: 'Nhóm',
+      key: 'role',
+      render: (value) => (
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${value === 'admin'
+            ? 'bg-emerald-100 text-emerald-700'
+            : 'bg-gray-100 text-gray-700'
+          }`}>
+          {value === 'admin' ? 'Admin' : value === 'user' ? 'Người dùng' : value || '-'}
+        </span>
+      )
+    },
   ];
 
   const handleEdit = (user) => {
