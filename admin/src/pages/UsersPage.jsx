@@ -7,7 +7,7 @@ import Modal from '../components/common/Modal';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
 import Pagination from '../components/common/Pagination';
-import { fetchUsers, createUser, updateUser, deleteUser, searchUsers } from '../api/userAPI';
+import { fetchUsers, createUser, updateUser, searchUsers } from '../api/userAPI';
 import { useAuth } from '../contexts/AuthContext';
 
 const UsersPage = () => {
@@ -83,7 +83,6 @@ const UsersPage = () => {
       setTotalPages(responseTotalPages || 1);
       setTotalItems(responseTotalItems || 0);
     } catch (error) {
-      console.error('Error loading users:', error);
       // In a real app, you might want to show an error message to the user
     } finally {
       setLoading(false);
@@ -106,7 +105,18 @@ const UsersPage = () => {
     { header: 'Họ tên', key: 'full_name' },
     { header: 'Email', key: 'email' },
     { header: 'Số điện thoại', key: 'phone' },
-    { header: 'Nhóm', key: 'role' },
+    {
+      header: 'Nhóm',
+      key: 'role',
+      render: (value) => (
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${value === 'admin'
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-gray-100 text-gray-700'
+          }`}>
+          {value === 'admin' ? 'Admin' : value === 'user' ? 'Người dùng' : value || '-'}
+        </span>
+      )
+    },
   ];
 
   const handleEdit = (user) => {
@@ -124,18 +134,7 @@ const UsersPage = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (user) => {
-    if (window.confirm(`Bạn có chắc muốn xóa người dùng "${user.full_name}"?`)) {
-      try {
-        await deleteUser(user.id);
-        // Remove user from local state after successful deletion
-        setUsers(users.filter(u => u.id !== user.id));
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        // In a real app, you might want to show an error message to the user
-      }
-    }
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -153,7 +152,6 @@ const UsersPage = () => {
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving user:', error);
       // In a real app, you might want to show an error message to the user
     }
   };
@@ -207,7 +205,6 @@ const UsersPage = () => {
       setTotalItems(responseTotalItems || 0);
       setCurrentPage(1); // Reset to first page after search
     } catch (error) {
-      console.error('Error searching users:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = users.filter(u =>
         u.full_name.toLowerCase().includes(searchValue.toLowerCase()) ||
@@ -265,7 +262,6 @@ const UsersPage = () => {
         columns={columns}
         data={currentUsers}
         onEdit={handleEdit}
-        onDelete={handleDelete}
       />
 
       {totalPages > 1 && (

@@ -1,5 +1,6 @@
 // AuthContext for managing authentication state
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { API_BASE_URL } from '../api/config';
 
 const AuthContext = createContext();
 
@@ -28,7 +29,6 @@ export const AuthProvider = ({ children }) => {
       const currentTime = Date.now() / 1000;
       return payload.exp < currentTime;
     } catch (error) {
-      console.error('Error checking token expiration:', error);
       return true;
     }
   };
@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:8090/api/auth/refresh', {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,7 +71,6 @@ export const AuthProvider = ({ children }) => {
 
       return data.access_token;
     } catch (error) {
-      console.error('Error refreshing token:', error);
       logout(); // If refresh fails, logout user
       return null;
     }
@@ -107,7 +106,7 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:8090/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,7 +160,6 @@ export const AuthProvider = ({ children }) => {
   const apiRequest = async (endpoint, options = {}) => {
     // This function is not needed since we use the authFetch utility
     // The authFetch utility handles token refresh automatically
-    console.warn('apiRequest is deprecated. Use the API services that use authFetch instead.');
     return Promise.reject(new Error('Use API services that use authFetch instead of apiRequest'));
   };
 

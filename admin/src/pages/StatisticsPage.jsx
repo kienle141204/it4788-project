@@ -98,7 +98,6 @@ const StatisticsPage = () => {
                 setSelectedFamilyId(familiesData[0].id.toString());
             }
         } catch (error) {
-            console.error('Error loading families:', error);
         }
     };
 
@@ -305,7 +304,6 @@ const StatisticsPage = () => {
                 remainingCost: Math.round(remainingCost)
             });
         } catch (error) {
-            console.error('Error loading statistics:', error);
         } finally {
             setLoading(false);
         }

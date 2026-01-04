@@ -84,7 +84,6 @@ const RecipesPage = () => {
       setTotalPages(responseTotalPages || 1);
       setTotalItems(responseTotalItems || 0);
     } catch (error) {
-      console.error('Error loading recipes:', error);
       setRecipes([]);
     } finally {
       setLoading(false);
@@ -162,7 +161,6 @@ const RecipesPage = () => {
         steps: fullRecipe.steps || []
       });
     } catch (error) {
-      console.error('Error loading recipe for edit:', error);
       // Fallback to basic data if fetch fails
       setEditingRecipe(recipe);
       setFormData({
@@ -182,7 +180,6 @@ const RecipesPage = () => {
         // Remove recipe from local state after successful deletion
         setRecipes(recipes.filter(r => r.id !== recipe.id));
       } catch (error) {
-        console.error('Error deleting recipe:', error);
       }
     }
   };
@@ -195,7 +192,6 @@ const RecipesPage = () => {
       setSelectedRecipe(recipe);
       setIsDetailModalOpen(true);
     } catch (error) {
-      console.error('Error loading recipe details:', error);
     } finally {
       setDetailLoading(false);
     }
@@ -286,7 +282,6 @@ const RecipesPage = () => {
       }
       closeEditModal();
     } catch (error) {
-      console.error('Error saving recipe:', error);
       alert('Có lỗi khi lưu công thức: ' + error.message);
     }
   };
@@ -337,7 +332,6 @@ const RecipesPage = () => {
       setTotalItems(responseTotalItems || 0);
       setCurrentPage(1); // Reset to first page after search
     } catch (error) {
-      console.error('Error searching recipes:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = recipes.filter(r =>
         (r.dish?.name?.toLowerCase().includes(searchValue.toLowerCase()) || false) ||

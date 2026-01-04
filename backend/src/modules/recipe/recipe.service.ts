@@ -346,7 +346,23 @@ export class RecipeService {
       throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00118]);
     }
 
-    // Xóa công thức (các bước sẽ tự động xóa do cascade)
+    // Lấy danh sách các bước của công thức
+    const steps = await this.recipeStepRepository.find({
+      where: { recipe_id: recipeId },
+    });
+
+    // Nếu có các bước, xóa images và steps trước
+    if (steps.length > 0) {
+      const stepIds = steps.map(step => step.id);
+
+      // Xóa tất cả images liên quan đến các bước
+      await this.imageRepository.delete({ recipe_steps_id: In(stepIds) });
+
+      // Xóa tất cả các bước của công thức
+      await this.recipeStepRepository.delete({ recipe_id: recipeId });
+    }
+
+    // Cuối cùng xóa công thức
     await this.recipeRepository.delete(recipeId);
   }
 }
