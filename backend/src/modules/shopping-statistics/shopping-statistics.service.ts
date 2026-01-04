@@ -120,32 +120,54 @@ export class ShoppingStatisticsService {
   /** Top nguyên liệu mua nhiều nhất (theo stock) */
   async topIngredients(limit: number = 5, familyId: number, user: JwtUser) {
     await this.checkFamilyPermission(familyId, user);
-    const items = await this.shoppingItemRepo.find({
-      where: {
-        shoppingList: { family_id: familyId },
-        is_checked: true,
-      },
-      relations: ['ingredient', 'shoppingList']
+    
+    // Lấy tất cả shared lists của family (giống như statisticsByFamily)
+    const lists = await this.shoppingListRepo.find({
+      where: { family_id: familyId, is_shared: true },
+      relations: ['items', 'items.ingredient']
     });
 
     const map = new Map<number, any>();
 
-    for (const item of items) {
-      if (!map.has(item.ingredient_id)) {
-        map.set(item.ingredient_id, {
-          ingredient_id: item.ingredient_id,
-          ingredient_name: item.ingredient?.name,
-          ingredient_image: item.ingredient?.image_url,
-          total_quantity: 0,
-          price: item.price ?? 0,
-        });
-      }
+    // Duyệt qua tất cả lists và lấy items đã checked
+    for (const list of lists) {
+      if (list.items && Array.isArray(list.items)) {
+        const checkedItems = list.items.filter(item => item.is_checked === true);
+        
+        for (const item of checkedItems) {
+          const ingredientId = item.ingredient_id;
+          const stock = Number(item.stock) || 0;
+          const price = Number(item.price) || 0;
+          
+          if (!map.has(ingredientId)) {
+            map.set(ingredientId, {
+              ingredient_id: ingredientId,
+              ingredient_name: item.ingredient?.name,
+              ingredient_image: item.ingredient?.image_url,
+              total_quantity: 0,
+              total_cost: 0,
+            });
+          }
 
-      const group = map.get(item.ingredient_id);
-      group.total_quantity += item.stock ?? 0;
+          const group = map.get(ingredientId);
+          
+          // Cộng dồn số lượng (gram)
+          group.total_quantity += stock;
+          
+          // Tính và cộng dồn tổng tiền: price/kg * stock(gram) / 1000 = giá tiền
+          const itemCost = (price * stock) / 1000;
+          group.total_cost += itemCost;
+        }
+      }
     }
 
-    return [...map.values()]
+    // Làm tròn kết quả cuối cùng cho từng nguyên liệu
+    const result = [...map.values()].map(item => ({
+      ...item,
+      total_cost: Number(item.total_cost.toFixed(2)),
+    }));
+
+    return result
       .sort((a, b) => b.total_quantity - a.total_quantity)
       .slice(0, limit);
   }
@@ -213,23 +235,33 @@ export class ShoppingStatisticsService {
   async statisticsByFamily(familyId: number, user: JwtUser) {
     await this.checkFamilyPermission(familyId, user);
 
+    // Lấy tất cả shared lists của family để tính toán chính xác
     const lists = await this.shoppingListRepo.find({
-      where: { family_id: familyId },
-      select: ['cost']
+      where: { family_id: familyId, is_shared: true },
+      relations: ['items', 'items.ingredient']
     });
     const total_cost = lists.reduce((sum, list) => sum + Number(list.cost || 0), 0);
 
-    const items = await this.shoppingItemRepo.find({
-      where: {
-        shoppingList: { family_id: familyId },
-        is_checked: true
-      },
-      relations: ['ingredient', 'shoppingList']
+    // Tính tổng số items và số items đã checked từ shared lists
+    let total_items = 0;
+    let checked_items = 0;
+    const purchasedItems: any[] = [];
+    
+    lists.forEach(list => {
+      if (list.items && Array.isArray(list.items)) {
+        total_items += list.items.length;
+        const checked = list.items.filter(item => item.is_checked === true);
+        checked_items += checked.length;
+        // Thu thập các items đã checked với đầy đủ thông tin
+        purchasedItems.push(...checked);
+      }
     });
 
     return {
       total_cost,
-      purchased_items: items,
+      total_items,
+      checked_items,
+      purchased_items: purchasedItems,
     };
   }
 }

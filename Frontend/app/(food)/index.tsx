@@ -245,19 +245,21 @@ export default function FoodPage() {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={foodStyles.searchContainer}>
-        <View style={foodStyles.searchBar}>
-          <Ionicons name="search" size={20} color={COLORS.darkGrey} style={foodStyles.searchIcon} />
-          <TextInput
-            style={foodStyles.searchInput}
-            placeholder="Search Anything"
-            placeholderTextColor={COLORS.darkGrey}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+      {/* Search Bar - Only show when tab is "explore" */}
+      {activeTab === 'explore' && (
+        <View style={foodStyles.searchContainer}>
+          <View style={foodStyles.searchBar}>
+            <Ionicons name="search" size={20} color={COLORS.darkGrey} style={foodStyles.searchIcon} />
+            <TextInput
+              style={foodStyles.searchInput}
+              placeholder="Tìm kiếm món ăn"
+              placeholderTextColor={COLORS.darkGrey}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Content */}
       {((activeTab === 'explore' && loading && dishes.length === 0) ||

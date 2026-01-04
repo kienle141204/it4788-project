@@ -785,6 +785,53 @@ class PushNotificationService {
   }
 
   /**
+   * Check xem có nên hiển thị notification không
+   * Trả về false nếu user đang ở chat screen của cùng family
+   */
+  private async shouldDisplayNotification(data: any): Promise<boolean> {
+    try {
+      // Chỉ check cho chat messages
+      if (data?.type !== 'chat_message' || !data?.familyId) {
+        return true; // Hiển thị các notification khác
+      }
+
+      // Dynamic import để tránh circular dependency
+      const { useScreenState } = await import('@/context/ScreenStateContext');
+      
+      // Lấy screen state từ context
+      // Note: Đây là một workaround vì chúng ta không thể dùng hook trong class method
+      // Thay vào đó, chúng ta sẽ lưu screen state trong AsyncStorage hoặc dùng một global variable
+      // Hoặc tốt hơn: truyền callback từ component
+      
+      // Tạm thời dùng cách đơn giản: check từ AsyncStorage hoặc global state
+      // Sẽ cần refactor để truyền callback từ component
+      return true; // Tạm thời return true, sẽ implement sau
+    } catch (error) {
+      console.error('[PushNotifications] Error checking should display notification:', error);
+      return true; // Default: hiển thị notification nếu có lỗi
+    }
+  }
+
+  /**
+   * Set callback để check screen state
+   */
+  private screenStateChecker: ((data: any) => boolean) | null = null;
+
+  setScreenStateChecker(checker: ((data: any) => boolean) | null) {
+    this.screenStateChecker = checker;
+  }
+
+  /**
+   * Check xem có nên hiển thị notification không (sử dụng callback)
+   */
+  private async shouldDisplayNotificationWithCallback(data: any): Promise<boolean> {
+    if (this.screenStateChecker) {
+      return this.screenStateChecker(data);
+    }
+    return true; // Default: hiển thị nếu không có checker
+  }
+
+  /**
    * Hiển thị notification bằng Notifee với format đúng
    */
   private async displayNotificationWithNotifee(
@@ -987,6 +1034,17 @@ class PushNotificationService {
         hasNotification: !!remoteMessage.notification
       });
       
+      // Check if we should display notification (skip if user is on chat screen for same family)
+      const shouldDisplay = await this.shouldDisplayNotificationWithCallback(remoteMessage.data);
+      if (!shouldDisplay) {
+        console.log('[PushNotifications] ⏭️ Skipping notification display - user is on chat screen');
+        // Still call callback to refresh notifications list
+        if (onNotificationReceived) {
+          onNotificationReceived(remoteMessage);
+        }
+        return;
+      }
+
       // Đảm bảo hiển thị notification
       let notificationDisplayed = false;
       

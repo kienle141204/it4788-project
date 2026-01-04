@@ -198,54 +198,58 @@ export default function CreateMenuPage() {
       return;
     }
 
-    setLoading(true);
-    try {
-      // Tạo menu
-      const menuResponse = await postAccess(`menus?familyId=${selectedFamilyId}`, {
-        description: description.trim() || undefined,
-        time: time,
-      });
-
-      if (!menuResponse?.success) {
-        throw new Error(menuResponse?.message || 'Không thể tạo thực đơn');
-      }
-
-      const menuId = menuResponse.data?.id;
-      if (!menuId) {
-        throw new Error('Không nhận được ID thực đơn');
-      }
-
-      // Thêm các món ăn vào menu
-      const addDishPromises = selectedDishes.map(selectedDish =>
-        postAccess(`menus/${menuId}/dishes`, {
-          dish_id: parseInt(selectedDish.dish.id),
-          stock: selectedDish.stock,
-          price: selectedDish.price,
-        }),
-      );
-
-      await Promise.all(addDishPromises);
-
-      // Invalidate cache when creating menu
-      await clearCacheByPattern('meal:menus');
-
-      // Back trước, rồi mới hiện thông báo
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(meal)' as any);
-      }
-
-      Alert.alert('Thành công', 'Tạo thực đơn thành công');
-    } catch (err: any) {
-      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
-        handleSessionExpired();
-        return;
-      }
-      Alert.alert('Lỗi', err?.message || 'Không thể tạo thực đơn. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
+    // Navigate back IMMEDIATELY (optimistic navigation)
+    // Menu will appear via useFocusEffect refresh
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(meal)' as any);
     }
+
+    // Call API in background (don't await to keep UI responsive)
+    setLoading(true);
+    
+    postAccess(`menus?familyId=${selectedFamilyId}`, {
+      description: description.trim() || undefined,
+      time: time,
+    })
+      .then(async (menuResponse) => {
+        if (!menuResponse?.success) {
+          throw new Error(menuResponse?.message || 'Không thể tạo thực đơn');
+        }
+
+        const menuId = menuResponse.data?.id;
+        if (!menuId) {
+          throw new Error('Không nhận được ID thực đơn');
+        }
+
+        // Thêm các món ăn vào menu
+        const addDishPromises = selectedDishes.map(selectedDish =>
+          postAccess(`menus/${menuId}/dishes`, {
+            dish_id: parseInt(selectedDish.dish.id),
+            stock: selectedDish.stock,
+            price: selectedDish.price,
+          }),
+        );
+
+        await Promise.all(addDishPromises);
+
+        // Invalidate cache when creating menu
+        await clearCacheByPattern('meal:menus');
+        
+        setLoading(false);
+      })
+      .catch((err: any) => {
+        setLoading(false);
+        
+        if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+          handleSessionExpired();
+          return;
+        }
+        
+        // Show error - user is already back on menu list page
+        Alert.alert('Lỗi', err?.message || 'Không thể tạo thực đơn. Vui lòng thử lại.');
+      });
   };
 
   const selectedFamily = families.find(f => f.id === selectedFamilyId);
