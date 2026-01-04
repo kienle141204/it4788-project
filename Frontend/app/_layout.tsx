@@ -6,6 +6,8 @@ import { StatusBar } from "expo-status-bar";
 import { COLORS } from "@/constants/themes";
 import { useEffect, useRef } from "react";
 import * as SystemUI from "expo-system-ui";
+import * as NavigationBar from "expo-navigation-bar";
+import { Platform } from "react-native";
 import { subscribeToNetworkStatus, NetworkStatus } from "@/utils/network";
 import { processQueue, getQueueStatus } from "@/utils/requestQueue";
 import Toast from "react-native-toast-message";
@@ -17,6 +19,14 @@ export default function RootLayout() {
   useEffect(() => {
     // Set status bar background color for Android to match header
     SystemUI.setBackgroundColorAsync(COLORS.background);
+    
+    // Configure full screen immersive mode on Android
+    if (Platform.OS === 'android') {
+      NavigationBar.setVisibilityAsync('hidden');
+      NavigationBar.setBehaviorAsync('overlay-swipe');
+      // Enable immersive mode - bars can be swiped to show
+      NavigationBar.setPositionAsync('absolute');
+    }
   }, []);
 
   useEffect(() => {
@@ -97,7 +107,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
+      <StatusBar hidden={true} />
       <ScreenStateProvider>
         <NotificationsProvider>
           <Stack screenOptions={{ headerShown: false }} />

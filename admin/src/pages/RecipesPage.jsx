@@ -3,11 +3,13 @@ import { Plus, Eye, Edit, Trash2 } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import TextArea from '../components/common/TextArea';
+import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
 import Pagination from '../components/common/Pagination';
 import { fetchRecipes, createRecipe, updateRecipe, deleteRecipe, getRecipeById } from '../api/recipeAPI';
+import { createDish } from '../api/dishAPI';
 
 const RecipesPage = () => {
   const [recipes, setRecipes] = useState([]);
@@ -20,7 +22,9 @@ const RecipesPage = () => {
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [formData, setFormData] = useState({
-    dish_id: '',
+    dish_name: '',
+    dish_description: '',
+    image_url: '',
     status: '',
     steps: []
   });
@@ -203,7 +207,9 @@ const RecipesPage = () => {
     setIsEditModalOpen(false);
     setEditingRecipe(null);
     setFormData({
-      dish_id: '',
+      dish_name: '',
+      dish_description: '',
+      image_url: '',
       status: '',
       steps: []
     });
@@ -238,10 +244,10 @@ const RecipesPage = () => {
         // Reload recipes to get fresh data
         loadRecipes();
       } else {
-        // Create new recipe - includes dish_id
+        // Create new recipe - create dish first, then recipe
         // Validate required fields
-        if (!formData.dish_id) {
-          alert('Vui lòng nhập ID món ăn');
+        if (!formData.dish_name) {
+          alert('Vui lòng nhập tên món ăn');
           return;
         }
 
@@ -250,8 +256,19 @@ const RecipesPage = () => {
           return;
         }
 
+        // Create dish first
+        const dishData = {
+          name: formData.dish_name,
+          description: formData.dish_description || '',
+          image_url: formData.image_url || ''
+        };
+
+        const newDish = await createDish(dishData);
+        const dishId = newDish.id || newDish.data?.id;
+
+        // Then create recipe with the new dish_id
         const createData = {
-          dish_id: parseInt(formData.dish_id),
+          dish_id: dishId,
           status: formData.status || 'public',
           steps: formData.steps.map((step, index) => ({
             step_number: parseInt(step.step_number) || (index + 1),
@@ -372,7 +389,7 @@ const RecipesPage = () => {
       <div className="mb-6">
         <Button icon={Plus} onClick={() => {
           setEditingRecipe(null);
-          setFormData({ dish_id: '', status: '', steps: [] });
+          setFormData({ dish_name: '', dish_description: '', image_url: '', status: '', steps: [] });
           setIsEditModalOpen(true);
         }}>
           Thêm công thức
@@ -427,20 +444,73 @@ const RecipesPage = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <Input
-                label="ID Món ăn"
-                type="number"
-                value={formData.dish_id}
-                onChange={(e) => setFormData({ ...formData, dish_id: e.target.value })}
-                required
-                disabled={!!editingRecipe}
-              />
-              <Input
+            {!editingRecipe && (
+              <>
+                <div className="mb-6">
+                  <Input
+                    label="Tên món ăn *"
+                    value={formData.dish_name}
+                    onChange={(e) => setFormData({ ...formData, dish_name: e.target.value })}
+                    required
+                    placeholder="Nhập tên món ăn"
+                  />
+                </div>
+                <div className="mb-6">
+                  <TextArea
+                    label="Mô tả món ăn"
+                    value={formData.dish_description}
+                    onChange={(e) => setFormData({ ...formData, dish_description: e.target.value })}
+                    placeholder="Nhập mô tả cho món ăn..."
+                    rows={3}
+                  />
+                </div>
+                <div className="mb-6">
+                  <Input
+                    label="URL Hình ảnh"
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                  {formData.image_url && (
+                    <div className="mt-2">
+                      <img
+                        src={formData.image_url}
+                        alt="Preview"
+                        className="w-32 h-32 object-cover rounded-lg border border-gray-300"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            {editingRecipe && (
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <Input
+                  label="ID"
+                  type="number"
+                  value={editingRecipe.id || ''}
+                  disabled={true}
+                />
+                <Input
+                  label="ID Món ăn"
+                  type="number"
+                  value={editingRecipe.dish_id || ''}
+                  disabled={true}
+                />
+              </div>
+            )}
+            <div className="mb-6">
+              <Select
                 label="Trạng thái"
-                value={formData.status}
+                value={formData.status || 'public'}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                placeholder="public, private, draft..."
+                options={[
+                  { value: 'public', label: 'Công khai' },
+                  { value: 'private', label: 'Riêng tư' }
+                ]}
               />
             </div>
 

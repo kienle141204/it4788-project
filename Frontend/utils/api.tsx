@@ -26,6 +26,7 @@ const config = {
     Accept: "application/json",
     "Content-Type": "application/json",
   },
+  timeout: 30000, // 30 seconds timeout for all requests
 }
 
 export const get = async (path: string) => {

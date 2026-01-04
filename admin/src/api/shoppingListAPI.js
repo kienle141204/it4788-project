@@ -56,3 +56,15 @@ export const shareShoppingList = async (id) => {
         throw error;
     }
 };
+
+// Get family shared shopping lists
+export const getFamilySharedLists = async (familyId) => {
+    console.log('API call: getFamilySharedLists', familyId);
+    try {
+        const response = await get(`/shopping-lists/my-family-shared/${familyId}`);
+        return response.data || response || [];
+    } catch (error) {
+        console.error('Error getting family shared lists:', error);
+        throw error;
+    }
+};
