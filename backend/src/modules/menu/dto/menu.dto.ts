@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min, Max, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, Max, IsEnum, IsDateString } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { MenuTime } from '../../../entities/menu.entity';
 
@@ -12,6 +12,10 @@ export class CreateMenuDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
 
 export class UpdateMenuDto {
@@ -24,6 +28,10 @@ export class UpdateMenuDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
 
 export class CreateMenuDishDto {

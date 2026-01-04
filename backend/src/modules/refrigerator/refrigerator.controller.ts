@@ -582,6 +582,7 @@ export class RefrigeratorController {
         {
           dishId: 1,
           dishName: 'Phở Bò',
+          image_url: 'https://example.com/pho-bo.jpg',
           matchCount: 3,
           totalIngredients: 5,
           matchPercentage: 0.6,

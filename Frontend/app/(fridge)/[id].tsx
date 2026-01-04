@@ -437,30 +437,43 @@ export default function FridgeDetailPage() {
       const cacheKey = `fridge:${refrigeratorId}:suggestions`;
       const cachedData = await getCache<any>(cacheKey);
       
-      if (cachedData && Array.isArray(cachedData)) {
-        // We have cache, show it immediately without loading
-        setSuggestions(cachedData);
-        setLoadingSuggestions(false);
+      if (cachedData) {
+        // Handle both cases: cache might have full API response or just the array
+        const cachedSuggestions = cachedData?.data && Array.isArray(cachedData.data)
+          ? cachedData.data
+          : Array.isArray(cachedData)
+            ? cachedData
+            : [];
         
-        // Fetch fresh data in background
-        refreshCachedAccess<any>(
-          `fridge/${refrigeratorId}/suggestions`,
-          {},
-          {
-            ttl: CACHE_TTL.SHORT,
-            cacheKey,
-            compareData: true,
-          }
-        ).then((freshResult) => {
-          if (freshResult.updated) {
-            const freshSuggestions = Array.isArray(freshResult.data) ? freshResult.data : [];
-            setSuggestions(freshSuggestions);
-          }
-        }).catch(() => {
-          // Silently fail background refresh
-        });
-        
-        return;
+        if (cachedSuggestions.length > 0 || Array.isArray(cachedData)) {
+          // We have cache, show it immediately without loading
+          setSuggestions(cachedSuggestions);
+          setLoadingSuggestions(false);
+          
+          // Fetch fresh data in background
+          refreshCachedAccess<any>(
+            `fridge/${refrigeratorId}/suggestions`,
+            {},
+            {
+              ttl: CACHE_TTL.SHORT,
+              cacheKey,
+              compareData: true,
+            }
+          ).then((freshResult) => {
+            if (freshResult.updated) {
+              const freshSuggestions = freshResult.data?.data && Array.isArray(freshResult.data.data)
+                ? freshResult.data.data
+                : Array.isArray(freshResult.data)
+                  ? freshResult.data
+                  : [];
+              setSuggestions(freshSuggestions);
+            }
+          }).catch(() => {
+            // Silently fail background refresh
+          });
+          
+          return;
+        }
       }
       
       // No cache, fetch from API
@@ -479,8 +492,12 @@ export default function FridgeDetailPage() {
         }
       );
       
-      const suggestionsData = result.data;
-      setSuggestions(Array.isArray(suggestionsData) ? suggestionsData : []);
+      const suggestionsData = result.data?.data && Array.isArray(result.data.data)
+        ? result.data.data
+        : Array.isArray(result.data)
+          ? result.data
+          : [];
+      setSuggestions(suggestionsData);
       
       // If we got data from cache, fetch fresh data in background
       if (result.fromCache) {
@@ -494,7 +511,11 @@ export default function FridgeDetailPage() {
           }
         ).then((freshResult) => {
           if (freshResult.updated) {
-            const freshSuggestions = Array.isArray(freshResult.data) ? freshResult.data : [];
+            const freshSuggestions = freshResult.data?.data && Array.isArray(freshResult.data.data)
+              ? freshResult.data.data
+              : Array.isArray(freshResult.data)
+                ? freshResult.data
+                : [];
             setSuggestions(freshSuggestions);
           }
         }).catch(() => {
@@ -869,12 +890,26 @@ export default function FridgeDetailPage() {
         text: 'Xóa',
         style: 'destructive',
         onPress: async () => {
+          // Optimistic UI: Xóa ngay khỏi state
+          const deletedDish = fridgeDishes.find(d => d.id === dishId);
+          setFridgeDishes(prev => prev.filter(d => d.id !== dishId));
+          
           try {
             await removeFridgeDish(dishId);
             // Invalidate cache when removing dish
             await clearCacheByPattern(`fridge:${refrigeratorId}`);
+            // Refresh data in background để đảm bảo sync
             fetchRefrigeratorData(true);
           } catch (err: any) {
+            // Rollback nếu xóa thất bại
+            if (deletedDish) {
+              setFridgeDishes(prev => [...prev, deletedDish].sort((a, b) => {
+                if (a.created_at && b.created_at) {
+                  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                }
+                return a.id - b.id;
+              }));
+            }
             Alert.alert('Lỗi', 'Không thể xóa món ăn. Vui lòng thử lại.');
           }
         },
@@ -889,12 +924,26 @@ export default function FridgeDetailPage() {
         text: 'Xóa',
         style: 'destructive',
         onPress: async () => {
+          // Optimistic UI: Xóa ngay khỏi state
+          const deletedIngredient = fridgeIngredients.find(i => i.id === ingredientId);
+          setFridgeIngredients(prev => prev.filter(i => i.id !== ingredientId));
+          
           try {
             await removeFridgeIngredient(ingredientId);
             // Invalidate cache when removing ingredient
             await clearCacheByPattern(`fridge:${refrigeratorId}`);
+            // Refresh data in background để đảm bảo sync
             fetchRefrigeratorData(true);
           } catch (err: any) {
+            // Rollback nếu xóa thất bại
+            if (deletedIngredient) {
+              setFridgeIngredients(prev => [...prev, deletedIngredient].sort((a, b) => {
+                if (a.created_at && b.created_at) {
+                  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                }
+                return a.id - b.id;
+              }));
+            }
             Alert.alert('Lỗi', 'Không thể xóa nguyên liệu. Vui lòng thử lại.');
           }
         },
@@ -1807,10 +1856,13 @@ export default function FridgeDetailPage() {
               ) : (
                 <KeyboardAwareScrollView 
                   style={{ maxHeight: '90%' }} 
-                  contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+                  contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
                   showsVerticalScrollIndicator={true}
                   enableOnAndroid={true}
-                  extraScrollHeight={20}
+                  enableAutomaticScroll={true}
+                  extraScrollHeight={100}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="interactive"
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Thông tin món ăn</Text>
@@ -2117,10 +2169,13 @@ export default function FridgeDetailPage() {
               ) : (
                 <KeyboardAwareScrollView 
                   style={{ maxHeight: '90%' }} 
-                  contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+                  contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
                   showsVerticalScrollIndicator={true}
                   enableOnAndroid={true}
-                  extraScrollHeight={20}
+                  enableAutomaticScroll={true}
+                  extraScrollHeight={100}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="interactive"
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.darkGrey }}>Thông tin nguyên liệu</Text>

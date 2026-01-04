@@ -19,6 +19,7 @@ import { COLORS } from '../../constants/themes';
 import { getAccess, deleteAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
 import { clearCacheByPattern, getCache } from '../../utils/cache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Family {
   id: string;
@@ -43,7 +44,7 @@ interface Menu {
   id: string;
   family: Family | null;
   description: string | null;
-  created_at: string;
+  created_at: string; // Coi created_at như date của menu
   time?: string; // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   menuDishes: MenuDish[];
 }
@@ -273,18 +274,57 @@ export default function MealPage() {
   // Refresh danh sách khi màn hình được focus lại (ví dụ: quay lại từ màn hình edit)
   useFocusEffect(
     useCallback(() => {
-      // Always refresh when coming back from create/edit page to show new menu immediately
-      // Don't show loading state for better UX (optimistic refresh)
-      if (menus.length > 0 && deletedMenuIdsRef.current.size === 0) {
-        // Refresh immediately without showing loading state for better UX (optimistic refresh)
-        // Use isRefreshing=false to avoid showing spinner
-        fetchMenus(1, true, false).catch(() => {
-          // Silently fail, optimistic update is already shown
+      // Check for optimistic menu from create page
+      AsyncStorage.getItem('optimistic_menu_new')
+        .then(async (optimisticMenuStr) => {
+          if (optimisticMenuStr) {
+            try {
+              const optimisticMenu: Menu = JSON.parse(optimisticMenuStr);
+              
+              // Add optimistic menu to state immediately (optimistic UI)
+              setMenus(prevMenus => {
+                // Check if menu already exists (avoid duplicates)
+                const exists = prevMenus.some(m => String(m.id) === String(optimisticMenu.id));
+                if (!exists) {
+                  // Add to beginning of list
+                  return [optimisticMenu, ...prevMenus];
+                }
+                return prevMenus;
+              });
+              
+              // Remove from AsyncStorage after adding to state
+              await AsyncStorage.removeItem('optimistic_menu_new');
+              
+              // Refresh in background to get real data from server
+              fetchMenus(1, true, false).catch(() => {
+                // Silently fail, optimistic update is already shown
+              });
+            } catch (error) {
+              console.warn('Error parsing optimistic menu:', error);
+              await AsyncStorage.removeItem('optimistic_menu_new');
+            }
+          } else {
+            // No optimistic menu, just refresh normally
+            if (menus.length > 0 && deletedMenuIdsRef.current.size === 0) {
+              // Refresh immediately without showing loading state for better UX (optimistic refresh)
+              // Use isRefreshing=false to avoid showing spinner
+              fetchMenus(1, true, false).catch(() => {
+                // Silently fail, optimistic update is already shown
+              });
+            } else if (menus.length === 0) {
+              // If no menus, fetch normally (first load)
+              fetchMenus(1, true, false).catch(() => {});
+            }
+          }
+        })
+        .catch(() => {
+          // If error reading AsyncStorage, just refresh normally
+          if (menus.length > 0 && deletedMenuIdsRef.current.size === 0) {
+            fetchMenus(1, true, false).catch(() => {});
+          } else if (menus.length === 0) {
+            fetchMenus(1, true, false).catch(() => {});
+          }
         });
-      } else if (menus.length === 0) {
-        // If no menus, fetch normally (first load)
-        fetchMenus(1, true, false).catch(() => {});
-      }
     }, [fetchMenus, menus.length]),
   );
 
@@ -480,11 +520,32 @@ export default function MealPage() {
     setDateOffset(prev => prev + 1);
   };
 
-  // Filter menus by selected date
+  // Filter menus by selected date (coi created_at như date)
   const filteredMenus = useMemo(() => {
+    if (!menus || menus.length === 0) {
+      return [];
+    }
+    
     return menus.filter(menu => {
-      const menuDate = new Date(menu.created_at);
-      return isSameDay(menuDate, selectedDate);
+      try {
+        // Sử dụng created_at như date của menu
+        if (!menu.created_at) {
+          return false;
+        }
+        
+        const menuDate = new Date(menu.created_at);
+        
+        // Check if date is valid
+        if (isNaN(menuDate.getTime())) {
+          return false;
+        }
+        
+        return isSameDay(menuDate, selectedDate);
+      } catch (error) {
+        // If there's an error parsing the date, skip this menu
+        console.warn('Error parsing menu date:', error, menu);
+        return false;
+      }
     });
   }, [menus, selectedDate]);
 
@@ -684,11 +745,20 @@ export default function MealPage() {
             </View>
           )}
 
-          {!error && filteredMenus.length === 0 && (
+          {!error && filteredMenus.length === 0 && menus.length > 0 && (
             <View style={mealStyles.emptyState}>
               <Ionicons name='restaurant-outline' size={32} color={COLORS.grey} />
               <Text style={mealStyles.emptyStateText}>
                 Không có thực đơn nào cho ngày đã chọn.
+              </Text>
+            </View>
+          )}
+
+          {!error && menus.length === 0 && !loading && (
+            <View style={mealStyles.emptyState}>
+              <Ionicons name='restaurant-outline' size={32} color={COLORS.grey} />
+              <Text style={mealStyles.emptyStateText}>
+                Chưa có thực đơn nào. Nhấn nút + để tạo thực đơn mới.
               </Text>
             </View>
           )}

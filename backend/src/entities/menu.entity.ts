@@ -35,7 +35,7 @@ export class Menu {
   })
   time: MenuTime | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column({ name: 'decription', type: 'text', nullable: true })

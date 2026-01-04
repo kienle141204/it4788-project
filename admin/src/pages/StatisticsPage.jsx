@@ -14,12 +14,12 @@ import { getFamilySharedLists } from '../api/shoppingListAPI';
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm text-gray-500 mb-1">{title}</p>
-                <p className={`text-2xl font-bold ${color || 'text-gray-800'}`}>{value}</p>
-                {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+            <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-500 mb-1 break-words">{title}</p>
+                <p className={`text-2xl font-bold ${color || 'text-gray-800'} break-words`}>{value}</p>
+                {subtitle && <p className="text-xs text-gray-400 mt-1 break-words">{subtitle}</p>}
             </div>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${color ? color.replace('text-', 'bg-').replace('600', '100') : 'bg-gray-100'}`}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ml-2 ${color ? color.replace('text-', 'bg-').replace('600', '100') : 'bg-gray-100'}`}>
                 <Icon size={24} className={color || 'text-gray-600'} />
             </div>
         </div>
@@ -72,6 +72,19 @@ const StatisticsPage = () => {
 
     useEffect(() => {
         if (selectedFamilyId) {
+            // Reset stats when family or year changes
+            setStats({
+                monthlyCost: [],
+                checkedItems: 0,
+                totalItems: 0,
+                topIngredients: [],
+                topIngredientsByCost: [],
+                familyStats: null,
+                totalIngredientCost: 0,
+                paidCost: 0,
+                remainingCost: 0
+            });
+            setShoppingLists([]);
             loadStatistics();
         }
     }, [selectedFamilyId, selectedYear]);
@@ -93,13 +106,28 @@ const StatisticsPage = () => {
 
         setLoading(true);
         try {
+            // Ensure selectedFamilyId is parsed correctly
+            const familyId = parseInt(selectedFamilyId, 10);
+            if (isNaN(familyId)) {
+                console.error('Invalid family ID:', selectedFamilyId);
+                return;
+            }
+            
+            // Debug: log selected family info
+            const selectedFamily = families.find(f => f.id === familyId);
+            console.log('Loading statistics for family:', {
+                id: familyId,
+                name: selectedFamily?.name,
+                selectedFamilyId: selectedFamilyId
+            });
+            
             const [monthlyCostRes, checkedItemsRes, topIngredientsRes, topIngredientsCostRes, familyStatsRes, shoppingListsRes] = await Promise.allSettled([
-                getMonthlyCost(selectedYear, parseInt(selectedFamilyId)),
-                getCheckedItems(parseInt(selectedFamilyId)),
-                getTopIngredients(parseInt(selectedFamilyId), 10),
-                getTopIngredientsByCost(parseInt(selectedFamilyId), 10),
-                getFamilyStatistics(parseInt(selectedFamilyId)),
-                getFamilySharedLists(parseInt(selectedFamilyId))
+                getMonthlyCost(selectedYear, familyId),
+                getCheckedItems(familyId),
+                getTopIngredients(familyId, 10),
+                getTopIngredientsByCost(familyId, 10),
+                getFamilyStatistics(familyId),
+                getFamilySharedLists(familyId)
             ]);
 
             // Calculate costs from shopping lists (same as Frontend)
@@ -109,24 +137,50 @@ const StatisticsPage = () => {
             let remainingCost = 0;
             let checkedItems = 0;
             let totalItems = 0;
+            
+            // Calculate top ingredients from filtered shopping lists by year
+            const topIngredientsMap = new Map(); // ingredient_id -> { name, quantity, cost }
+            const topIngredientsByCostMap = new Map(); // ingredient_id -> { name, quantity, cost }
+            
+            // Initialize filteredLists outside if block
+            let filteredLists = [];
 
             if (shoppingListsRes.status === 'fulfilled') {
                 const familyLists = shoppingListsRes.value.data || shoppingListsRes.value || [];
                 
                 // Filter shopping lists by selected year
-                const filteredLists = Array.isArray(familyLists) ? familyLists.filter((list) => {
+                filteredLists = Array.isArray(familyLists) ? familyLists.filter((list) => {
                     const listDate = list.shopping_date || list.created_at;
                     if (!listDate) return false;
-                    const date = new Date(listDate);
-                    return date.getFullYear() === selectedYear;
+                    // Parse date correctly to avoid timezone issues
+                    let dateStr = String(listDate);
+                    if (dateStr.includes('T')) {
+                        dateStr = dateStr.split('T')[0]; // Get YYYY-MM-DD part
+                    }
+                    // Remove timezone info if exists
+                    if (dateStr.includes('+')) {
+                        dateStr = dateStr.split('+')[0];
+                    }
+                    // Parse year directly from string (avoid timezone conversion)
+                    const dateMatch = dateStr.match(/^(\d{4})/);
+                    if (!dateMatch) return false;
+                    const year = parseInt(dateMatch[1], 10);
+                    return year === selectedYear;
                 }) : [];
                 
                 // Store filtered lists for daily chart
                 setShoppingLists(filteredLists);
                 
+                // Debug: log filtered lists info
+                console.log('Filtered shopping lists:', {
+                    totalLists: filteredLists.length,
+                    selectedYear,
+                    listsWithItems: filteredLists.filter(list => list.items && list.items.length > 0).length
+                });
+                
                 if (Array.isArray(filteredLists)) {
                     filteredLists.forEach((list) => {
-                        if (Array.isArray(list.items)) {
+                        if (Array.isArray(list.items) && list.items.length > 0) {
                             totalItems += list.items.length;
                             const checked = list.items.filter((item) => item.is_checked === true);
                             checkedItems += checked.length;
@@ -136,29 +190,116 @@ const StatisticsPage = () => {
                                 const price = Number(item.price) || Number(item.ingredient?.price) || 0;
                                 const stock = Number(item.stock) || 0;
                                 const itemCost = (price * stock) / 1000;
+                                const ingredientId = item.ingredient_id || item.ingredient?.id;
+                                const ingredientName = item.ingredient?.name || item.ingredient_name || 'Unknown';
 
                                 totalIngredientCost += itemCost;
+                                
+                                // Debug: log if item has no cost
+                                if (itemCost === 0 && (price > 0 || stock > 0)) {
+                                    console.warn('Item with zero cost:', {
+                                        itemId: item.id,
+                                        price,
+                                        stock,
+                                        ingredientName
+                                    });
+                                }
 
                                 if (item.is_checked) {
                                     paidCost += itemCost;
                                 } else {
                                     remainingCost += itemCost;
                                 }
+                                
+                                // Calculate top ingredients only from checked items (same as backend)
+                                if (item.is_checked && ingredientId && stock > 0) {
+                                    // Top ingredients by quantity
+                                    if (topIngredientsMap.has(ingredientId)) {
+                                        const existing = topIngredientsMap.get(ingredientId);
+                                        existing.total_quantity += stock;
+                                        existing.total_cost += itemCost;
+                                    } else {
+                                        topIngredientsMap.set(ingredientId, {
+                                            ingredient_id: ingredientId,
+                                            ingredient_name: ingredientName,
+                                            ingredient_image: item.ingredient?.image_url,
+                                            total_quantity: stock,
+                                            total_cost: itemCost
+                                        });
+                                    }
+                                    
+                                    // Top ingredients by cost
+                                    if (itemCost > 0) {
+                                        if (topIngredientsByCostMap.has(ingredientId)) {
+                                            const existing = topIngredientsByCostMap.get(ingredientId);
+                                            existing.total_quantity += stock;
+                                            existing.total_cost += itemCost;
+                                        } else {
+                                            topIngredientsByCostMap.set(ingredientId, {
+                                                ingredient_id: ingredientId,
+                                                ingredient_name: ingredientName,
+                                                ingredient_image: item.ingredient?.image_url,
+                                                total_quantity: stock,
+                                                total_cost: itemCost
+                                            });
+                                        }
+                                    }
+                                }
                             });
                         }
                     });
                 }
             }
+            
+            // Convert maps to arrays and sort
+            const calculatedTopIngredients = Array.from(topIngredientsMap.values())
+                .sort((a, b) => b.total_quantity - a.total_quantity)
+                .slice(0, 10);
+            
+            const calculatedTopIngredientsByCost = Array.from(topIngredientsByCostMap.values())
+                .sort((a, b) => b.total_cost - a.total_cost)
+                .slice(0, 10);
 
+            // If totalIngredientCost is 0 but monthlyCost has data, calculate from monthlyCost
+            let finalTotalIngredientCost = totalIngredientCost;
+            if (totalIngredientCost === 0 && monthlyCostRes.status === 'fulfilled') {
+                const monthlyData = monthlyCostRes.value.data || monthlyCostRes.value || [];
+                // Sum all monthly costs for selected year
+                const yearTotal = monthlyData.reduce((sum, month) => {
+                    const monthYear = month.month ? parseInt(month.month.split('-')[0]) : 0;
+                    if (monthYear === selectedYear) {
+                        return sum + (Number(month.total_cost) || 0);
+                    }
+                    return sum;
+                }, 0);
+                if (yearTotal > 0) {
+                    finalTotalIngredientCost = yearTotal;
+                    console.log('Using monthly cost data for total:', yearTotal);
+                }
+            }
+            
+                // Debug: log calculated values
+            console.log('Calculated statistics:', {
+                totalIngredientCost: Math.round(totalIngredientCost),
+                finalTotalIngredientCost: Math.round(finalTotalIngredientCost),
+                paidCost: Math.round(paidCost),
+                remainingCost: Math.round(remainingCost),
+                totalItems,
+                checkedItems,
+                filteredListsCount: filteredLists ? filteredLists.length : 0,
+                monthlyCostData: monthlyCostRes.status === 'fulfilled' ? (monthlyCostRes.value.data || monthlyCostRes.value || []) : []
+            });
+            
             setStats({
                 monthlyCost: monthlyCostRes.status === 'fulfilled' ? (monthlyCostRes.value.data || monthlyCostRes.value || []) : [],
                 // Use calculated values from filtered shopping lists by year
                 checkedItems: checkedItems,
                 totalItems: totalItems,
-                topIngredients: topIngredientsRes.status === 'fulfilled' ? (topIngredientsRes.value.data || topIngredientsRes.value || []) : [],
-                topIngredientsByCost: topIngredientsCostRes.status === 'fulfilled' ? (topIngredientsCostRes.value.data || topIngredientsCostRes.value || []) : [],
+                // Use calculated top ingredients from filtered lists by year, fallback to API if no data
+                topIngredients: calculatedTopIngredients.length > 0 ? calculatedTopIngredients : (topIngredientsRes.status === 'fulfilled' ? (topIngredientsRes.value.data || topIngredientsRes.value || []) : []),
+                topIngredientsByCost: calculatedTopIngredientsByCost.length > 0 ? calculatedTopIngredientsByCost : (topIngredientsCostRes.status === 'fulfilled' ? (topIngredientsCostRes.value.data || topIngredientsCostRes.value || []) : []),
                 familyStats: familyStatsRes.status === 'fulfilled' ? (familyStatsRes.value.data || familyStatsRes.value) : null,
-                totalIngredientCost: Math.round(totalIngredientCost),
+                totalIngredientCost: Math.round(finalTotalIngredientCost),
                 paidCost: Math.round(paidCost),
                 remainingCost: Math.round(remainingCost)
             });
@@ -183,7 +324,7 @@ const StatisticsPage = () => {
 
     const monthNames = ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
 
-    // Prepare daily chart data from shopping lists
+    // Prepare daily chart data from shopping lists (calculate from items like React Native)
     const prepareDailyChartData = () => {
         if (!shoppingLists || shoppingLists.length === 0) {
             return null;
@@ -194,16 +335,58 @@ const StatisticsPage = () => {
         
         shoppingLists.forEach((list) => {
             if (list.shopping_date) {
-                const date = new Date(list.shopping_date);
+                // Parse date correctly to avoid timezone issues
+                // Get date string in YYYY-MM-DD format
+                let dateStr = String(list.shopping_date);
+                // Remove time part if exists
+                if (dateStr.includes('T')) {
+                    dateStr = dateStr.split('T')[0]; // Get YYYY-MM-DD part
+                }
+                // Remove timezone info if exists
+                if (dateStr.includes('+')) {
+                    dateStr = dateStr.split('+')[0];
+                }
+                if (dateStr.includes('Z') && !dateStr.includes('T')) {
+                    // Handle edge case
+                    dateStr = dateStr.replace('Z', '');
+                }
+                
+                // Validate date string format (YYYY-MM-DD)
+                const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (!dateMatch) {
+                    return; // Skip invalid dates
+                }
+                
+                const year = parseInt(dateMatch[1], 10);
+                const month = parseInt(dateMatch[2], 10);
+                const day = parseInt(dateMatch[3], 10);
+                
                 // Only include dates from selected year
-                if (date.getFullYear() === selectedYear) {
-                    const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-                    const cost = Number(list.cost) || 0;
+                // API now returns date in correct format (YYYY-MM-DD) without timezone issues
+                if (year === selectedYear) {
+                    // Use normalized date string as key (YYYY-MM-DD)
+                    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     
-                    if (dailyMap.has(dateKey)) {
-                        dailyMap.set(dateKey, dailyMap.get(dateKey) + cost);
-                    } else {
-                        dailyMap.set(dateKey, cost);
+                    // Always calculate cost from items to ensure accuracy (same as totalIngredientCost)
+                    let listCost = 0;
+                    if (Array.isArray(list.items) && list.items.length > 0) {
+                        list.items.forEach((item) => {
+                            const price = Number(item.price) || Number(item.ingredient?.price) || 0;
+                            const stock = Number(item.stock) || 0;
+                            const itemCost = (price * stock) / 1000;
+                            listCost += itemCost;
+                        });
+                    } else if (list.cost) {
+                        // Fallback to list.cost if items not available
+                        listCost = Number(list.cost) || 0;
+                    }
+                    
+                    if (listCost > 0) {
+                        if (dailyMap.has(dateKey)) {
+                            dailyMap.set(dateKey, dailyMap.get(dateKey) + listCost);
+                        } else {
+                            dailyMap.set(dateKey, listCost);
+                        }
                     }
                 }
             }
@@ -218,17 +401,32 @@ const StatisticsPage = () => {
             return null;
         }
 
-        const labels = sortedEntries.map(([date]) => {
-            const d = new Date(date);
-            return `${d.getDate()}/${d.getMonth() + 1}`;
+        const labels = sortedEntries.map(([dateStr]) => {
+            // Parse date string directly to avoid timezone issues
+            // dateStr is in format YYYY-MM-DD (normalized)
+            const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (dateMatch) {
+                const day = parseInt(dateMatch[3], 10);
+                const month = parseInt(dateMatch[2], 10);
+                return `${day}/${month}`;
+            }
+            // Fallback: try to parse as date
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const day = parseInt(parts[2], 10);
+                const month = parseInt(parts[1], 10);
+                return `${day}/${month}`;
+            }
+            return dateStr;
         });
 
-        const data = sortedEntries.map(([, cost]) => cost);
+        // Divide by 1000 to show in thousands (k) - same as React Native
+        const data = sortedEntries.map(([, cost]) => Math.round(cost / 1000) || 0);
 
         return { labels, data };
     };
 
-    // Prepare monthly chart data
+    // Prepare monthly chart data (same as React Native)
     const prepareMonthlyChartData = () => {
         if (stats.monthlyCost.length === 0) {
             return null;
@@ -237,7 +435,9 @@ const StatisticsPage = () => {
         const monthData = monthNames.map((_, index) => {
             const monthNumber = index + 1;
             const monthDataItem = stats.monthlyCost.find(m => parseMonthFromData(m.month) === monthNumber);
-            return parseFloat(monthDataItem?.total_cost) || parseFloat(monthDataItem?.cost) || 0;
+            const cost = parseFloat(monthDataItem?.total_cost) || parseFloat(monthDataItem?.cost) || 0;
+            // Divide by 1000 to show in thousands (k) - same as React Native
+            return Math.round(cost / 1000) || 0;
         });
 
         return {
@@ -250,11 +450,11 @@ const StatisticsPage = () => {
         ? prepareDailyChartData() 
         : prepareMonthlyChartData();
 
-    // Sort top ingredients based on sort mode
+    // Sort top ingredients based on sort mode (same as React Native)
     const sortedTopIngredients = sortMode === 'cost' 
         ? [...stats.topIngredientsByCost].sort((a, b) => {
-            const costA = parseFloat(a.total_cost) || parseFloat(a.cost) || 0;
-            const costB = parseFloat(b.total_cost) || parseFloat(b.cost) || 0;
+            const costA = Math.round(parseFloat(a.total_cost) || parseFloat(a.cost) || 0);
+            const costB = Math.round(parseFloat(b.total_cost) || parseFloat(b.cost) || 0);
             return costB - costA;
         })
         : [...stats.topIngredients].sort((a, b) => {
@@ -276,7 +476,14 @@ const StatisticsPage = () => {
                         <Select
                             label="Chọn gia đình"
                             value={selectedFamilyId}
-                            onChange={(e) => setSelectedFamilyId(e.target.value)}
+                            onChange={(e) => {
+                                const newFamilyId = e.target.value;
+                                console.log('Family selection changed:', {
+                                    newFamilyId,
+                                    selectedFamily: families.find(f => f.id.toString() === newFamilyId)
+                                });
+                                setSelectedFamilyId(newFamilyId);
+                            }}
                             options={families.map(f => ({ value: f.id.toString(), label: f.name }))}
                         />
                     </div>
@@ -302,23 +509,23 @@ const StatisticsPage = () => {
                 </div>
             ) : (
                 <>
-                    {/* Summary Cards */}
+                    {/* Summary Cards - Same layout as React Native */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <StatCard
                             title="Tổng tiền nguyên liệu"
-                            value={`${stats.totalIngredientCost.toLocaleString('vi-VN')} đ`}
+                            value={`${stats.totalIngredientCost.toLocaleString('vi-VN')} ₫`}
                             icon={DollarSign}
                             color="text-purple-600"
                         />
                         <StatCard
                             title="Tiền đã chi"
-                            value={`${stats.paidCost.toLocaleString('vi-VN')} đ`}
+                            value={`${stats.paidCost.toLocaleString('vi-VN')} ₫`}
                             icon={ShoppingCart}
                             color="text-emerald-600"
                         />
                         <StatCard
                             title="Tiền cần chi"
-                            value={`${stats.remainingCost.toLocaleString('vi-VN')} đ`}
+                            value={`${stats.remainingCost.toLocaleString('vi-VN')} ₫`}
                             icon={TrendingUp}
                             color="text-orange-600"
                         />
@@ -331,8 +538,14 @@ const StatisticsPage = () => {
                         />
                     </div>
                     
-                    {/* Additional Stats Row */}
+                    {/* Additional Stats Row - Same as React Native */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <StatCard
+                            title="Đã mua"
+                            value={stats.checkedItems}
+                            icon={ShoppingCart}
+                            color="text-emerald-600"
+                        />
                         <StatCard
                             title="Tỷ lệ hoàn thành"
                             value={stats.totalItems > 0 ? `${Math.round((stats.checkedItems / stats.totalItems) * 100)}%` : '0%'}
@@ -341,16 +554,10 @@ const StatisticsPage = () => {
                         />
                         <StatCard
                             title="Tổng chi phí năm"
-                            value={`${calculateTotalCost().toLocaleString('vi-VN')} đ`}
+                            value={`${calculateTotalCost().toLocaleString('vi-VN')} ₫`}
                             icon={DollarSign}
                             color="text-emerald-600"
                             subtitle={`Năm ${selectedYear}`}
-                        />
-                        <StatCard
-                            title="Nguyên liệu theo dõi"
-                            value={stats.topIngredients.length}
-                            icon={Package}
-                            color="text-orange-600"
                         />
                     </div>
 
@@ -386,7 +593,7 @@ const StatisticsPage = () => {
                                     </button>
                                 </div>
                             </div>
-                            <p className="text-xs text-gray-400 mb-4">Đơn vị: đồng (đ)</p>
+                            <p className="text-xs text-gray-400 mb-4">Đơn vị: nghìn đồng (k)</p>
                             {chartData && chartData.data && chartData.data.some(v => v > 0) ? (
                                 <div className="flex gap-3 h-64">
                                     {/* Y-axis */}
@@ -401,7 +608,7 @@ const StatisticsPage = () => {
                                             }
                                             return yAxisValues.map((val, idx) => (
                                                 <span key={idx} className="text-xs text-gray-500 text-right min-w-[50px]">
-                                                    {val.toLocaleString('vi-VN')}
+                                                    {val}k
                                                 </span>
                                             ));
                                         })()}
@@ -420,7 +627,7 @@ const StatisticsPage = () => {
                                                     {value > 0 && (
                                                         <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
                                                             <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
-                                                                {value.toLocaleString('vi-VN')}
+                                                                {value}k
                                                             </span>
                                                         </div>
                                                     )}
@@ -430,7 +637,7 @@ const StatisticsPage = () => {
                                                         <div
                                                             className="w-full bg-emerald-500 rounded-t transition-all duration-500 hover:bg-emerald-600 relative"
                                                             style={{ height: `${height}%`, minHeight: value > 0 ? '4px' : '0' }}
-                                                            title={`${value.toLocaleString('vi-VN')} đ`}
+                                                            title={`${value}k`}
                                                         />
                                                     </div>
                                                     
@@ -487,12 +694,13 @@ const StatisticsPage = () => {
                                 ) : (
                                     sortedTopIngredients.slice(0, 5).map((item, index) => {
                                         if (sortMode === 'cost') {
-                                            const cost = parseFloat(item.total_cost) || parseFloat(item.cost) || 0;
-                                            const maxCost = Math.max(...sortedTopIngredients.slice(0, 5).map(i => parseFloat(i.total_cost) || parseFloat(i.cost) || 0), 1);
+                                            // Round cost to avoid decimals (same as React Native)
+                                            const cost = Math.round(parseFloat(item.total_cost) || parseFloat(item.cost) || 0);
+                                            const maxCost = Math.max(...sortedTopIngredients.slice(0, 5).map(i => Math.round(parseFloat(i.total_cost) || parseFloat(i.cost) || 0)), 1);
                                             return (
                                                 <ProgressBar
                                                     key={index}
-                                                    label={`${item.ingredient_name || item.name || `Nguyên liệu #${index + 1}`} (${cost.toLocaleString('vi-VN')} đ)`}
+                                                    label={`${item.ingredient_name || item.name || `Nguyên liệu #${index + 1}`} (${cost.toLocaleString('vi-VN')} ₫)`}
                                                     value={cost}
                                                     maxValue={maxCost}
                                                     color="bg-orange-500"

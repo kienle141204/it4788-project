@@ -236,14 +236,10 @@ export default function ExploreScreen() {
         {/* Header */}
         <View style={[styles.header, { paddingTop: 10, backgroundColor: COLORS.background }]}>
         <View style={styles.headerContent}>
-          <View style={styles.headerIconContainer}>
-            <Ionicons name="compass" size={28} color={COLORS.purple} />
-          </View>
           <Text style={styles.headerTitle}>
             Khám phá
           </Text>
         </View>
-        <View style={styles.headerDivider} />
       </View>
 
       <ScrollView

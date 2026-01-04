@@ -191,20 +191,43 @@ export class ShoppingListService {
 
   // Lấy ra toàn bộ các danh sách các danh sách mua sắm đã được share trong gia đình
   async myFamilyShared(family_id: number, user: JwtUser): Promise<ShoppingList[]> {
-    // Lấy tất cả thành viên của family
-    const members = await this.memberService.getMembersByFamily(family_id);
+    // Admin có thể xem tất cả families
+    if (user.role !== 'admin') {
+      // Lấy tất cả thành viên của family
+      const members = await this.memberService.getMembersByFamily(family_id);
 
-    // Kiểm tra user có thuộc family không
-    const isMember = members.some(member => member.user_id === user.id);
-    if (!isMember) {
-      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00173]);
+      // Kiểm tra user có thuộc family không
+      const isMember = members.some(member => member.user_id === user.id);
+      if (!isMember) {
+        throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00173]);
+      }
     }
 
     // Lấy các shopping list được chia sẻ trong family với owner info
-    return this.shoppingListRepo.find({
+    const lists = await this.shoppingListRepo.find({
       where: { family_id, is_shared: true },
       relations: ['family', 'owner', 'items', 'items.ingredient'],
       order: { created_at: 'DESC' },
+    });
+
+    // Format shopping_date đúng timezone (Vietnam +07:00)
+    // Convert date to local date string (YYYY-MM-DD) to avoid timezone issues
+    return lists.map(list => {
+      if (list.shopping_date) {
+        // Get date object
+        const date = new Date(list.shopping_date);
+        // Format as YYYY-MM-DD using local timezone
+        // Use getFullYear, getMonth, getDate to get local date components
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        // Create new object with formatted date string
+        return {
+          ...list,
+          shopping_date: `${year}-${month}-${day}` as any,
+        };
+      }
+      return list;
     });
   }
 

@@ -22,6 +22,8 @@ import { mealStyles } from '../../styles/meal.styles';
 import { getAccess, postAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
 import { clearCacheByPattern } from '../../utils/cache';
+import DateSelector from '../../components/DateSelector';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Family {
   id: string;
@@ -51,6 +53,7 @@ export default function CreateMenuPage() {
   const [description, setDescription] = useState('');
   const [time, setTime] = useState<string>('breakfast'); // 'breakfast' | 'lunch' | 'dinner' | 'snack'
   const [selectedDishes, setSelectedDishes] = useState<SelectedDish[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [loadingFamilies, setLoadingFamilies] = useState(true);
   const [loadingDishes, setLoadingDishes] = useState(false);
@@ -198,20 +201,16 @@ export default function CreateMenuPage() {
       return;
     }
 
-    // Navigate back IMMEDIATELY (optimistic navigation)
-    // Menu will appear via useFocusEffect refresh
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(meal)' as any);
-    }
-
-    // Call API in background (don't await to keep UI responsive)
+    // Call API to create menu
     setLoading(true);
+    
+    // Format date as YYYY-MM-DD
+    const dateString = selectedDate.toISOString().split('T')[0];
     
     postAccess(`menus?familyId=${selectedFamilyId}`, {
       description: description.trim() || undefined,
       time: time,
+      date: dateString,
     })
       .then(async (menuResponse) => {
         if (!menuResponse?.success) {
@@ -234,10 +233,36 @@ export default function CreateMenuPage() {
 
         await Promise.all(addDishPromises);
 
+        // Tạo optimistic menu object để hiển thị ngay
+        const selectedFamily = families.find(f => f.id === selectedFamilyId);
+        const optimisticMenu = {
+          id: String(menuId),
+          family: selectedFamily || null,
+          description: description.trim() || null,
+          created_at: dateString + 'T00:00:00.000Z', // Use selected date as created_at
+          time: time,
+          menuDishes: selectedDishes.map(sd => ({
+            id: `temp-${Date.now()}-${sd.dish.id}`,
+            stock: sd.stock,
+            price: String(sd.price),
+            dish: sd.dish,
+          })),
+        };
+
+        // Lưu optimistic menu vào AsyncStorage để index page có thể lấy
+        await AsyncStorage.setItem('optimistic_menu_new', JSON.stringify(optimisticMenu));
+
         // Invalidate cache when creating menu
         await clearCacheByPattern('meal:menus');
         
         setLoading(false);
+
+        // Navigate back AFTER creating menu successfully (optimistic UI)
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(meal)' as any);
+        }
       })
       .catch((err: any) => {
         setLoading(false);
@@ -247,7 +272,7 @@ export default function CreateMenuPage() {
           return;
         }
         
-        // Show error - user is already back on menu list page
+        // Show error
         Alert.alert('Lỗi', err?.message || 'Không thể tạo thực đơn. Vui lòng thử lại.');
       });
   };
@@ -292,6 +317,19 @@ export default function CreateMenuPage() {
             </Text>
             <Ionicons name="chevron-down" size={20} color={COLORS.grey} />
           </TouchableOpacity>
+        </View>
+
+        {/* Chọn ngày */}
+        <View style={mealStyles.menuCard}>
+          <Text style={mealStyles.sectionLabel}>Ngày *</Text>
+          <DateSelector
+            selectedDate={selectedDate.getDate()}
+            onSelectDate={(day, fullDate) => {
+              if (fullDate) {
+                setSelectedDate(fullDate);
+              }
+            }}
+          />
         </View>
 
         {/* Chọn bữa ăn */}

@@ -8,6 +8,7 @@ import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
 import Pagination from '../components/common/Pagination';
 import { fetchIngredients, createIngredient, updateIngredient, deleteIngredient, searchIngredients } from '../api/ingredientAPI';
+import { uploadFile } from '../api/uploadAPI';
 
 const FoodsPage = () => {
   const [foods, setFoods] = useState([]);
@@ -19,6 +20,8 @@ const FoodsPage = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFood, setEditingFood] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -120,6 +123,7 @@ const FoodsPage = () => {
       category_id: food.category_id || food.category?.id || '',
       place_id: food.place_id || ''
     });
+    setImagePreview(food.image_url || '');
     setIsModalOpen(true);
   };
 
@@ -127,9 +131,25 @@ const FoodsPage = () => {
     if (window.confirm(`Bạn có chắc muốn xóa "${food.name}"?`)) {
       try {
         await deleteIngredient(food.id);
-        // Remove ingredient from local state after successful deletion
-        setFoods(foods.filter(f => f.id !== food.id));
+        // Reload ingredients after successful deletion
+        await loadIngredients();
       } catch (error) {
+        console.error('Error deleting ingredient:', error);
+        let errorMessage = 'Không thể xóa thực phẩm. Vui lòng thử lại.';
+        
+        // Check for foreign key constraint error
+        if (error?.message?.includes('foreign key constraint') || 
+            error?.message?.includes('Cannot delete or update a parent row')) {
+          errorMessage = 'Không thể xóa thực phẩm này vì đang được sử dụng trong:\n' +
+                        '- Danh sách mua sắm (shopping_items)\n' +
+                        '- Tủ lạnh (fridge_ingredients)\n' +
+                        '- Hoặc các bản ghi khác\n\n' +
+                        'Vui lòng xóa các bản ghi liên quan trước khi xóa thực phẩm này.';
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        alert(errorMessage);
       }
     }
   };
@@ -148,14 +168,14 @@ const FoodsPage = () => {
 
       if (editingFood) {
         // Update existing ingredient
-        const updatedIngredient = await updateIngredient(editingFood.id, ingredientData);
-        // Update ingredient in local state
-        setFoods(foods.map(f => f.id === editingFood.id ? updatedIngredient : f));
+        await updateIngredient(editingFood.id, ingredientData);
+        // Reload ingredients after successful update
+        await loadIngredients();
       } else {
         // Create new ingredient
-        const newIngredient = await createIngredient(ingredientData);
-        // Add new ingredient to local state
-        setFoods([...foods, newIngredient]);
+        await createIngredient(ingredientData);
+        // Reload ingredients after successful creation
+        await loadIngredients();
       }
       handleCloseModal();
     } catch (error) {
@@ -165,6 +185,7 @@ const FoodsPage = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingFood(null);
+    setImagePreview('');
     setFormData({
       name: '',
       price: '',
@@ -176,6 +197,7 @@ const FoodsPage = () => {
 
   const handleOpenModal = () => {
     setEditingFood(null);
+    setImagePreview('');
     setFormData({
       name: '',
       price: '',
@@ -184,6 +206,44 @@ const FoodsPage = () => {
       place_id: ''
     });
     setIsModalOpen(true);
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file ảnh hợp lệ');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Kích thước file không được vượt quá 10MB');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload file
+      const imageUrl = await uploadFile(file, 'ingredients');
+      setFormData({ ...formData, image_url: imageUrl });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Không thể upload ảnh. Vui lòng thử lại.');
+      setImagePreview('');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   // Instead of client-side filtering, we'll implement server-side search
@@ -279,6 +339,8 @@ const FoodsPage = () => {
       <Table
         columns={columns}
         data={currentFoods}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
 
       {totalPages > 1 && (
@@ -323,12 +385,33 @@ const FoodsPage = () => {
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
             required
           />
-          <Input
-            label="URL Hình ảnh"
-            value={formData.image_url}
-            onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-            placeholder="https://example.com/image.jpg"
-          />
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hình ảnh
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={uploadingImage}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            {uploadingImage && (
+              <p className="mt-2 text-sm text-gray-500">Đang upload ảnh...</p>
+            )}
+            {(imagePreview || formData.image_url) && (
+              <div className="mt-4">
+                <img
+                  src={imagePreview || formData.image_url}
+                  alt="Preview"
+                  className="w-32 h-32 object-cover rounded-lg border border-gray-300"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+          </div>
           <Input
             label="ID Địa điểm (place_id)"
             type="number"
