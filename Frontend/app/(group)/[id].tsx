@@ -2012,7 +2012,7 @@ export default function GroupDetailPage() {
             // Store deleted list for rollback
             let deletedList: ShoppingList | null = null;
 
-            // Optimistic update: Remove list immediately
+            // Optimistic update: Remove list immediately from UI
             setShoppingLists(prevLists => {
               const listToDelete = prevLists.find(l => l.id === listId);
               if (listToDelete) {
@@ -2022,21 +2022,23 @@ export default function GroupDetailPage() {
             });
 
             try {
+              // Delete from server
               await deleteShoppingList(listId);
               
-              // Invalidate cache when deleting shopping list
+              // Invalidate cache to ensure fresh data on next fetch
               await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
               
-              // Only fetch shopping lists (much faster)
-              await fetchShoppingLists(true);
-              Alert.alert('Thành công', 'Đã xóa danh sách mua sắm');
+              // Silently refresh in background without blocking UI
+              // The list is already removed optimistically, so no need to refetch immediately
+              fetchShoppingLists(false).catch(() => {
+                // Silently fail background refresh
+              });
             } catch (error) {
-              // Rollback on error
+              // Rollback on error: restore the deleted list
               if (deletedList) {
                 setShoppingLists(prevLists => [...prevLists, deletedList!]);
               }
-              await fetchShoppingLists();
-              Alert.alert('Lỗi', 'Không thể xóa danh sách mua sắm');
+              Alert.alert('Lỗi', 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.');
             }
           },
         },
