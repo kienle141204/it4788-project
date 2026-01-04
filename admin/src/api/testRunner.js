@@ -21,21 +21,17 @@ const apiTests = {
   },
 
   async runTest(name, testFunction) {
-    console.log(`🧪 Running test: ${name}`);
     try {
       const result = await testFunction();
       this.results.passed.push({ name, result });
-      console.log(`✅ PASSED: ${name}`);
       return true;
     } catch (error) {
       this.results.failed.push({ name, error: error.message });
-      console.log(`❌ FAILED: ${name} - ${error.message}`);
       return false;
     }
   },
 
   async runAllTests() {
-    console.log('🚀 Starting API Tests...\n');
 
     // Import the APIs (in a real scenario, these would be imported)
     const { 
@@ -99,7 +95,6 @@ const apiTests = {
         return result;
       } catch (error) {
         // It's ok if this fails if dish ID doesn't exist
-        console.log(`   (Expected failure if dish ID ${this.testData.dishId} doesn't exist)`);
         throw error;
       }
     });
@@ -110,7 +105,6 @@ const apiTests = {
         return result;
       } catch (error) {
         // It's ok if this fails if ingredient ID doesn't exist
-        console.log(`   (Expected failure if ingredient ID ${this.testData.dishId} doesn't exist)`);
         throw error;
       }
     });
@@ -120,22 +114,9 @@ const apiTests = {
   },
 
   printSummary() {
-    console.log('\n📊 TEST SUMMARY');
-    console.log('===============');
-    console.log(`✅ Passed: ${this.results.passed.length}`);
-    console.log(`❌ Failed: ${this.results.failed.length}`);
-    console.log(`📊 Total: ${this.results.passed.length + this.results.failed.length}`);
 
     if (this.results.failed.length === 0) {
-      console.log('\n🎉 All API tests completed successfully!');
-      console.log('✅ All APIs are properly configured and connecting to the backend');
-      console.log('✅ The admin panel can now use all the updated API endpoints');
     } else {
-      console.log('\n⚠️  Some tests failed, but this may be due to:');
-      console.log('   - Missing test data in the backend');
-      console.log('   - Authentication token not set');
-      console.log('   - Backend server not running');
-      console.log('\nCheck if the backend service is running on http://localhost:8090');
     }
   }
 };
@@ -151,7 +132,6 @@ if (typeof module !== 'undefined' && module.exports) {
 // Run the tests automatically if this is the main module
 if (typeof window !== 'undefined') {
   // In browser environment
-  console.log('API Test Suite loaded. Run apiTests.runAllTests() to start testing.');
 } else if (typeof require !== 'undefined' && require.main === module) {
   // In Node.js environment
   apiTests.runAllTests().catch(console.error);

@@ -1,8 +1,8 @@
 // Centralized authentication fetch utility
 // Handles authentication, token refresh, and common API request patterns
 
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
-const API_BASE_URL = 'https://it4788-project-ttac.onrender.com/api';
+import { API_BASE_URL } from './config';
+
 
 // Main auth fetch function with token refresh logic
 export const authFetch = async (endpoint, options = {}) => {
@@ -22,7 +22,6 @@ export const authFetch = async (endpoint, options = {}) => {
   };
 
   try {
-    console.log(`Making API request to: ${url}`, config);
     const response = await fetch(url, config);
 
     // If unauthorized, try to refresh token
@@ -66,7 +65,6 @@ export const authFetch = async (endpoint, options = {}) => {
             return await retryResponse.json();
           }
         } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
           // If refresh fails, redirect to login
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
@@ -102,7 +100,6 @@ export const authFetch = async (endpoint, options = {}) => {
 
     return await response.json();
   } catch (error) {
-    console.error(`API request failed: ${url}`, error);
     throw error;
   }
 };

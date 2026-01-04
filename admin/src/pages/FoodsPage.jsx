@@ -70,7 +70,6 @@ const FoodsPage = () => {
       setTotalPages(responseTotalPages || 1);
       setTotalItems(responseTotalItems || 0);
     } catch (error) {
-      console.error('Error loading ingredients:', error);
     } finally {
       setLoading(false);
     }
@@ -131,7 +130,6 @@ const FoodsPage = () => {
         // Remove ingredient from local state after successful deletion
         setFoods(foods.filter(f => f.id !== food.id));
       } catch (error) {
-        console.error('Error deleting ingredient:', error);
       }
     }
   };
@@ -161,7 +159,6 @@ const FoodsPage = () => {
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving ingredient:', error);
     }
   };
 
@@ -223,7 +220,6 @@ const FoodsPage = () => {
       setTotalItems(responseTotalItems || 0);
       setCurrentPage(1); // Reset to first page after search
     } catch (error) {
-      console.error('Error searching ingredients:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = foods.filter(f =>
         f.name.toLowerCase().includes(searchValue.toLowerCase()) ||

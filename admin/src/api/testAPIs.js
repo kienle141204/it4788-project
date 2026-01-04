@@ -132,7 +132,6 @@ class APITester {
   }
 
   async testAPI(name, apiFunction, params = null) {
-    console.log(`\n🧪 Testing ${name}...`);
     
     try {
       let result;
@@ -145,19 +144,15 @@ class APITester {
       }
       
       this.results[name] = { success: true, result };
-      console.log(`✅ ${name} - SUCCESS`);
-      console.log(`   Response:`, result);
       return { success: true, result };
     } catch (error) {
       this.results[name] = { success: false, error: error.message };
       this.failedTests.push({ name, error: error.message });
-      console.error(`❌ ${name} - FAILED:`, error.message);
       return { success: false, error: error.message };
     }
   }
 
   async runAllTests() {
-    console.log('🚀 Starting API Tests...\n');
     
     // Test User APIs
     await this.testAPI('fetchUsers', fetchUsers);
@@ -187,7 +182,6 @@ class APITester {
     
     // Test some specific API calls with sample data
     // Note: These might fail if the backend has validation or requires specific existing data
-    console.log('\n📝 Testing with sample data (might fail due to validation)...');
     
     try {
       // Try to get a specific dish to verify the endpoint works
@@ -209,40 +203,28 @@ class APITester {
       await this.testAPI('getDishReviewStats', getDishReviewStats, [1]);
       
     } catch (error) {
-      console.log('Note: Some tests with IDs failed as expected due to missing test data.');
     }
     
     this.printSummary();
   }
 
   printSummary() {
-    console.log('\n📊 TEST SUMMARY');
-    console.log('===============');
     
     const totalTests = Object.keys(this.results).length;
     const successfulTests = Object.values(this.results).filter(r => r.success).length;
     const failedTests = totalTests - successfulTests;
     
-    console.log(`Total Tests: ${totalTests}`);
-    console.log(`Successful: ${successfulTests}`);
-    console.log(`Failed: ${failedTests}`);
     
     if (failedTests > 0) {
-      console.log('\n❌ FAILED TESTS:');
       this.failedTests.forEach((test, index) => {
-        console.log(`${index + 1}. ${test.name}: ${test.error}`);
       });
     } else {
-      console.log('\n🎉 All tests passed!');
     }
     
     // Check if basic connectivity is working
     const hasSuccessfulConnection = Object.values(this.results).some(r => r.success);
     if (hasSuccessfulConnection) {
-      console.log('\n✅ Backend connection is working properly!');
-      console.log('✅ You can now use all the updated APIs in your admin panel');
     } else {
-      console.log('\n❌ No successful API calls - please check backend connection');
     }
   }
 }
@@ -250,7 +232,6 @@ class APITester {
 // Run the tests
 const tester = new APITester();
 tester.runAllTests().then(() => {
-  console.log('\n🎯 API testing completed!');
 });
 
 export default APITester;
