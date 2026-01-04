@@ -74,8 +74,15 @@ export class AuthService {
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
 
-    // Gửi email OTP
-    await this.emailService.sendOtpEmail(email, otpCode);
+    // Gửi email OTP - không block registration nếu email fail
+    try {
+      await this.emailService.sendOtpEmail(email, otpCode);
+    } catch (error: any) {
+      // Log error nhưng vẫn cho phép registration thành công
+      // User có thể dùng resend OTP sau
+      console.error(`[AuthService] Failed to send OTP email to ${email}:`, error.message);
+      // Không throw error để user vẫn có thể đăng ký và dùng resend OTP
+    }
 
     return {
       message: ResponseMessageVi[ResponseCode.C00035],
@@ -172,8 +179,14 @@ export class AuthService {
       otp_sent_at: newSentTime,
     });
 
-    // Gửi email OTP mới
-    await this.emailService.sendOtpEmail(email, newOtpCode);
+    // Gửi email OTP mới - có error handling
+    try {
+      await this.emailService.sendOtpEmail(email, newOtpCode);
+    } catch (error: any) {
+      console.error(`[AuthService] Failed to resend OTP email to ${email}:`, error.message);
+      // Vẫn throw error ở đây vì đây là resend request, user đang chờ email
+      throw new Error(`Không thể gửi email OTP. Vui lòng kiểm tra cấu hình email server.`);
+    }
 
     return {
       message: ResponseMessageVi[ResponseCode.C00048],

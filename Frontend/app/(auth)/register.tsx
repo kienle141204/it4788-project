@@ -55,11 +55,21 @@ export default function register() {
     setLoading(true);
     try {
       const data = { email, phone_number: phone, password };
-      const res = await registerUser(data);
+      
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 30000); // 30 seconds timeout
+      });
+      
+      const res = await Promise.race([
+        registerUser(data),
+        timeoutPromise
+      ]) as any;
   
       // Check if response exists and has error
       if (!res) {
         Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+        setLoading(false);
         return;
       }
       
@@ -70,18 +80,24 @@ export default function register() {
         }
 
         Alert.alert('Lỗi', message || 'Đăng ký thất bại');
+        setLoading(false);
         return;
       }
 
       // Success - navigate to verify page
+      setLoading(false);
       route.push({
         pathname: '/verify',
         params: { email },  
       });
-    } catch (error) {
-      Alert.alert('Lỗi', 'Đăng ký thất bại, vui lòng thử lại sau.');
-    } finally {
+    } catch (error: any) {
       setLoading(false);
+      const errorMessage = error?.message || 'Đăng ký thất bại, vui lòng thử lại sau.';
+      if (errorMessage.includes('timeout')) {
+        Alert.alert('Lỗi', 'Kết nối quá lâu. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      } else {
+        Alert.alert('Lỗi', errorMessage);
+      }
     }
   };
 
@@ -168,19 +184,18 @@ export default function register() {
                 value={repassword}
                 onChangeText={setRePassword} />
         </View>
-        <View style={styles.loginButton}>
-          <TouchableOpacity
-            style={styles.touchAble}
-            onPress={handleRegister}
-            disabled={loading} // disable khi đang loading
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={COLORS.white} />
-            ) : (
-              <Text style={styles.loginButtonText}>Đăng ký</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={styles.loginButton} 
+          onPress={handleRegister}
+          activeOpacity={0.8}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.white} />
+          ) : (
+            <Text style={styles.loginButtonText}>Đăng ký</Text>
+          )}
+        </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
