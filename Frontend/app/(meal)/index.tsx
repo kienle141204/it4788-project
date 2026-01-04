@@ -89,6 +89,7 @@ const formatPrice = (value?: string | number) => {
 export default function MealPage() {
   const router = useRouter();
   const sessionExpiredRef = useRef(false);
+  const deletedMenuIdsRef = useRef<Set<string>>(new Set()); // Track optimistically deleted menu IDs
   const [menus, setMenus] = useState<Menu[]>([]);
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -147,7 +148,9 @@ export default function MealPage() {
             if (freshResult.updated && freshResult.data?.success) {
               const freshMenus: Menu[] = freshResult.data.data || [];
               const freshPagination = freshResult.data.pagination || {};
-              setMenus(freshMenus);
+              // Filter out optimistically deleted menus
+              const filteredMenus = freshMenus.filter(m => !deletedMenuIdsRef.current.has(String(m.id)));
+              setMenus(filteredMenus);
               setHasNextPage(Boolean(freshPagination.hasNextPage));
               setPage(freshPagination.currentPage || pageNumber);
             }
@@ -224,7 +227,21 @@ export default function MealPage() {
         const newMenus: Menu[] = payload.data || [];
         const pagination = payload.pagination || {};
 
-        setMenus(prev => (reset ? newMenus : [...prev, ...newMenus]));
+        // When resetting, replace all menus. When appending, add new ones.
+        // Filter out any menus that were optimistically deleted
+        setMenus(prev => {
+          if (reset) {
+            // Filter out optimistically deleted menus
+            return newMenus.filter(m => !deletedMenuIdsRef.current.has(String(m.id)));
+          } else {
+            // Only add menus that don't already exist and weren't deleted
+            const existingIds = new Set(prev.map(m => String(m.id)));
+            const uniqueNewMenus = newMenus.filter(
+              m => !existingIds.has(String(m.id)) && !deletedMenuIdsRef.current.has(String(m.id))
+            );
+            return [...prev, ...uniqueNewMenus];
+          }
+        });
         setHasNextPage(Boolean(pagination.hasNextPage));
         setPage(pagination.currentPage || pageNumber);
         setError(null);
@@ -256,9 +273,17 @@ export default function MealPage() {
   // Refresh danh sách khi màn hình được focus lại (ví dụ: quay lại từ màn hình edit)
   useFocusEffect(
     useCallback(() => {
-      // Chỉ refresh nếu đã có dữ liệu (tránh double loading lần đầu)
-      if (menus.length > 0) {
-        fetchMenus(1, true);
+      // Always refresh when coming back from create/edit page to show new menu immediately
+      // Don't show loading state for better UX (optimistic refresh)
+      if (menus.length > 0 && deletedMenuIdsRef.current.size === 0) {
+        // Refresh immediately without showing loading state for better UX (optimistic refresh)
+        // Use isRefreshing=false to avoid showing spinner
+        fetchMenus(1, true, false).catch(() => {
+          // Silently fail, optimistic update is already shown
+        });
+      } else if (menus.length === 0) {
+        // If no menus, fetch normally (first load)
+        fetchMenus(1, true, false).catch(() => {});
       }
     }, [fetchMenus, menus.length]),
   );
@@ -322,53 +347,91 @@ export default function MealPage() {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: async () => {
-            try {
+          onPress: () => {
+            // Đảm bảo ID là số
+            const menuId = typeof selectedMenu.id === 'string' ? parseInt(selectedMenu.id, 10) : selectedMenu.id;
+
+            if (isNaN(menuId)) {
               setShowMenuOptionsModal(false);
-
-              // Đảm bảo ID là số
-              const menuId = typeof selectedMenu.id === 'string' ? parseInt(selectedMenu.id, 10) : selectedMenu.id;
-
-              if (isNaN(menuId)) {
-                throw new Error('ID thực đơn không hợp lệ');
-              }
-
-              const payload = await deleteAccess(`menus/${menuId}`);
-
-              // Kiểm tra response - backend trả về { success: true, message: '...' }
-              if (payload?.success === true) {
-                // Invalidate cache when deleting menu
-                await clearCacheByPattern('meal:menus');
-                
-                Alert.alert('Thành công', payload?.message || 'Đã xóa thực đơn thành công');
-                setSelectedMenu(null);
-                // Refresh danh sách
-                fetchMenus(1, true, true);
-              } else {
-                throw new Error(payload?.message || payload?.error || 'Không thể xóa thực đơn');
-              }
-            } catch (err: any) {
-              if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
-                handleSessionExpired();
-                return;
-              }
-
-              let errorMessage = 'Không thể xóa thực đơn. Vui lòng thử lại.';
-
-              if (err?.response?.status === 500) {
-                errorMessage = 'Lỗi server. Vui lòng thử lại sau.';
-              } else if (err?.response?.status === 403) {
-                errorMessage = 'Bạn không có quyền xóa thực đơn này.';
-              } else if (err?.response?.status === 404) {
-                errorMessage = 'Không tìm thấy thực đơn.';
-              } else if (err?.response?.data?.message) {
-                errorMessage = err.response.data.message;
-              } else if (err?.message) {
-                errorMessage = err.message;
-              }
-
-              Alert.alert('Lỗi', errorMessage);
+              Alert.alert('Lỗi', 'ID thực đơn không hợp lệ');
+              return;
             }
+
+            // Store deleted menu for rollback
+            const deletedMenu = { ...selectedMenu };
+            const menuIdToDelete = String(selectedMenu.id);
+
+            // Track deleted menu ID to prevent it from reappearing
+            deletedMenuIdsRef.current.add(menuIdToDelete);
+
+            // CRITICAL: Update state IMMEDIATELY before closing modal
+            // This ensures the menu disappears instantly
+            // Use String comparison to handle both string and number IDs
+            setMenus(prevMenus => 
+              prevMenus.filter(menu => String(menu.id) !== menuIdToDelete)
+            );
+            
+            // Close modal after state update
+            setShowMenuOptionsModal(false);
+            setSelectedMenu(null);
+
+            // Call API in background (don't await to keep UI responsive)
+            deleteAccess(`menus/${menuId}`)
+              .then((payload) => {
+                // Kiểm tra response - backend trả về { success: true, message: '...' }
+                if (payload?.success === true) {
+                  // Invalidate cache when deleting menu
+                  clearCacheByPattern('meal:menus').catch(() => {});
+                  
+                  // Clear deleted menu ID from tracking after successful deletion
+                  // Wait a bit to ensure server has processed the deletion
+                  setTimeout(() => {
+                    deletedMenuIdsRef.current.delete(menuIdToDelete);
+                  }, 3000);
+                  
+                  // Don't fetch menus again - optimistic update is already shown
+                  // Menu is already removed from state, no need to refresh
+                  // This prevents the menu from reappearing and avoids showing spinner
+                } else {
+                  throw new Error(payload?.message || payload?.error || 'Không thể xóa thực đơn');
+                }
+              })
+              .catch((err: any) => {
+                // Rollback optimistic update on error
+                const deletedMenuId = String(deletedMenu.id);
+                deletedMenuIdsRef.current.delete(deletedMenuId); // Remove from deleted set
+                
+                setMenus(prevMenus => {
+                  // Check if menu is not already in the list (avoid duplicates)
+                  const exists = prevMenus.some(m => String(m.id) === deletedMenuId);
+                  if (!exists) {
+                    // Insert back at the beginning to maintain order
+                    return [deletedMenu, ...prevMenus];
+                  }
+                  return prevMenus;
+                });
+
+                if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+                  handleSessionExpired();
+                  return;
+                }
+
+                let errorMessage = 'Không thể xóa thực đơn. Vui lòng thử lại.';
+
+                if (err?.response?.status === 500) {
+                  errorMessage = 'Lỗi server. Vui lòng thử lại sau.';
+                } else if (err?.response?.status === 403) {
+                  errorMessage = 'Bạn không có quyền xóa thực đơn này.';
+                } else if (err?.response?.status === 404) {
+                  errorMessage = 'Không tìm thấy thực đơn.';
+                } else if (err?.response?.data?.message) {
+                  errorMessage = err.response.data.message;
+                } else if (err?.message) {
+                  errorMessage = err.message;
+                }
+
+                Alert.alert('Lỗi', errorMessage);
+              });
           },
         },
       ],

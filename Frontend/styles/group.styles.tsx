@@ -962,19 +962,18 @@ export const groupStyles = StyleSheet.create({
   chatInputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 12,
+    paddingTop: 12,
     paddingBottom: 0,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGrey,
-    gap: 10,
   },
   chatInputWrapper: {
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
     borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     minHeight: 44,
     maxHeight: 120,
   },
@@ -1041,5 +1040,78 @@ export const groupStyles = StyleSheet.create({
   chatLoadingText: {
     fontSize: 14,
     color: COLORS.grey,
+  },
+  // Typing Indicator Styles
+  typingIndicatorContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGrey,
+  },
+  typingIndicatorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  typingIndicatorAvatars: {
+    flexDirection: 'row',
+    gap: -8, // Overlap avatars slightly
+  },
+  typingAvatarContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    overflow: 'hidden',
+    backgroundColor: COLORS.white,
+  },
+  typingAvatar: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  typingAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  typingAvatarPlaceholderOwner: {
+    backgroundColor: COLORS.orange,
+  },
+  typingAvatarPlaceholderManager: {
+    backgroundColor: COLORS.blue,
+  },
+  typingAvatarPlaceholderMember: {
+    backgroundColor: COLORS.lightBlue,
+  },
+  typingAvatarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  typingIndicatorTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typingIndicatorText: {
+    fontSize: 13,
+    color: COLORS.grey,
+    fontStyle: 'italic',
+  },
+  typingDots: {
+    flexDirection: 'row',
+    gap: 4,
+    alignItems: 'center',
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
   },
 });

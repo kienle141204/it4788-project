@@ -41,9 +41,14 @@ import ActionMenu from '@/components/ActionMenu';
 
 interface Refrigerator {
   id: number;
+  name?: string;
   owner_id: number;
   family_id?: number | null;
   created_at: string;
+  family?: {
+    id: number;
+    name: string;
+  };
 }
 
 interface FridgeDish {
@@ -1540,7 +1545,9 @@ export default function FridgeDetailPage() {
             color: COLORS.darkGrey,
           }}
         >
-          {refrigerator?.family_id ? 'Tủ lạnh Gia đình' : 'Tủ lạnh Cá nhân'}
+          {refrigerator?.family_id && refrigerator?.family?.name
+            ? refrigerator.family.name
+            : (refrigerator?.name || 'Tủ lạnh Cá nhân')}
         </Text>
 
         <TouchableOpacity onPress={() => setShowMenu(true)}>

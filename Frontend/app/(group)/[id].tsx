@@ -16,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,12 +38,24 @@ import {
 import { searchIngredients } from '../../service/market';
 import { getAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
-import { clearCacheByPattern, clearCache } from '../../utils/cache';
+// Helper function to clear cache by pattern (using dynamic import)
+const clearCacheByPattern = async (pattern: string) => {
+  try {
+    const cacheModule = await import('@/utils/cache') as any;
+    if (cacheModule?.clearCacheByPattern) {
+      await cacheModule.clearCacheByPattern(pattern);
+    }
+  } catch (error) {
+    // Silently fail
+  }
+};
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionMenu from '../../components/ActionMenu';
 import InvitationModal from '../../components/InvitationModal';
 import GroupStatistics from '../../components/GroupStatistics';
-import { getChatMessages, sendChatMessage, type ChatMessage, type ChatMessagesResponse, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage } from '../../service/chat';
+import { getChatMessages, sendChatMessage, type ChatMessage, type ChatMessagesResponse, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage, onUserTyping, sendTyping, getChatSocket } from '../../service/chat';
+import { useScreenState } from '../../context/ScreenStateContext';
+import { pushNotificationService } from '../../service/pushNotifications';
 
 const defaultAvatar = require('../../assets/images/avatar.png');
 
@@ -245,10 +258,19 @@ export default function GroupDetailPage() {
   const tempMessageIdRef = useRef<number>(-1); // Use negative IDs for temporary messages
   const pendingTempMessagesRef = useRef<Map<number, { tempId: number; message: string; timestamp: number }>>(new Map()); // Track pending temp messages
 
+  // Typing indicator states
+  const [typingUsers, setTypingUsers] = useState<Map<number, { userId: number; email: string; timestamp: number }>>(new Map());
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+
   // Refs for scrolling
   const chatListRef = useRef<FlatList<ChatMessage>>(null);
   const tabScrollRef = useRef<ScrollView>(null);
   const shouldScrollToEndRef = useRef(true);
+  
+  // Refs for WebSocket callbacks to use latest values
+  const currentUserIdRef = useRef<number | null>(null);
+  const familyIdRef = useRef<number>(familyId);
 
   const handleSessionExpired = useCallback(() => {
     Alert.alert(
@@ -499,6 +521,39 @@ export default function GroupDetailPage() {
   useEffect(() => {
     fetchFamilyData();
   }, []);
+
+  // Screen state management for push notifications
+  const { setScreenState, clearScreenState } = useScreenState();
+
+  // Set screen state when component mounts or activeTab changes
+  useEffect(() => {
+    setScreenState({
+      currentRoute: `/(group)/${familyId}`,
+      currentFamilyId: familyId,
+      activeTab: activeTab,
+    });
+
+    // Set checker callback for push notification service
+    pushNotificationService.setScreenStateChecker((data: any) => {
+      // Don't show notification if:
+      // 1. It's a chat message
+      // 2. User is on chat tab
+      // 3. It's for the same family
+      if (data?.type === 'chat_message' && data?.familyId) {
+        const isSameFamily = String(data.familyId) === String(familyId);
+        const isOnChatTab = activeTab === 'chat';
+        if (isSameFamily && isOnChatTab) {
+          return false; // Don't show notification
+        }
+      }
+      return true; // Show notification
+    });
+
+    return () => {
+      clearScreenState();
+      pushNotificationService.setScreenStateChecker(null);
+    };
+  }, [familyId, activeTab, setScreenState, clearScreenState]);
 
   // Reload data when page comes into focus (to sync with calendar page)
   useFocusEffect(
@@ -763,18 +818,31 @@ export default function GroupDetailPage() {
       const { getAccess } = await import('@/utils/api');
       const response = await getAccess(`users/${userId}`);
       
-      const payload = response?.data || response;
-      if (payload?.success !== false && payload?.data) {
-        setMemberProfile(payload.data);
-        setShowMemberProfileModal(true);
-      } else if (payload && !payload.success) {
-        throw new Error(payload?.message || 'Không thể tải thông tin thành viên');
+      // Backend returns: { success: true, message: string, data: { ...userInfo } }
+      // getAccess returns result.data, so response is already unwrapped
+      let userData = null;
+      
+      if (response?.data && (response.data.id || response.data.email)) {
+        // Response has structure: { success, message, data: { ...userInfo } }
+        userData = response.data;
+      } else if (response && (response.id || response.email)) {
+        // Direct user object (fallback)
+        userData = response;
+      } else if (response?.data) {
+        // Try response.data even if it doesn't have id/email
+        userData = response.data;
       } else {
-        // Handle direct data response
-        setMemberProfile(payload);
+        throw new Error('Dữ liệu không hợp lệ');
+      }
+      
+      if (userData) {
+        setMemberProfile(userData);
         setShowMemberProfileModal(true);
+      } else {
+        throw new Error('Không tìm thấy thông tin thành viên');
       }
     } catch (err: any) {
+      
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
         return;
@@ -793,13 +861,17 @@ export default function GroupDetailPage() {
         
         // Clear cache for this user profile to prevent showing old data
         try {
-          await clearCache(`user:profile:${userId}`);
+          const cacheModule = await import('@/utils/cache');
+          if ((cacheModule as any).clearCache) {
+            await (cacheModule as any).clearCache(`user:profile:${userId}`);
+          }
         } catch (cacheError) {
           // Silently fail cache deletion
         }
       } else {
         const errorMessage = err?.response?.data?.message || 
                            err?.response?.data?.resultMessage?.vn ||
+                           err?.response?.data?.resultMessage ||
                            err?.message || 
                            'Không thể tải thông tin thành viên';
         Alert.alert('Lỗi', errorMessage);
@@ -983,22 +1055,49 @@ export default function GroupDetailPage() {
     }
   }, [familyId, handleSessionExpired]);
 
+  // Update refs when values change
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  useEffect(() => {
+    familyIdRef.current = familyId;
+  }, [familyId]);
+
   // WebSocket connection and chat real-time
   useEffect(() => {
     let unsubscribeNewMessage: (() => void) | null = null;
+    const currentFamilyId = familyId; // Capture current familyId
 
     const setupSocket = async () => {
       try {
+        // Leave old room if socket is already connected
+        const socket = getChatSocket();
+        if (socket?.connected) {
+          // Leave any existing room before joining new one
+          await leaveChatRoom(currentFamilyId);
+        }
+        
         await connectChatSocket();
         console.log('[Chat] Socket connected');
 
         // Listen for new messages
         unsubscribeNewMessage = onNewMessage((message) => {
           console.log('[Chat] New message received:', message);
+          
+          // CRITICAL: Only process messages for the current family
+          // Use ref to get latest familyId value
+          const currentFamilyId = familyIdRef.current;
+          if (message.familyId !== currentFamilyId) {
+            console.log('[Chat] Ignoring message from different family:', message.familyId, 'current:', currentFamilyId);
+            return;
+          }
+          
           setChatMessages((prev) => {
             // Check if this is replacing a temporary message (sending status)
-            // Use currentUserId from closure - it will be the value when effect runs
-            const isOwnMessage = String(message.userId) === String(currentUserId);
+            // Use ref to get latest currentUserId value
+            const currentUserIdValue = currentUserIdRef.current;
+            const isOwnMessage = String(message.userId) === String(currentUserIdValue);
             
             // First check: avoid duplicates by message ID
             if (prev.some((m) => m.id === message.id && m.id > 0)) {
@@ -1084,8 +1183,8 @@ export default function GroupDetailPage() {
 
         // Join room if chat tab is active
         if (activeTab === 'chat') {
-          await joinChatRoom(familyId);
-          console.log('[Chat] Joined room for family:', familyId);
+          await joinChatRoom(currentFamilyId);
+          console.log('[Chat] Joined room for family:', currentFamilyId);
         }
       } catch (err) {
         console.error('[Chat] Socket connection error:', err);
@@ -1098,11 +1197,25 @@ export default function GroupDetailPage() {
       if (unsubscribeNewMessage) {
         unsubscribeNewMessage();
       }
+      // Only cleanup listener when familyId changes
+      // Socket will be disconnected by the cleanup effect below
+    };
+  }, [familyId, activeTab]); // Depend on familyId and activeTab
+
+  // Cleanup socket only when familyId changes or component unmounts
+  useEffect(() => {
+    return () => {
       leaveChatRoom(familyId);
       disconnectChatSocket();
+      // Cleanup typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      sendTyping(familyId, false);
       console.log('[Chat] Socket cleanup completed');
     };
-  }, [familyId, currentUserId]);
+  }, [familyId]);
 
   // Join/leave room when tab changes
   useEffect(() => {
@@ -1110,11 +1223,118 @@ export default function GroupDetailPage() {
       // Reset scroll position flag when switching to chat tab
       shouldScrollToEndRef.current = true;
       fetchChatMessages();
-      joinChatRoom(familyId);
+      
+      // Ensure socket is connected before joining room
+      const joinRoomWithRetry = async () => {
+        try {
+          // First ensure socket is connected
+          const socket = await connectChatSocket();
+          if (socket?.connected) {
+            const result = await joinChatRoom(familyId);
+            if (result.success) {
+              console.log('[Chat] Successfully joined room for family:', familyId);
+            } else {
+              console.error('[Chat] Failed to join room:', result.error);
+            }
+          }
+        } catch (error) {
+          console.error('[Chat] Error joining room:', error);
+        }
+      };
+      
+      joinRoomWithRetry();
     } else {
       leaveChatRoom(familyId);
     }
   }, [activeTab, familyId, fetchChatMessages]);
+
+  // Clear typing users when leaving chat tab
+  useEffect(() => {
+    if (activeTab !== 'chat') {
+      setTypingUsers(new Map());
+      // Stop typing indicator
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      sendTyping(familyId, false);
+    }
+  }, [activeTab, familyId]);
+
+  // Listen for typing events
+  useEffect(() => {
+    if (activeTab !== 'chat') return;
+
+    let unsubscribeTyping: (() => void) | null = null;
+
+    const setupTypingListener = async () => {
+      try {
+        await connectChatSocket();
+        unsubscribeTyping = onUserTyping((data) => {
+          // Use current members and currentUserId from the latest closure
+          // Only process typing events for current family
+          // Filter by checking if user is in current family members
+          const isInCurrentFamily = members.some(m => String(m.user_id) === String(data.userId));
+          if (!isInCurrentFamily) return;
+
+          // Don't show typing indicator for own messages
+          if (String(data.userId) === String(currentUserId)) return;
+
+          setTypingUsers((prev) => {
+            const updated = new Map(prev);
+            const now = Date.now();
+
+            if (data.isTyping) {
+              updated.set(data.userId, {
+                userId: data.userId,
+                email: data.email,
+                timestamp: now,
+              });
+            } else {
+              updated.delete(data.userId);
+            }
+
+            return updated;
+          });
+        });
+      } catch (err) {
+        console.error('[Chat] Typing listener setup error:', err);
+      }
+    };
+
+    setupTypingListener();
+
+    return () => {
+      if (unsubscribeTyping) {
+        unsubscribeTyping();
+      }
+    };
+  }, [activeTab, familyId, currentUserId, members]);
+
+  // Auto-remove typing indicator after 3 seconds of inactivity
+  useEffect(() => {
+    if (typingUsers.size === 0) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers((prev) => {
+        const updated = new Map(prev);
+        let hasChanges = false;
+
+        for (const [userId, data] of updated.entries()) {
+          // Remove typing indicator if no update for 3 seconds
+          if (now - data.timestamp > 3000) {
+            updated.delete(userId);
+            hasChanges = true;
+          }
+        }
+
+        return hasChanges ? updated : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [typingUsers]);
 
   // Auto-scroll to bottom when chat messages are loaded or tab is opened
   useEffect(() => {
@@ -1149,8 +1369,43 @@ export default function GroupDetailPage() {
     };
   }, []);
 
+  // Handle typing indicator with debounce
+  const handleMessageChange = useCallback((text: string) => {
+    setNewMessage(text);
+
+    // Send typing indicator with debounce (only send every 1 second)
+    const now = Date.now();
+    if (now - lastTypingSentRef.current > 1000) {
+      if (text.trim().length > 0 && activeTab === 'chat') {
+        sendTyping(familyId, true);
+        lastTypingSentRef.current = now;
+      }
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Stop typing indicator after 2 seconds of no typing
+    typingTimeoutRef.current = setTimeout(() => {
+      if (activeTab === 'chat') {
+        sendTyping(familyId, false);
+      }
+      lastTypingSentRef.current = 0;
+    }, 2000);
+  }, [familyId, activeTab]);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage) return;
+
+    // Stop typing indicator when sending message
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    sendTyping(familyId, false);
+    lastTypingSentRef.current = 0;
 
     const messageText = newMessage.trim();
     const tempId = tempMessageIdRef.current--;
@@ -1322,6 +1577,101 @@ export default function GroupDetailPage() {
     return members.find(m => String(m.user_id) === String(userId)) || null;
   }, [members]);
 
+  // Typing Indicator Component
+  const TypingIndicator = ({ typingUsers, getMemberByUserId }: { 
+    typingUsers: Map<number, { userId: number; email: string; timestamp: number }>;
+    getMemberByUserId: (userId: number | string) => any;
+  }) => {
+    const dot1Opacity = useRef(new Animated.Value(0.3)).current;
+    const dot2Opacity = useRef(new Animated.Value(0.3)).current;
+    const dot3Opacity = useRef(new Animated.Value(0.3)).current;
+
+    useEffect(() => {
+      const animateDot = (dot: Animated.Value, delay: number) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.timing(dot, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot, {
+              toValue: 0.3,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const anim1 = animateDot(dot1Opacity, 0);
+      const anim2 = animateDot(dot2Opacity, 200);
+      const anim3 = animateDot(dot3Opacity, 400);
+
+      anim1.start();
+      anim2.start();
+      anim3.start();
+
+      return () => {
+        anim1.stop();
+        anim2.stop();
+        anim3.stop();
+      };
+    }, []);
+
+    return (
+      <View style={groupStyles.typingIndicatorContainer}>
+        <View style={groupStyles.typingIndicatorContent}>
+          <View style={groupStyles.typingIndicatorAvatars}>
+            {Array.from(typingUsers.values()).slice(0, 3).map((typingUser) => {
+              const member = getMemberByUserId(typingUser.userId);
+              const avatarUrl = member?.user?.avatar_url;
+              const role = member?.role || 'member';
+              
+              const getAvatarPlaceholderStyle = () => {
+                switch (role) {
+                  case 'owner': return groupStyles.typingAvatarPlaceholderOwner;
+                  case 'manager': return groupStyles.typingAvatarPlaceholderManager;
+                  default: return groupStyles.typingAvatarPlaceholderMember;
+                }
+              };
+
+              return (
+                <View key={typingUser.userId} style={groupStyles.typingAvatarContainer}>
+                  {avatarUrl ? (
+                    <Image
+                      source={{ uri: avatarUrl }}
+                      style={groupStyles.typingAvatar}
+                    />
+                  ) : (
+                    <View style={[groupStyles.typingAvatarPlaceholder, getAvatarPlaceholderStyle()]}>
+                      <Text style={groupStyles.typingAvatarText}>
+                        {(member?.user?.full_name || typingUser.email || 'U').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+          <View style={groupStyles.typingIndicatorTextContainer}>
+            <Text style={groupStyles.typingIndicatorText}>
+              {typingUsers.size === 1
+                ? `${getMemberByUserId(Array.from(typingUsers.values())[0].userId)?.user?.full_name || 'Ai đó'} đang gõ...`
+                : `${typingUsers.size} người đang gõ...`}
+            </Text>
+            <View style={groupStyles.typingDots}>
+              <Animated.View style={[groupStyles.typingDot, { opacity: dot1Opacity }]} />
+              <Animated.View style={[groupStyles.typingDot, { opacity: dot2Opacity }]} />
+              <Animated.View style={[groupStyles.typingDot, { opacity: dot3Opacity }]} />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderChatMessage = ({ item }: { item: LocalChatMessage }) => {
     const member = getMemberByUserId(item.userId);
     // Use == for type coercion or explicitly convert to same type
@@ -1413,7 +1763,7 @@ export default function GroupDetailPage() {
       <KeyboardAvoidingView
         style={groupStyles.chatContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -30}
       >
         {chatMessages.length === 0 ? (
           <View style={groupStyles.chatEmptyState}>
@@ -1487,14 +1837,17 @@ export default function GroupDetailPage() {
           />
         )}
 
-        <View style={[groupStyles.chatInputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        {/* Typing Indicator */}
+        {typingUsers.size > 0 && <TypingIndicator typingUsers={typingUsers} getMemberByUserId={getMemberByUserId} />}
+
+        <View style={[groupStyles.chatInputContainer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
           <View style={groupStyles.chatInputWrapper}>
             <TextInput
               style={groupStyles.chatInput}
               placeholder="Nhập tin nhắn..."
               placeholderTextColor={COLORS.grey}
               value={newMessage}
-              onChangeText={setNewMessage}
+              onChangeText={handleMessageChange}
               multiline
               maxLength={1000}
               editable={!sendingMessage}
@@ -1847,6 +2200,11 @@ export default function GroupDetailPage() {
       .then((newItem) => {
         // Invalidate cache when adding item
         clearCacheByPattern(`group:family:${familyId}:shopping-lists`).catch(() => {});
+        // Clear statistics cache to force refresh
+        clearCacheByPattern(`stats:family:${familyId}`).catch(() => {});
+        clearCacheByPattern(`monthly-cost:*:family:${familyId}`).catch(() => {});
+        clearCacheByPattern(`top-ingredients:family:${familyId}`).catch(() => {});
+        clearCacheByPattern(`checked-items:family:${familyId}`).catch(() => {});
         
         // Update optimistic item with real ID from server, but PRESERVE optimistic cost
         // Don't let server data overwrite the cost that user just saw
@@ -1955,6 +2313,11 @@ export default function GroupDetailPage() {
       
       // Invalidate cache when toggling item
       await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+      // Clear statistics cache to force refresh
+      await clearCacheByPattern(`stats:family:${familyId}`);
+      await clearCacheByPattern(`monthly-cost:*:family:${familyId}`);
+      await clearCacheByPattern(`top-ingredients:family:${familyId}`);
+      await clearCacheByPattern(`checked-items:family:${familyId}`);
       
       // Only fetch shopping lists (much faster)
       await fetchShoppingLists(true);
@@ -2003,6 +2366,11 @@ export default function GroupDetailPage() {
               
               // Invalidate cache when deleting item
               await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+              // Clear statistics cache to force refresh
+              await clearCacheByPattern(`stats:family:${familyId}`);
+              await clearCacheByPattern(`monthly-cost:*:family:${familyId}`);
+              await clearCacheByPattern(`top-ingredients:family:${familyId}`);
+              await clearCacheByPattern(`checked-items:family:${familyId}`);
               
               // Only fetch shopping lists (much faster)
               await fetchShoppingLists(true);
@@ -2112,6 +2480,11 @@ export default function GroupDetailPage() {
       
       // Invalidate cache when updating item
       await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+      // Clear statistics cache to force refresh
+      await clearCacheByPattern(`stats:family:${familyId}`);
+      await clearCacheByPattern(`monthly-cost:*:family:${familyId}`);
+      await clearCacheByPattern(`top-ingredients:family:${familyId}`);
+      await clearCacheByPattern(`checked-items:family:${familyId}`);
       
       // Fetch fresh data from API to ensure consistency
       await fetchShoppingLists(true);

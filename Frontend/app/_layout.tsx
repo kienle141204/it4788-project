@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NotificationsProvider } from "@/context/NotificationsContext";
+import { ScreenStateProvider } from "@/context/ScreenStateContext";
 import { StatusBar } from "expo-status-bar";
 import { COLORS } from "@/constants/themes";
 import { useEffect, useRef } from "react";
@@ -97,9 +98,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <NotificationsProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </NotificationsProvider>
+      <ScreenStateProvider>
+        <NotificationsProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </NotificationsProvider>
+      </ScreenStateProvider>
     </SafeAreaProvider>
   );
 }
