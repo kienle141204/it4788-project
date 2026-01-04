@@ -403,8 +403,16 @@ export default function GroupStatistics({ familyId }: GroupStatisticsProps) {
         
         shoppingLists.forEach((list: any) => {
             if (list.shopping_date && list.cost) {
-                const date = new Date(list.shopping_date);
-                const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+                // Parse date string directly to avoid timezone issues
+                let dateStr = String(list.shopping_date);
+                if (dateStr.includes('T')) {
+                    dateStr = dateStr.split('T')[0]; // Get YYYY-MM-DD part
+                }
+                // Remove timezone info if exists
+                if (dateStr.includes('+')) {
+                    dateStr = dateStr.split('+')[0];
+                }
+                const dateKey = dateStr; // Use date string directly as key
                 const cost = Number(list.cost) || 0;
                 
                 if (dailyMap.has(dateKey)) {
@@ -425,7 +433,20 @@ export default function GroupStatistics({ familyId }: GroupStatisticsProps) {
         }
 
         const labels = sortedEntries.map(([date]) => {
+            // Parse date string directly (YYYY-MM-DD) and add 1 day for display
+            const parts = date.split('-');
+            if (parts.length === 3) {
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const day = parseInt(parts[2], 10);
+                // Create date and add 1 day for display
+                const d = new Date(year, month - 1, day);
+                d.setDate(d.getDate() + 1);
+                return `${d.getDate()}/${d.getMonth() + 1}`;
+            }
+            // Fallback: use Date object
             const d = new Date(date);
+            d.setDate(d.getDate() + 1);
             return `${d.getDate()}/${d.getMonth() + 1}`;
         });
 
