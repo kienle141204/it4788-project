@@ -161,7 +161,12 @@ export default function CreateFridgePage() {
         {
           text: 'OK',
           onPress: () => {
-            router.replace('/(fridge)' as any);
+            // Quay về trang danh sách tủ lạnh thay vì replace để tránh lặp stack
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(fridge)' as any);
+            }
           },
         },
       ]);

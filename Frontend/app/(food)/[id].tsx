@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, Image, ActivityIndicator, TextInput, Alert, Share } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, Image, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -448,22 +448,6 @@ export default function FoodDetailPage() {
     }
   };
 
-  const handleShareDish = async () => {
-    if (!dish) {
-      return;
-    }
-
-    try {
-      await Share.share({
-        title: dish.name,
-        message: `${dish.name}\n\n${dish.description || ''}`.trim(),
-      });
-    } catch (shareError: any) {
-      if (shareError?.message !== 'User did not share') {
-        Alert.alert('Lỗi', 'Không thể chia sẻ món ăn lúc này.');
-      }
-    }
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -779,9 +763,6 @@ export default function FoodDetailPage() {
           <View style={foodDetailStyles.headerTitleGroup}>
             <Text style={foodDetailStyles.eyebrowLabel}>Chi tiết món ăn</Text>
           </View>
-          <TouchableOpacity onPress={handleShareDish} style={foodDetailStyles.headerButton}>
-            <Ionicons name="share-social-outline" size={20} color={COLORS.darkGrey} />
-          </TouchableOpacity>
         </View>
       </View>
 

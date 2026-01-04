@@ -263,14 +263,7 @@ export default function MarketScreen() {
               numColumns={2}
               keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={marketStyles.card}
-                  activeOpacity={0.8}
-                  onPress={() => router.push({
-                    pathname: '/(market)/ingredient-detail',
-                    params: { id: item.id.toString() }
-                  })}
-                >
+                <View style={marketStyles.card}>
                   <View style={marketStyles.imageContainer}>
                     <Image
                       source={{ uri: item.image_url || 'https://via.placeholder.com/150' }}
@@ -289,12 +282,20 @@ export default function MarketScreen() {
                     <TouchableOpacity
                       style={marketStyles.addBtn}
                       activeOpacity={0.7}
+                      onPress={() => {
+                        if (item.id) {
+                          router.push({
+                            pathname: '/(market)/ingredient-detail',
+                            params: { id: item.id.toString() }
+                          });
+                        }
+                      }}
                     >
                       <Ionicons name="eye-outline" size={16} color={COLORS.white} />
                       <Text style={marketStyles.addText}>Xem chi tiết</Text>
                     </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
+                </View>
               )}
               contentContainerStyle={marketStyles.listContent}
               refreshControl={

@@ -1,6 +1,6 @@
 // Ingredients API Service - Using centralized auth fetch utility
 
-import { get, post } from './authFetch';
+import { get, post, patch, del } from './authFetch';
 
 // Get ingredients
 export const fetchIngredients = async (params = {}) => {
@@ -30,16 +30,32 @@ export const createIngredient = async (ingredientData) => {
   }
 };
 
-// Update an existing ingredient - NOT SUPPORTED BY BACKEND
+// Update an existing ingredient
 export const updateIngredient = async (id, ingredientData) => {
   console.log('API call: updateIngredient', id, ingredientData);
-  throw new Error('Chức năng sửa nguyên liệu chưa được hỗ trợ bởi backend');
+
+  try {
+    // Real API call: PATCH /api/ingredients/:id
+    const response = await patch(`/ingredients/${id}`, ingredientData);
+    return response.data || response;
+  } catch (error) {
+    console.error('Error updating ingredient:', error);
+    throw error;
+  }
 };
 
-// Delete an ingredient - NOT SUPPORTED BY BACKEND
+// Delete an ingredient
 export const deleteIngredient = async (id) => {
   console.log('API call: deleteIngredient', id);
-  throw new Error('Chức năng xóa nguyên liệu chưa được hỗ trợ bởi backend');
+
+  try {
+    // Real API call: DELETE /api/ingredients/:id
+    await del(`/ingredients/${id}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting ingredient:', error);
+    throw error;
+  }
 };
 
 // Search ingredients

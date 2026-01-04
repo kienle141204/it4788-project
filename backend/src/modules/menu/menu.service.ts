@@ -225,10 +225,14 @@ export class MenuService {
     // Nếu role là admin, không cần kiểm tra quyền
 
     // Tạo menu mới
+    // Nếu có date trong DTO, set created_at theo date đó (coi created_at như date)
+    // Nếu không có date, để created_at tự động set bởi database
     const menu = this.menuRepository.create({
       family_id: familyId,
       time: createMenuDto.time ?? null,
       description: createMenuDto.description ?? null,
+      // Nếu có date, set created_at theo date đó (coi created_at như date)
+      ...(createMenuDto.date && { created_at: new Date(createMenuDto.date) }),
     });
 
     const savedMenu = await this.menuRepository.save(menu);
@@ -307,6 +311,10 @@ export class MenuService {
     }
     if (updateMenuDto.description !== undefined) {
       menu.description = updateMenuDto.description;
+    }
+    // Nếu có date trong update, cập nhật created_at (coi created_at như date)
+    if (updateMenuDto.date !== undefined) {
+      menu.created_at = updateMenuDto.date ? new Date(updateMenuDto.date) : new Date();
     }
 
     return await this.menuRepository.save(menu);
@@ -526,12 +534,12 @@ export class MenuService {
         accessibleFamilyIds,
       });
 
-      // Nếu có date, thêm điều kiện lọc theo ngày
+      // Nếu có date, lọc theo created_at (coi created_at như date)
       if (date) {
         queryBuilder.andWhere('DATE(menu.created_at) = :date', { date });
       }
     } else {
-      // Nếu role là admin và có date, lọc theo ngày
+      // Nếu role là admin và có date, lọc theo created_at (coi created_at như date)
       if (date) {
         queryBuilder.where('DATE(menu.created_at) = :date', { date });
       }

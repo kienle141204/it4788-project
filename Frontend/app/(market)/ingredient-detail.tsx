@@ -173,7 +173,7 @@ export default function IngredientDetailScreen() {
           )}
 
           {/* Action Buttons */}
-          <View style={styles.actionButtons}>
+          {/* <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={styles.addToCartButton}
               activeOpacity={0.7}
@@ -187,7 +187,7 @@ export default function IngredientDetailScreen() {
             >
               <Text style={styles.buyNowText}>Mua ngay</Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
     </View>

@@ -208,7 +208,7 @@ export default function GroupDetailPage() {
   const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
   const [selectedListId, setSelectedListId] = useState<number | null>(null);
   const [newItemIngredientId, setNewItemIngredientId] = useState<number | null>(null);
-  const [newItemStock, setNewItemStock] = useState<string>('500');
+  const [newItemStock, setNewItemStock] = useState<string>('');
   const [newItemPrice, setNewItemPrice] = useState<string>('');
 
   // Create list states
@@ -2080,21 +2080,36 @@ export default function GroupDetailPage() {
     setIngredientSearchTerm('');
     setSearchedIngredients([]);
 
-    // Calculate price based on current stock
-    if (ingredient.price) {
-      const stock = parseInt(newItemStock) || 500;
-      const calculatedPrice = (ingredient.price * stock / 1000).toFixed(0);
-      setNewItemPrice(calculatedPrice);
+    // Only calculate price if stock is already entered
+    // Don't show price until user enters grams
+    if (ingredient.price && newItemStock) {
+      const stock = parseInt(newItemStock);
+      if (!isNaN(stock) && stock > 0) {
+        const calculatedPrice = (ingredient.price * stock / 1000).toFixed(0);
+        setNewItemPrice(calculatedPrice);
+      } else {
+        setNewItemPrice('');
+      }
+    } else {
+      // Clear price if no stock entered
+      setNewItemPrice('');
     }
   };
 
   // Update price when stock changes
   useEffect(() => {
-    if (selectedIngredient && selectedIngredient.price && newItemStock) {
-      const stock = parseInt(newItemStock);
-      if (!isNaN(stock) && stock > 0) {
-        const calculatedPrice = (selectedIngredient.price * stock / 1000).toFixed(0);
-        setNewItemPrice(calculatedPrice);
+    if (selectedIngredient && selectedIngredient.price) {
+      if (newItemStock && newItemStock.trim() !== '') {
+        const stock = parseInt(newItemStock);
+        if (!isNaN(stock) && stock > 0) {
+          const calculatedPrice = (selectedIngredient.price * stock / 1000).toFixed(0);
+          setNewItemPrice(calculatedPrice);
+        } else {
+          setNewItemPrice('');
+        }
+      } else {
+        // Clear price if stock is empty
+        setNewItemPrice('');
       }
     }
   }, [newItemStock, selectedIngredient]);
@@ -2190,7 +2205,7 @@ export default function GroupDetailPage() {
     setSelectedListId(null);
     setNewItemIngredientId(null);
     setSelectedIngredient(null);
-    setNewItemStock('500');
+    setNewItemStock('');
     setNewItemPrice('');
     setIngredientSearchTerm('');
     setSearchedIngredients([]);
@@ -3467,7 +3482,7 @@ export default function GroupDetailPage() {
             setSelectedListId(null);
             setNewItemIngredientId(null);
             setSelectedIngredient(null);
-            setNewItemStock('500');
+            setNewItemStock('');
             setNewItemPrice('');
             setIngredientSearchTerm('');
             setSearchedIngredients([]);
@@ -3487,7 +3502,7 @@ export default function GroupDetailPage() {
                   setSelectedListId(null);
                   setNewItemIngredientId(null);
                   setSelectedIngredient(null);
-                  setNewItemStock('500');
+                  setNewItemStock('');
                   setNewItemPrice('');
                   setIngredientSearchTerm('');
                   setSearchedIngredients([]);
@@ -3619,7 +3634,7 @@ export default function GroupDetailPage() {
                     setSelectedListId(null);
                     setNewItemIngredientId(null);
                     setSelectedIngredient(null);
-                    setNewItemStock('500');
+                    setNewItemStock('');
                     setNewItemPrice('');
                     setIngredientSearchTerm('');
                     setSearchedIngredients([]);

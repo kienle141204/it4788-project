@@ -253,6 +253,7 @@ export class RefrigeratorService {
     data: Array<{
       dishId: number;
       dishName: string;
+      image_url: string | null;
       matchCount: number;
       totalIngredients: number;
       matchPercentage: number;
@@ -359,6 +360,7 @@ export class RefrigeratorService {
         return {
           dishId: dish.id,
           dishName: dish.name,
+          image_url: dish.image_url,
           matchCount,
           totalIngredients,
           matchPercentage,

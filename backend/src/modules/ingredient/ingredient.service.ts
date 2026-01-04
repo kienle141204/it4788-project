@@ -5,6 +5,9 @@ import { Ingredient } from '../../entities/ingredient.entity';
 import { IngredientCategory } from '../../entities/ingredient-category.entity';
 import { Place } from '../../entities/place.entity';
 import { DishesIngredients } from '../../entities/dishes-ingredients.entity';
+import { ShoppingItem } from '../../entities/shopping-item.entity';
+import { FridgeIngredient } from '../../entities/fridge-ingredient.entity';
+import { ConsumptionHistory } from '../../entities/consumption-history.entity';
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import {
   PaginationDto,
@@ -27,6 +30,12 @@ export class IngredientService {
     private placeRepository: Repository<Place>,
     @InjectRepository(DishesIngredients)
     private dishesIngredientsRepository: Repository<DishesIngredients>,
+    @InjectRepository(ShoppingItem)
+    private shoppingItemRepository: Repository<ShoppingItem>,
+    @InjectRepository(FridgeIngredient)
+    private fridgeIngredientRepository: Repository<FridgeIngredient>,
+    @InjectRepository(ConsumptionHistory)
+    private consumptionHistoryRepository: Repository<ConsumptionHistory>,
   ) {}
 
   /**
@@ -436,6 +445,7 @@ export class IngredientService {
 
   /**
    * Xóa nguyên liệu
+   * Xóa tất cả các bản ghi liên quan trước khi xóa ingredient
    */
   async remove(id: number): Promise<void> {
     const ingredient = await this.ingredientRepository.findOne({ where: { id } });
@@ -444,6 +454,20 @@ export class IngredientService {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00300]);
     }
 
+    // Xóa tất cả các bản ghi liên quan trước
+    // 1. Xóa shopping_items liên quan
+    await this.shoppingItemRepository.delete({ ingredient_id: id });
+
+    // 2. Xóa fridge_ingredients liên quan
+    await this.fridgeIngredientRepository.delete({ ingredient_id: id });
+
+    // 3. Xóa consumption_history liên quan (khi consume_type = 'ingredient')
+    await this.consumptionHistoryRepository.delete({ 
+      item_id: id,
+      consume_type: 'ingredient'
+    });
+
+    // 4. Cuối cùng mới xóa ingredient
     await this.ingredientRepository.delete(id);
   }
 }
