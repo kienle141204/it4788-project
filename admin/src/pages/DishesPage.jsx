@@ -68,7 +68,6 @@ const DishesPage = () => {
       setTotalPages(responseTotalPages || 1);
       setTotalItems(responseTotalItems || 0);
     } catch (error) {
-      console.error('Error loading dishes:', error);
     } finally {
       setLoading(false);
     }
@@ -111,7 +110,6 @@ const DishesPage = () => {
         // Remove dish from local state after successful deletion
         setDishes(dishes.filter(d => d.id !== dish.id));
       } catch (error) {
-        console.error('Error deleting dish:', error);
       }
     }
   };
@@ -139,7 +137,6 @@ const DishesPage = () => {
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving dish:', error);
     }
   };
 
@@ -197,7 +194,6 @@ const DishesPage = () => {
       setTotalItems(responseTotalItems || 0);
       setCurrentPage(1); // Reset to first page after search
     } catch (error) {
-      console.error('Error searching dishes:', error);
       // Fallback to client-side filtering if API search fails
       const filtered = dishes.filter(d =>
         d.name.toLowerCase().includes(searchValue.toLowerCase()) ||

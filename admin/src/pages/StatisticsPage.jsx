@@ -78,7 +78,6 @@ const StatisticsPage = () => {
                 setSelectedFamilyId(familiesData[0].id.toString());
             }
         } catch (error) {
-            console.error('Error loading families:', error);
         }
     };
 
@@ -104,7 +103,6 @@ const StatisticsPage = () => {
                 familyStats: familyStatsRes.status === 'fulfilled' ? (familyStatsRes.value.data || familyStatsRes.value) : null
             });
         } catch (error) {
-            console.error('Error loading statistics:', error);
         } finally {
             setLoading(false);
         }

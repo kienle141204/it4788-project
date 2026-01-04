@@ -64,7 +64,6 @@ const RefrigeratorsPage = () => {
             setTotalPages(responseTotalPages || 1);
             setTotalItems(responseTotalItems || 0);
         } catch (error) {
-            console.error('Error loading refrigerators:', error);
         } finally {
             setLoading(false);
         }
@@ -106,7 +105,6 @@ const RefrigeratorsPage = () => {
                 ingredients: ingredientsRes.data || ingredientsRes || []
             });
         } catch (error) {
-            console.error('Error loading fridge contents:', error);
             setFridgeContents({ dishes: [], ingredients: [] });
         } finally {
             setDetailLoading(false);
@@ -119,7 +117,6 @@ const RefrigeratorsPage = () => {
                 await deleteRefrigerator(fridge.id);
                 setRefrigerators(refrigerators.filter(f => f.id !== fridge.id));
             } catch (error) {
-                console.error('Error deleting refrigerator:', error);
             }
         }
     };

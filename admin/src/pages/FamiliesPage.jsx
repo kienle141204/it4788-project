@@ -65,7 +65,6 @@ const FamiliesPage = () => {
             setTotalPages(responseTotalPages || 1);
             setTotalItems(responseTotalItems || 0);
         } catch (error) {
-            console.error('Error loading families:', error);
         } finally {
             setLoading(false);
         }
@@ -97,7 +96,6 @@ const FamiliesPage = () => {
                 await deleteFamily(family.id);
                 setFamilies(families.filter(f => f.id !== family.id));
             } catch (error) {
-                console.error('Error deleting family:', error);
             }
         }
     };
@@ -110,7 +108,6 @@ const FamiliesPage = () => {
             const response = await getFamilyMembers(family.id);
             setFamilyMembers(response.data || response || []);
         } catch (error) {
-            console.error('Error loading family members:', error);
             setFamilyMembers([]);
         } finally {
             setMembersLoading(false);
@@ -129,7 +126,6 @@ const FamiliesPage = () => {
             }
             handleCloseModal();
         } catch (error) {
-            console.error('Error saving family:', error);
         }
     };
 
@@ -174,7 +170,6 @@ const FamiliesPage = () => {
             setTotalItems(responseTotalItems || 0);
             setCurrentPage(1);
         } catch (error) {
-            console.error('Error searching families:', error);
         } finally {
             setLoading(false);
         }

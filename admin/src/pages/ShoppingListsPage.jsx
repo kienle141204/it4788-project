@@ -30,7 +30,6 @@ const ShoppingListsPage = () => {
             const familiesData = response.data || response || [];
             setFamilies(familiesData);
         } catch (error) {
-            console.error('Error loading families:', error);
         }
     };
 
@@ -70,7 +69,6 @@ const ShoppingListsPage = () => {
             dateKeys.forEach(key => expandState[key] = true);
             setExpandedDates(expandState);
         } catch (error) {
-            console.error('Error loading shopping lists:', error);
         } finally {
             setLoading(false);
         }
@@ -119,7 +117,6 @@ const ShoppingListsPage = () => {
             const response = await getShoppingListById(list.id);
             setSelectedList(response);
         } catch (error) {
-            console.error('Error loading shopping list detail:', error);
             setSelectedList(list);
         } finally {
             setDetailLoading(false);
