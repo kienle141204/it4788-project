@@ -337,36 +337,18 @@ const StatisticsPage = () => {
         
         shoppingLists.forEach((list) => {
             if (list.shopping_date) {
-                // Parse date correctly to avoid timezone issues
-                // Get date string in YYYY-MM-DD format
-                let dateStr = String(list.shopping_date);
-                // Remove time part if exists
-                if (dateStr.includes('T')) {
-                    dateStr = dateStr.split('T')[0]; // Get YYYY-MM-DD part
-                }
-                // Remove timezone info if exists
-                if (dateStr.includes('+')) {
-                    dateStr = dateStr.split('+')[0];
-                }
-                if (dateStr.includes('Z') && !dateStr.includes('T')) {
-                    // Handle edge case
-                    dateStr = dateStr.replace('Z', '');
-                }
+                // Parse date from API (returns Date object or ISO string)
+                const date = new Date(list.shopping_date);
+                // Add 1 day to compensate for timezone offset (API returns UTC, needs +1 day)
+                date.setDate(date.getDate() + 1);
                 
-                // Validate date string format (YYYY-MM-DD)
-                const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                if (!dateMatch) {
-                    return; // Skip invalid dates
-                }
-                
-                const year = parseInt(dateMatch[1], 10);
-                const month = parseInt(dateMatch[2], 10);
-                const day = parseInt(dateMatch[3], 10);
+                const year = date.getFullYear();
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
                 
                 // Only include dates from selected year
-                // API now returns date in correct format (YYYY-MM-DD) without timezone issues
                 if (year === selectedYear) {
-                    // Use normalized date string as key (YYYY-MM-DD)
+                    // Use normalized date string as key (YYYY-MM-DD) with +1 day
                     const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     
                     // Always calculate cost from items to ensure accuracy (same as totalIngredientCost)
@@ -404,20 +386,18 @@ const StatisticsPage = () => {
         }
 
         const labels = sortedEntries.map(([dateStr]) => {
-            // Parse date string directly to avoid timezone issues
-            // dateStr is in format YYYY-MM-DD (normalized)
-            const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (dateMatch) {
-                const day = parseInt(dateMatch[3], 10);
-                const month = parseInt(dateMatch[2], 10);
-                return `${day}/${month}`;
-            }
-            // Fallback: try to parse as date
+            // Parse date string (YYYY-MM-DD) and subtract 1 day for display
             const parts = dateStr.split('-');
             if (parts.length === 3) {
-                const day = parseInt(parts[2], 10);
+                const year = parseInt(parts[0], 10);
                 const month = parseInt(parts[1], 10);
-                return `${day}/${month}`;
+                const day = parseInt(parts[2], 10);
+                // Create date and subtract 1 day for display
+                const date = new Date(year, month - 1, day);
+                date.setDate(date.getDate() - 1);
+                const displayDay = date.getDate();
+                const displayMonth = date.getMonth() + 1;
+                return `${displayDay}/${displayMonth}`;
             }
             return dateStr;
         });
