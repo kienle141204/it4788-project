@@ -27,6 +27,7 @@ export class EmailService {
     const isSecure = smtpPort === 465;
 
     // Cấu hình transporter với TLS phù hợp cho production
+    // Tăng timeout và cải thiện cấu hình cho Render
     this.transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
@@ -46,10 +47,17 @@ export class EmailService {
         requireTLS: true, // Yêu cầu TLS cho port 587
         ignoreTLS: false,
       }),
-      // Thêm timeout để tránh hang
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
+      // Tăng timeout cho Render (có thể mất thời gian kết nối)
+      connectionTimeout: 30000, // 30 seconds (tăng từ 10s)
+      greetingTimeout: 30000, // 30 seconds
+      socketTimeout: 30000, // 30 seconds
+      // Thêm pool connection để tái sử dụng kết nối
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 3,
+      // Rate limiting để tránh bị Gmail chặn
+      rateDelta: 1000, // 1 second between messages
+      rateLimit: 5, // Max 5 messages per rateDelta
     });
 
     // Verify connection khi khởi tạo (chỉ trong development để debug)
@@ -99,8 +107,37 @@ export class EmailService {
       };
 
       this.logger.log(`Attempting to send OTP email to: ${email}`);
-      const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`✅ OTP email sent successfully to ${email}. MessageId: ${info.messageId}`);
+      
+      // Thử gửi email với retry mechanism
+      let lastError: any;
+      const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 1) {
+            this.logger.log(`Retry attempt ${attempt}/${maxRetries} for ${email}`);
+            // Đợi trước khi retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          }
+          
+          const info = await this.transporter.sendMail(mailOptions);
+          this.logger.log(`✅ OTP email sent successfully to ${email}. MessageId: ${info.messageId}`);
+          return; // Thành công, thoát khỏi function
+        } catch (error: any) {
+          lastError = error;
+          this.logger.warn(`Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+          
+          // Nếu là connection timeout và chưa hết retry, thử lại
+          if (error.code === 'ETIMEDOUT' && attempt < maxRetries) {
+            continue;
+          }
+          // Nếu là lỗi khác không phải timeout, throw ngay
+          throw error;
+        }
+      }
+      
+      // Nếu tất cả retry đều fail, throw error cuối cùng
+      throw lastError;
     } catch (error: any) {
       this.logger.error(`❌ Failed to send OTP email to ${email}`);
       this.logger.error(`Error message: ${error.message}`);
