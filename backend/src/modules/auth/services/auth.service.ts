@@ -24,13 +24,12 @@ import { ResponseCode, ResponseMessageVi } from 'src/common';
 export class AuthService {
 
   /**
-   * Chuyển đổi thời gian hiện tại thành Vietnam timezone
+   * Lấy thời gian hiện tại (UTC)
+   * Sử dụng UTC để đảm bảo tính nhất quán giữa các server và timezone
+   * Database sẽ tự động convert sang timezone được cấu hình khi cần
    */
-  private getVietnamTime(): Date {
-    const now = new Date();
-    // Vietnam timezone là UTC+7
-    const vietnamTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    return vietnamTime;
+  private getCurrentTime(): Date {
+    return new Date(); // Trả về UTC time
   }
   constructor(
     @InjectRepository(User)
@@ -61,15 +60,15 @@ export class AuthService {
     // Xóa temp_user cũ nếu có (để có thể đăng ký lại)
     await this.tempUserRepository.delete({ email });
 
-    // Tạo temp_user mới với Vietnam time
-    const vietnamTime = this.getVietnamTime();
+    // Tạo temp_user mới với UTC time
+    const currentTime = this.getCurrentTime();
     const tempUser = this.tempUserRepository.create({
       email,
       phone_number,
       password_hash: hashedPassword,
       otp_code: otpCode,
       status: 'PENDING',
-      otp_sent_at: vietnamTime, // Sử dụng Vietnam time
+      otp_sent_at: currentTime, // Sử dụng UTC time để đảm bảo tính nhất quán
     });
 
     const savedTempUser = await this.tempUserRepository.save(tempUser);
@@ -110,9 +109,10 @@ export class AuthService {
     }
 
     // Kiểm tra OTP có hết hạn không (3 phút)
-    const currentTime = new Date(); // Sử dụng thời gian hiện tại
-    const otpSentTime = new Date(tempUser.otp_sent_at);
-    const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000);
+    // Sử dụng UTC time để đảm bảo tính nhất quán giữa các server
+    const currentTime = this.getCurrentTime(); // UTC time
+    const otpSentTime = new Date(tempUser.otp_sent_at); // Lấy từ database (đã được convert về UTC)
+    const otpExpiryTime = new Date(otpSentTime.getTime() + 3 * 60 * 1000); // Thêm 3 phút
 
     if (currentTime > otpExpiryTime) {
       await this.tempUserRepository.update(tempUser.temp_user_id, { status: 'EXPIRED' });
@@ -172,8 +172,8 @@ export class AuthService {
     // Tạo mã OTP mới
     const newOtpCode = this.generateOtp();
 
-    // Cập nhật OTP mới với Vietnam time
-    const newSentTime = this.getVietnamTime();
+    // Cập nhật OTP mới với UTC time
+    const newSentTime = this.getCurrentTime();
     await this.tempUserRepository.update(tempUser.temp_user_id, {
       otp_code: newOtpCode,
       otp_sent_at: newSentTime,
