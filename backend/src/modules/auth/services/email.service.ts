@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as sgMail from '@sendgrid/mail';
+// Import SendGrid với cách đúng cho v8+
+const sgMail = require('@sendgrid/mail');
 
 @Injectable()
 export class EmailService {
@@ -8,8 +9,13 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     // Cấu hình SendGrid API Key
-    const sendGridApiKey = this.configService.get<string>('SENDGRID_API_KEY');
+    let sendGridApiKey = this.configService.get<string>('SENDGRID_API_KEY');
     const sendGridFrom = this.configService.get<string>('SENDGRID_FROM_EMAIL');
+
+    // Trim để loại bỏ khoảng trắng thừa (có thể có khi copy/paste)
+    if (sendGridApiKey) {
+      sendGridApiKey = sendGridApiKey.trim();
+    }
 
     if (!sendGridApiKey || !sendGridFrom) {
       this.logger.error('❌ SendGrid API configuration is missing!');
@@ -17,8 +23,15 @@ export class EmailService {
       throw new Error('SendGrid API configuration is required. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL');
     }
 
+    // Validate API Key format (SendGrid API Key bắt đầu bằng SG.)
+    if (!sendGridApiKey.startsWith('SG.')) {
+      this.logger.error('❌ Invalid SendGrid API Key format! API Key must start with "SG."');
+      throw new Error('Invalid SendGrid API Key format. API Key must start with "SG."');
+    }
+
     // Khởi tạo SendGrid
     sgMail.setApiKey(sendGridApiKey);
+    
     this.logger.log('✅ Email service initialized with SendGrid API');
     this.logger.log(`SendGrid From Email: ${sendGridFrom}`);
   }
