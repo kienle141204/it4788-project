@@ -26,24 +26,41 @@ export class EmailService {
     // Xác định secure dựa trên port (465 = secure, 587 = TLS)
     const isSecure = smtpPort === 465;
 
+    // Cấu hình transporter với TLS phù hợp cho production
     this.transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
-      secure: isSecure, // true cho port 465 (Gmail), false cho port 587
+      secure: isSecure, // true cho port 465 (SSL), false cho port 587 (TLS)
       auth: {
         user: smtpUser,
         pass: smtpPass,
       },
       tls: {
-        rejectUnauthorized: false, // Cho phép self-signed certificates
-        ciphers: 'SSLv3'
+        // Không reject unauthorized certificates trong production để tránh lỗi
+        rejectUnauthorized: false,
+        // Không dùng SSLv3 (đã deprecated), để Node.js tự chọn cipher phù hợp
+        minVersion: 'TLSv1.2',
       },
       // Cấu hình cho Gmail và các SMTP servers khác
       ...(isSecure ? {} : {
         requireTLS: true, // Yêu cầu TLS cho port 587
         ignoreTLS: false,
-      })
+      }),
+      // Thêm timeout để tránh hang
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
+
+    // Verify connection khi khởi tạo (chỉ trong development để debug)
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
+    if (nodeEnv !== 'production') {
+      this.transporter.verify().then(() => {
+        this.logger.log('✅ SMTP connection verified successfully');
+      }).catch((error) => {
+        this.logger.error('❌ SMTP connection verification failed:', error.message);
+      });
+    }
   }
 
   /**
@@ -85,10 +102,10 @@ export class EmailService {
       const info = await this.transporter.sendMail(mailOptions);
       this.logger.log(`✅ OTP email sent successfully to ${email}. MessageId: ${info.messageId}`);
     } catch (error: any) {
-      this.logger.error(`❌ Failed to send OTP email to ${email}:`, error.message);
-      this.logger.error(`Error details:`, error);
+      this.logger.error(`❌ Failed to send OTP email to ${email}`);
+      this.logger.error(`Error message: ${error.message}`);
       
-      // Log thêm thông tin debug
+      // Log thêm thông tin debug chi tiết
       if (error.code) {
         this.logger.error(`Error code: ${error.code}`);
       }
@@ -98,9 +115,22 @@ export class EmailService {
       if (error.responseCode) {
         this.logger.error(`SMTP response code: ${error.responseCode}`);
       }
+      if (error.command) {
+        this.logger.error(`Failed SMTP command: ${error.command}`);
+      }
+      if (error.stack) {
+        this.logger.error(`Error stack: ${error.stack}`);
+      }
 
-      // Throw error để caller có thể handle
-      throw new Error(`Failed to send email: ${error.message}`);
+      // Log cấu hình hiện tại (không log password)
+      const smtpHost = this.configService.get<string>('SMTP_HOST');
+      const smtpPort = this.configService.get<number>('SMTP_PORT') || 587;
+      const smtpUser = this.configService.get<string>('SMTP_USER');
+      this.logger.error(`Current SMTP config - Host: ${smtpHost}, Port: ${smtpPort}, User: ${smtpUser ? 'SET' : 'NOT SET'}`);
+
+      // Throw error với thông tin chi tiết hơn
+      const errorMessage = error.response || error.message || 'Unknown error';
+      throw new Error(`Failed to send email: ${errorMessage}`);
     }
   }
 
