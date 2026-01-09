@@ -95,8 +95,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
                 text: 'Không',
                 style: 'cancel',
                 onPress: () => {
-                  // Vẫn hiển thị thông báo lỗi nếu người dùng từ chối
-                  Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+                  // Không hiển thị thông báo lỗi nếu người dùng từ chối, chỉ log
+                  console.log('[Notifications] User declined notification permission');
                 },
               },
               {
@@ -112,7 +112,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
                       fetchNotifications(page);
                     }, 1000);
                   } else {
-                    Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+                    // Không hiển thị thông báo lỗi, chỉ log
+                    console.log('[Notifications] Notification permission not granted');
                   }
                 },
               },
@@ -120,13 +121,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
             { cancelable: false }
           );
         } else {
-          // Đã có permission nhưng vẫn lỗi, hiển thị thông báo lỗi như cũ
-          Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+          // Đã có permission nhưng vẫn lỗi, chỉ log không hiển thị alert
+          console.error('[Notifications] Error fetching notifications despite having permission');
         }
       } catch (permissionError) {
-        // Nếu kiểm tra permission fail, hiển thị thông báo lỗi như cũ
+        // Nếu kiểm tra permission fail, chỉ log không hiển thị alert
         console.error('[Notifications] Error checking permission:', permissionError);
-        Alert.alert('Lỗi', 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
       }
     } finally {
       setLoading(false);
@@ -166,8 +166,21 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    // Load lần đầu
-    refreshNotifications();
+    // Load lần đầu - chỉ khi đã đăng nhập
+    const checkAndLoad = async () => {
+      try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (token) {
+          refreshNotifications();
+        } else {
+          // Không có token, không fetch notifications
+          console.log('[Notifications] No token found, skipping notification fetch');
+        }
+      } catch (error) {
+        console.error('[Notifications] Error checking token:', error);
+      }
+    };
+    checkAndLoad();
   }, [refreshNotifications]);
 
   const router = useRouter();

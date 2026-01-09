@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkAsyncStorage } from '@/utils/checkAsyncStorage'
 import { pushNotificationService } from '@/service/pushNotifications'
 import { inAppLogger } from '@/utils/logger';
+import { biometricService } from '@/service/biometric';
 
 export default function login() {
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
@@ -20,6 +21,104 @@ export default function login() {
   const [password, setPassword] = useState('');
   const route = useRouter()
   const [loading, setLoading] = useState(false)
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  // Kiểm tra hỗ trợ và trạng thái đăng nhập bằng vân tay
+  useEffect(() => {
+    const checkBiometric = async () => {
+      try {
+        const supported = await biometricService.isSupported();
+        const enrolled = await biometricService.isEnrolled();
+        const enabled = await biometricService.isBiometricEnabled();
+        
+        setBiometricSupported(supported && enrolled);
+        setBiometricEnabled(enabled);
+
+        // Nếu đã bật và có email đã lưu, tự động điền email
+        if (enabled) {
+          const savedEmail = await biometricService.getSavedEmail();
+          if (savedEmail) {
+            setEmail(savedEmail);
+          }
+        }
+      } catch (error) {
+        console.error('[Login] Error checking biometric:', error);
+      }
+    };
+
+    checkBiometric();
+  }, []);
+
+  // Xử lý đăng nhập bằng vân tay
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    try {
+      // Xác thực sinh trắc học
+      const authResult = await biometricService.authenticate('Xác thực để đăng nhập');
+      
+      if (!authResult.success) {
+        // Không hiển thị alert nếu người dùng hủy
+        if (authResult.error && !authResult.error.includes('hủy')) {
+          Alert.alert('Lỗi', authResult.error);
+        }
+        return;
+      }
+
+      // Lấy thông tin đăng nhập đã lưu
+      const savedEmail = await biometricService.getSavedEmail();
+      const savedPassword = await biometricService.getSavedPassword();
+
+      if (!savedEmail || !savedPassword) {
+        Alert.alert('Lỗi', 'Không tìm thấy thông tin đăng nhập đã lưu');
+        return;
+      }
+
+      // Đăng nhập với thông tin đã lưu
+      setEmail(savedEmail);
+      setPassword(savedPassword);
+      
+      // Gọi handleLogin với thông tin đã lưu
+      const data = { email: savedEmail, password: savedPassword };
+      const res = await loginUSer(data);
+
+      if (!res) {
+        Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+        return;
+      }
+
+      let message = res?.message;
+      if (res?.statusCode) {
+        if (Array.isArray(message)) {
+          message = message.join('\n');
+        }
+        Alert.alert('Lỗi', message || 'Đăng nhập thất bại');
+        return;
+      }
+
+      const access = res?.access_token;
+      const refresh = res?.refresh_token;
+
+      await AsyncStorage.setItem('access_token', access as any);
+      await AsyncStorage.setItem('refresh_token', refresh as any);
+
+      // Đăng ký push notification token (không hiển thị lỗi nếu thất bại)
+      try {
+        await pushNotificationService.registerTokenWithBackend();
+      } catch (error: any) {
+        console.warn('[Login] Push notification registration failed:', error?.message);
+        inAppLogger.log(`⚠️ Push notification registration failed: ${error?.message || 'Unknown error'}`, 'Login');
+      }
+
+      route.push('../(tabs)/home');
+    } catch (error: any) {
+      console.error('[Login] Biometric login error:', error);
+      Alert.alert('Lỗi', 'Đăng nhập bằng vân tay thất bại, vui lòng thử lại.');
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -55,24 +154,38 @@ export default function login() {
       await AsyncStorage.setItem('refresh_token', refresh as any)
       const key = await AsyncStorage.getAllKeys()
       
-      // Đăng ký push notification token sau khi đăng nhập thành công
-      console.log('[Login] 🔔 Attempting to register push notification token...');
-      inAppLogger.log('🔔 Attempting to register push notification token...', 'Login');
+      // Đăng ký push notification token sau khi đăng nhập thành công (không hiển thị lỗi nếu thất bại)
       try {
-        const registered = await pushNotificationService.registerTokenWithBackend();
-        if (registered) {
-          console.log('[Login] ✅ Push notification token registered successfully');
-          inAppLogger.log('✅ Push notification token registered successfully', 'Login');
-        } else {
-          console.warn('[Login] ⚠️ Push notification token registration failed (check logs above)');
-          inAppLogger.log('⚠️ Push notification token registration failed', 'Login');
-          // Không block login flow, nhưng log để debug
-        }
+        await pushNotificationService.registerTokenWithBackend();
       } catch (error: any) {
-        console.error('[Login] ❌ Error registering push notification token:', error);
-        console.error('[Login] ❌ Error details:', error?.message || 'Unknown error');
-        inAppLogger.log(`❌ Error: ${error?.message || 'Unknown error'}`, 'Login');
-        // Không block login flow nếu đăng ký token fail
+        console.warn('[Login] Push notification registration failed:', error?.message);
+        inAppLogger.log(`⚠️ Push notification registration failed: ${error?.message || 'Unknown error'}`, 'Login');
+      }
+
+      // Hỏi người dùng có muốn bật đăng nhập bằng vân tay không
+      if (biometricSupported && !biometricEnabled) {
+        Alert.alert(
+          'Bật đăng nhập bằng vân tay',
+          'Bạn có muốn bật đăng nhập bằng vân tay để đăng nhập nhanh hơn không?',
+          [
+            {
+              text: 'Không',
+              style: 'cancel',
+            },
+            {
+              text: 'Bật',
+              onPress: async () => {
+                const enabled = await biometricService.enableBiometric(email, password);
+                if (enabled) {
+                  setBiometricEnabled(true);
+                  Alert.alert('Thành công', 'Đã bật đăng nhập bằng vân tay');
+                } else {
+                  Alert.alert('Lỗi', 'Không thể bật đăng nhập bằng vân tay');
+                }
+              },
+            },
+          ]
+        );
       }
       
       route.push('../(tabs)/home');
@@ -143,18 +256,82 @@ export default function login() {
                 Bạn chưa có tài khoản?
             </Link>
         </View >
-        <TouchableOpacity 
-          style={styles.loginButton} 
-          onPress={handleLogin}
-          activeOpacity={0.8}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
-          ) : (
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
-          )}
-        </TouchableOpacity>
+        {/* Container chứa nút đăng nhập và nút vân tay */}
+        {biometricSupported ? (
+          <View style={{ flexDirection: 'row', width: '85%', alignSelf: 'center', marginTop: 24, gap: 12 }}>
+            {/* Nút đăng nhập - chiếm 90% khi có nút vân tay */}
+            <TouchableOpacity 
+              style={[styles.loginButton, { flex: 0.9, marginTop: 0 }]} 
+              onPress={handleLogin}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Nút đăng nhập bằng vân tay - chiếm 10%, chỉ hiển thị icon */}
+            <TouchableOpacity
+              style={{ 
+                flex: 0.1,
+                marginTop: 0,
+                backgroundColor: 'transparent', 
+                borderWidth: 1, 
+                borderColor: COLORS.primary,
+                borderRadius: 12,
+                paddingVertical: 16,
+                paddingHorizontal: 0,
+                minWidth: 50,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: 'transparent',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0,
+                shadowRadius: 0,
+                elevation: 0,
+              }}
+              onPress={async () => {
+                if (biometricEnabled) {
+                  await handleBiometricLogin();
+                } else {
+                  Alert.alert(
+                    'Bật đăng nhập bằng vân tay',
+                    'Bạn cần đăng nhập bằng email và mật khẩu trước để bật tính năng đăng nhập bằng vân tay.',
+                    [{ text: 'Đã hiểu', style: 'default' }]
+                  );
+                }
+              }}
+              activeOpacity={0.8}
+              disabled={biometricLoading || loading}
+            >
+              {biometricLoading ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Ionicons 
+                  name={biometricEnabled ? "finger-print" : "finger-print-outline"} 
+                  size={24} 
+                  color={COLORS.primary}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={handleLogin}
+            activeOpacity={0.8}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            )}
+          </TouchableOpacity>
+        )}
 
         <View style={styles.dividerContainer}>
             <View style={styles.line} />
