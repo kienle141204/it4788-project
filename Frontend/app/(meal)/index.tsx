@@ -20,6 +20,7 @@ import { getAccess, deleteAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
 import { clearCacheByPattern, getCache } from '../../utils/cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useMenu } from '../../context/MenuContext';
 
 interface Family {
   id: string;
@@ -270,6 +271,107 @@ export default function MealPage() {
   useEffect(() => {
     fetchMenus(1, true);
   }, [fetchMenus]);
+
+  // Real-time menu updates
+  const menuContext = useMenu();
+
+  // Listen to menu events
+  useEffect(() => {
+    const unsubscribers: Array<() => void> = [];
+
+    // Menu created
+    unsubscribers.push(
+      menuContext.onMenuCreated((data) => {
+        // Add new menu to the list
+        setMenus((prevMenus) => {
+          const exists = prevMenus.some((m) => String(m.id) === String(data.menu?.id));
+          if (!exists && data.menu) {
+            return [data.menu, ...prevMenus];
+          }
+          return prevMenus;
+        });
+      })
+    );
+
+    // Menu updated
+    unsubscribers.push(
+      menuContext.onMenuUpdated((data) => {
+        setMenus((prevMenus) => {
+          const index = prevMenus.findIndex(
+            (m) => String(m.id) === String(data.menu?.id)
+          );
+          if (index >= 0 && data.menu) {
+            const updated = [...prevMenus];
+            updated[index] = { ...updated[index], ...data.menu };
+            return updated;
+          }
+          return prevMenus;
+        });
+      })
+    );
+
+    // Menu deleted
+    unsubscribers.push(
+      menuContext.onMenuDeleted((data) => {
+        setMenus((prevMenus) =>
+          prevMenus.filter((m) => String(m.id) !== String(data.menuId))
+        );
+      })
+    );
+
+    // Menu dish added
+    unsubscribers.push(
+      menuContext.onDishAdded((data) => {
+        setMenus((prevMenus) => {
+          return prevMenus.map((menu) => {
+            if (String(menu.id) === String(data.menuId)) {
+              const updatedDishes = [...(menu.menuDishes || []), data.menuDish];
+              return { ...menu, menuDishes: updatedDishes };
+            }
+            return menu;
+          });
+        });
+      })
+    );
+
+    // Menu dish updated
+    unsubscribers.push(
+      menuContext.onDishUpdated((data) => {
+        setMenus((prevMenus) => {
+          return prevMenus.map((menu) => {
+            if (String(menu.id) === String(data.menuId)) {
+              const updatedDishes = (menu.menuDishes || []).map((dish: any) =>
+                String(dish.id) === String(data.menuDish?.id) ? data.menuDish : dish
+              );
+              return { ...menu, menuDishes: updatedDishes };
+            }
+            return menu;
+          });
+        });
+      })
+    );
+
+    // Menu dish removed
+    unsubscribers.push(
+      menuContext.onDishRemoved((data) => {
+        setMenus((prevMenus) => {
+          return prevMenus.map((menu) => {
+            if (String(menu.id) === String(data.menuId)) {
+              const updatedDishes = (menu.menuDishes || []).filter(
+                (dish: any) => String(dish.id) !== String(data.menuDishId)
+              );
+              return { ...menu, menuDishes: updatedDishes };
+            }
+            return menu;
+          });
+        });
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [menuContext]);
 
   // Refresh danh sách khi màn hình được focus lại (ví dụ: quay lại từ màn hình edit)
   useFocusEffect(

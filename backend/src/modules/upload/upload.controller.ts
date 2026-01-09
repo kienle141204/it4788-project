@@ -89,7 +89,25 @@ export class UploadController {
     @Req() req: any,
   ) {
     const folder = req.body?.folder;
+    
+    // Debug logging
+    console.log('[Upload] Request received');
+    console.log('[Upload] File:', file ? {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      encoding: file.encoding,
+      mimetype: file.mimetype,
+      size: file.size,
+      buffer: file.buffer ? `Buffer(${file.buffer.length} bytes)` : 'No buffer',
+    } : 'No file');
+    console.log('[Upload] Body:', req.body);
+    console.log('[Upload] Headers:', {
+      'content-type': req.headers['content-type'],
+      'content-length': req.headers['content-length'],
+    });
+    
     if (!file) {
+      console.error('[Upload] No file received!');
       throw new BadRequestException(ResponseMessageVi[ResponseCode.C00330]);
     }
 

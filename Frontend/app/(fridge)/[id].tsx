@@ -38,6 +38,7 @@ import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedA
 import { clearCacheByPattern, getCache } from '@/utils/cache';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import ActionMenu from '@/components/ActionMenu';
+import { useRefrigerator } from '@/context/RefrigeratorContext';
 
 interface Refrigerator {
   id: number;
@@ -562,6 +563,97 @@ export default function FridgeDetailPage() {
       fetchSuggestions(suggestions.length === 0);
     }
   }, [activeTab, fetchSuggestions, suggestions.length]);
+
+  // Real-time refrigerator updates
+  const refrigeratorContext = useRefrigerator();
+
+  // Join family room for real-time updates
+  useEffect(() => {
+    if (refrigerator?.family_id && refrigeratorContext.isConnected) {
+      refrigeratorContext.joinFamily(refrigerator.family_id);
+    }
+
+    return () => {
+      if (refrigerator?.family_id) {
+        refrigeratorContext.leaveFamily(refrigerator.family_id);
+      }
+    };
+  }, [refrigerator?.family_id, refrigeratorContext.isConnected]);
+
+  // Listen to refrigerator events
+  useEffect(() => {
+    const unsubscribers: Array<() => void> = [];
+
+    // Ingredient added
+    unsubscribers.push(
+      refrigeratorContext.onIngredientAdded((data) => {
+        if (data.refrigeratorId === refrigeratorId) {
+          setFridgeIngredients((prev) => [...prev, data.ingredient]);
+        }
+      })
+    );
+
+    // Ingredient updated
+    unsubscribers.push(
+      refrigeratorContext.onIngredientUpdated((data) => {
+        if (data.refrigeratorId === refrigeratorId) {
+          setFridgeIngredients((prev) =>
+            prev.map((ing) =>
+              Number(ing.id) === Number(data.ingredient?.id) ? data.ingredient : ing
+            )
+          );
+        }
+      })
+    );
+
+    // Ingredient deleted
+    unsubscribers.push(
+      refrigeratorContext.onIngredientDeleted((data) => {
+        if (data.refrigeratorId === refrigeratorId) {
+          setFridgeIngredients((prev) =>
+            prev.filter((ing) => Number(ing.id) !== Number(data.ingredientId))
+          );
+        }
+      })
+    );
+
+    // Dish added
+    unsubscribers.push(
+      refrigeratorContext.onDishAdded((data) => {
+        if (data.refrigeratorId === refrigeratorId) {
+          setFridgeDishes((prev) => [...prev, data.dish]);
+        }
+      })
+    );
+
+    // Dish updated
+    unsubscribers.push(
+      refrigeratorContext.onDishUpdated((data) => {
+        if (data.refrigeratorId === refrigeratorId) {
+          setFridgeDishes((prev) =>
+            prev.map((dish) =>
+              Number(dish.id) === Number(data.dish?.id) ? data.dish : dish
+            )
+          );
+        }
+      })
+    );
+
+    // Dish deleted
+    unsubscribers.push(
+      refrigeratorContext.onDishDeleted((data) => {
+        if (data.refrigeratorId === refrigeratorId) {
+          setFridgeDishes((prev) =>
+            prev.filter((dish) => Number(dish.id) !== Number(data.dishId))
+          );
+        }
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [refrigeratorId, refrigeratorContext]);
 
   const handleBack = () => {
     if (router.canGoBack()) {

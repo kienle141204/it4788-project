@@ -16,6 +16,7 @@ import { UpdateShoppingListDto } from './dto/update-shopping-list.dto';
 import { User, Roles, Owner, JwtAuthGuard, RolesGuard, OwnerGuard, SelfOrAdminGuard } from 'src/common';
 import type { JwtUser } from 'src/common/types/user.type';
 import { Public } from 'src/common/decorators/public.decorator';
+import { buildSuccessResponse, ResponseCode } from 'src/common/errors/error-codes';
 
 @ApiTags('Shopping Lists')
 @ApiBearerAuth('JWT-auth')
@@ -257,19 +258,24 @@ export class ShoppingListController {
   @Delete(':id')
   @ApiOperation({
     summary: 'Xóa danh sách mua sắm',
-    description: 'API này cho phép owner xóa danh sách mua sắm. Lưu ý: Tất cả các items trong danh sách cũng sẽ bị xóa.'
+    description: 'API này cho phép owner, manager hoặc chủ nhóm xóa danh sách mua sắm. Lưu ý: Tất cả các items trong danh sách cũng sẽ bị xóa.'
   })
   @ApiParam({ name: 'id', type: 'number', example: 1, description: 'ID của danh sách mua sắm' })
   @ApiResponse({
     status: 200,
     description: 'Xóa danh sách thành công',
     example: {
-      message: 'Danh sách mua sắm đã được xóa thành công'
+      success: true,
+      message: 'Xóa danh sách mua sắm thành công.',
+      data: {
+        shoppingListId: 1
+      }
     }
   })
   @ApiResponse({ status: 403, description: 'Không có quyền xóa danh sách này' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy danh sách mua sắm' })
   async remove(@Param('id', ParseIntPipe) id: number, @User() user: JwtUser) {
-    return await this.shoppingListService.remove(id, user);
+    await this.shoppingListService.remove(id, user);
+    return buildSuccessResponse(ResponseCode.C00268, { shoppingListId: id });
   }
 }

@@ -139,9 +139,10 @@ export const deleteShoppingItem = async (itemId: number): Promise<void> => {
 /**
  * Delete a shopping list
  */
-export const deleteShoppingList = async (listId: number): Promise<void> => {
+export const deleteShoppingList = async (listId: number): Promise<any> => {
   try {
-    await deleteAccess(`shopping-lists/${listId}`);
+    const response = await deleteAccess(`shopping-lists/${listId}`);
+    return response;
   } catch (error) {
     throw error;
   }

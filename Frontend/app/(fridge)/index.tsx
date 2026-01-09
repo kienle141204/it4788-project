@@ -19,6 +19,7 @@ import { getAccess } from '@/utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { clearCacheByPattern } from '@/utils/cache';
 import NotificationCard from '@/components/NotificationCard';
+import { useRefrigerator } from '@/context/RefrigeratorContext';
 
 interface Refrigerator {
   id: number;
@@ -182,6 +183,56 @@ export default function FridgeListPage() {
       fetchRefrigerators(true); // Skip loading state for smoother UX
     }, [fetchRefrigerators])
   );
+
+  // Real-time refrigerator updates
+  const refrigeratorContext = useRefrigerator();
+
+  // Listen to refrigerator events
+  useEffect(() => {
+    const unsubscribers: Array<() => void> = [];
+
+    // Ingredient added/updated/deleted - refresh list to show updated counts
+    unsubscribers.push(
+      refrigeratorContext.onIngredientAdded(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onIngredientUpdated(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onIngredientDeleted(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    // Dish added/updated/deleted - refresh list to show updated counts
+    unsubscribers.push(
+      refrigeratorContext.onDishAdded(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onDishUpdated(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onDishDeleted(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [refrigeratorContext, fetchRefrigerators]);
 
   const handleBack = () => {
     if (router.canGoBack()) {
