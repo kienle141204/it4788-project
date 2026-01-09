@@ -11,6 +11,7 @@ import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { FamilyService } from '../family/family.service';
 import { ShoppingListService } from '../shopping-list/shopping-list.service';
 import { MemberService } from '../member/member.service';
+import { ShoppingListGateway } from '../shopping-list/shopping-list.gateway';
 
 @Injectable()
 export class ShoppingItemService {
@@ -30,6 +31,9 @@ export class ShoppingItemService {
     private readonly shoppingListService: ShoppingListService,
 
     private readonly memberService: MemberService,
+
+    @Inject(forwardRef(() => ShoppingListGateway))
+    private readonly shoppingListGateway: ShoppingListGateway,
   ) { }
 
   /** Tạo item mới */
@@ -95,6 +99,15 @@ export class ShoppingItemService {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00340]);
     }
 
+    // Emit WebSocket event to family members
+    if (shoppingList.family_id) {
+      try {
+        await this.shoppingListGateway.emitItemAdded(shoppingList.family_id, list_id, result, user.id);
+      } catch (error) {
+        console.error('Error emitting item added event:', error);
+      }
+    }
+
     return result;
   }
 
@@ -154,6 +167,7 @@ export class ShoppingItemService {
   async update(id: number, dto: UpdateShoppingItemDto, user: JwtUser): Promise<ShoppingItem> {
     const item = await this.findOne(id, user);
     const oldListId = item.list_id;
+    const shoppingList = item.shoppingList;
 
     // Nếu có truyền lại list_id hay ingredient_id thì cập nhật đúng quan hệ
     if (dto.list_id) {
@@ -177,18 +191,37 @@ export class ShoppingItemService {
       await this.shoppingListService.recalculateShoppingListCost(oldListId);
     }
 
+    // Emit WebSocket event to family members
+    if (shoppingList?.family_id) {
+      try {
+        await this.shoppingListGateway.emitItemUpdated(shoppingList.family_id, updatedItem.list_id, updatedItem, user.id);
+      } catch (error) {
+        console.error('Error emitting item updated event:', error);
+      }
+    }
+
     return updatedItem;
   }
 
   // Check/uncheck item (toggle)
   async check(id: number, user: JwtUser): Promise<ShoppingItem> {
     const item = await this.findOne(id, user);
+    const shoppingList = item.shoppingList;
 
     // Đảo ngược trạng thái is_checked
     item.is_checked = !item.is_checked;
 
     // Cập nhật item
     const updatedItem = await this.shoppingItemRepo.save(item);
+
+    // Emit WebSocket event to family members
+    if (shoppingList?.family_id) {
+      try {
+        await this.shoppingListGateway.emitItemUpdated(shoppingList.family_id, updatedItem.list_id, updatedItem, user.id);
+      } catch (error) {
+        console.error('Error emitting item updated event:', error);
+      }
+    }
 
     // Note: Cost is always calculated from all items regardless of checked status
     // If you want to only count checked items, modify recalculateShoppingListCost method
@@ -200,9 +233,21 @@ export class ShoppingItemService {
   async remove(id: number, user: JwtUser): Promise<void> {
     const item = await this.findOne(id, user);
     const listId = item.list_id;
+    const itemId = item.id;
+    const familyId = item.shoppingList?.family_id;
+
     await this.shoppingItemRepo.remove(item);
 
     // Recalculate shopping list cost after removal
     await this.shoppingListService.recalculateShoppingListCost(listId);
+
+    // Emit WebSocket event to family members
+    if (familyId) {
+      try {
+        await this.shoppingListGateway.emitItemDeleted(familyId, listId, itemId, user.id);
+      } catch (error) {
+        console.error('Error emitting item deleted event:', error);
+      }
+    }
   }
 }

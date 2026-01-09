@@ -11,6 +11,7 @@ import { toggleItemChecked, type ShoppingItem as ShoppingItemType } from '@/serv
 import { COLORS } from '@/constants/themes';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { clearCacheByPattern } from '@/utils/cache';
+import { useShoppingList } from '@/context/ShoppingListContext';
 
 interface ShoppingList {
   id: number;
@@ -144,6 +145,109 @@ export default function TaskPage() {
       loadShoppingLists(true); // Silent refresh, use cache first
     }, [loadShoppingLists])
   );
+
+  // Real-time shopping list updates
+  const shoppingListContext = useShoppingList();
+
+  // Listen to shopping list events
+  useEffect(() => {
+    const unsubscribers: Array<() => void> = [];
+
+    // Shopping list created
+    unsubscribers.push(
+      shoppingListContext.onShoppingListCreated(() => {
+        loadShoppingLists(true);
+      })
+    );
+
+    // Shopping list updated
+    unsubscribers.push(
+      shoppingListContext.onShoppingListUpdated((data) => {
+        setShoppingLists((prevLists) => {
+          const index = prevLists.findIndex(
+            (list) => Number(list.id) === Number(data.shoppingList?.id)
+          );
+          if (index >= 0) {
+            const updated = [...prevLists];
+            updated[index] = { ...updated[index], ...data.shoppingList };
+            return updated;
+          }
+          // If not found, refresh the list
+          loadShoppingLists(true);
+          return prevLists;
+        });
+      })
+    );
+
+    // Shopping list deleted
+    unsubscribers.push(
+      shoppingListContext.onShoppingListDeleted((data) => {
+        setShoppingLists((prevLists) =>
+          prevLists.filter((list) => Number(list.id) !== Number(data.listId))
+        );
+      })
+    );
+
+    // Shopping item added
+    unsubscribers.push(
+      shoppingListContext.onShoppingItemAdded((data) => {
+        setShoppingLists((prevLists) => {
+          return prevLists.map((list) => {
+            if (Number(list.id) === Number(data.listId)) {
+              const updatedItems = [...(list.items || []), data.item];
+              return { ...list, items: updatedItems };
+            }
+            return list;
+          });
+        });
+      })
+    );
+
+    // Shopping item updated
+    unsubscribers.push(
+      shoppingListContext.onShoppingItemUpdated((data) => {
+        setShoppingLists((prevLists) => {
+          return prevLists.map((list) => {
+            if (Number(list.id) === Number(data.listId)) {
+              const updatedItems = (list.items || []).map((item: any) =>
+                Number(item.id) === Number(data.item?.id) ? data.item : item
+              );
+              return { ...list, items: updatedItems };
+            }
+            return list;
+          });
+        });
+      })
+    );
+
+    // Shopping item deleted
+    unsubscribers.push(
+      shoppingListContext.onShoppingItemDeleted((data) => {
+        setShoppingLists((prevLists) => {
+          return prevLists.map((list) => {
+            if (Number(list.id) === Number(data.listId)) {
+              const updatedItems = (list.items || []).filter(
+                (item: any) => Number(item.id) !== Number(data.itemId)
+              );
+              return { ...list, items: updatedItems };
+            }
+            return list;
+          });
+        });
+      })
+    );
+
+    // Shopping list shared
+    unsubscribers.push(
+      shoppingListContext.onShoppingListShared(() => {
+        loadShoppingLists(true);
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [shoppingListContext, loadShoppingLists]);
 
   // Load items when filtered lists change or date changes
   useEffect(() => {

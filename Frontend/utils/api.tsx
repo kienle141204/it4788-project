@@ -153,6 +153,9 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
     // Don't set Content-Type - fetch will set it automatically with boundary for FormData
 
     try {
+      console.log('[Upload] Sending request to:', uploadUrl);
+      console.log('[Upload] Headers:', { ...headers, Authorization: headers.Authorization ? 'Bearer ***' : undefined });
+      
       // Use fetch API with timeout
       // Create a promise that rejects after timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -168,6 +171,8 @@ export const uploadFileAccess = async (formData: FormData, folder?: string, retr
         }),
         timeoutPromise,
       ]);
+      
+      console.log('[Upload] Response status:', response.status, response.statusText);
 
       // Check if response is valid (not from timeout)
       if (!(response instanceof Response)) {

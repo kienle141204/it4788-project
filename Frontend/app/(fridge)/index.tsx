@@ -19,6 +19,7 @@ import { getAccess } from '@/utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { clearCacheByPattern } from '@/utils/cache';
 import NotificationCard from '@/components/NotificationCard';
+import { useRefrigerator } from '@/context/RefrigeratorContext';
 
 interface Refrigerator {
   id: number;
@@ -134,28 +135,35 @@ export default function FridgeListPage() {
       }
 
       setRefrigerators(refrigeratorsData);
+      
+      // If response is empty array, it's not an error - user just doesn't have any refrigerators
+      if (refrigeratorsData.length === 0) {
+        setError(null);
+      }
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
         return;
       }
 
-      // Handle 404 as "no refrigerators" - not an error
+      // Handle 404 or empty response as "no refrigerators" - not an error
       // Check both axios error structure and direct statusCode
       const statusCode = err?.response?.status || err?.response?.data?.statusCode || err?.statusCode;
-      if (statusCode === 404) {
-        const errorMessage = err?.response?.data?.message || err?.message || '';
-        // If the message indicates "no refrigerators", treat as empty list, not error
-        if (errorMessage.includes('chưa có tủ lạnh') ||
+      const errorMessage = err?.response?.data?.message || err?.message || '';
+      
+      // If 404 or message indicates no refrigerators, treat as empty list, not error
+      if (statusCode === 404 || 
+          errorMessage.includes('chưa có tủ lạnh') ||
+          errorMessage.includes('chưa có') ||
           errorMessage.includes('Not Found') ||
           errorMessage.includes('not found')) {
-          // User doesn't have any refrigerators yet - this is normal, not an error
-          setRefrigerators([]);
-          setError(null);
-          return;
-        }
+        // User doesn't have any refrigerators yet - this is normal, not an error
+        setRefrigerators([]);
+        setError(null);
+        return;
       }
 
+      // Actual error - show error message
       setError('Không thể tải danh sách tủ lạnh. Vui lòng thử lại.');
       setRefrigerators([]);
     } finally {
@@ -175,6 +183,56 @@ export default function FridgeListPage() {
       fetchRefrigerators(true); // Skip loading state for smoother UX
     }, [fetchRefrigerators])
   );
+
+  // Real-time refrigerator updates
+  const refrigeratorContext = useRefrigerator();
+
+  // Listen to refrigerator events
+  useEffect(() => {
+    const unsubscribers: Array<() => void> = [];
+
+    // Ingredient added/updated/deleted - refresh list to show updated counts
+    unsubscribers.push(
+      refrigeratorContext.onIngredientAdded(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onIngredientUpdated(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onIngredientDeleted(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    // Dish added/updated/deleted - refresh list to show updated counts
+    unsubscribers.push(
+      refrigeratorContext.onDishAdded(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onDishUpdated(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    unsubscribers.push(
+      refrigeratorContext.onDishDeleted(() => {
+        fetchRefrigerators(true);
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [refrigeratorContext, fetchRefrigerators]);
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -510,7 +568,7 @@ export default function FridgeListPage() {
                   color: COLORS.darkGrey,
                 }}
               >
-                Chưa có tủ lạnh nào
+                Bạn chưa có tủ lạnh
               </Text>
               <Text
                 style={{

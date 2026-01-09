@@ -232,22 +232,41 @@ export default function FoodDetailPage() {
       try {
         if (!dishId) return;
 
-        // Gọi API recipes/by-dish/{dishId} để lấy công thức theo món ăn
         const payload = await getAccess(`recipes/by-dish/${dishId}`);
 
         if (!payload?.success) {
           throw new Error(payload?.message || 'Không thể tải công thức');
         }
 
-        // API trả về mảng công thức, lấy công thức đầu tiên
-        const recipes = payload?.data;
-        if (recipes && Array.isArray(recipes) && recipes.length > 0) {
-          // Sắp xếp steps theo step_number trước khi set
-          const firstRecipe = recipes[0];
-          if (firstRecipe.steps && Array.isArray(firstRecipe.steps)) {
-            firstRecipe.steps.sort((a: RecipeStep, b: RecipeStep) => a.step_number - b.step_number);
-          }
-          setRecipe(firstRecipe);
+        // API trả về mảng các bước công thức (recipe steps), không phải mảng recipes
+        const recipeSteps = payload?.data;
+        if (recipeSteps && Array.isArray(recipeSteps) && recipeSteps.length > 0) {
+          // Lấy thông tin recipe từ bước đầu tiên
+          const firstStep = recipeSteps[0];
+          const recipeMetadata = firstStep.recipe;
+
+          // Tạo mảng steps từ response, sắp xếp theo step_number
+          const steps: RecipeStep[] = recipeSteps
+            .map((step: any) => ({
+              id: step.id,
+              recipe_id: step.recipe_id,
+              step_number: step.step_number,
+              description: step.description,
+              images: step.images || [],
+            }))
+            .sort((a: RecipeStep, b: RecipeStep) => a.step_number - b.step_number);
+
+          // Tạo Recipe object với recipe metadata và steps array
+          const recipe: Recipe = {
+            id: recipeMetadata.id,
+            dish_id: recipeMetadata.dish_id,
+            owner_id: recipeMetadata.owner_id,
+            status: recipeMetadata.status,
+            created_at: recipeMetadata.created_at,
+            steps: steps,
+          };
+
+          setRecipe(recipe);
         } else {
           setRecipe(null);
           setRecipeError('Chưa có công thức cho món ăn này');

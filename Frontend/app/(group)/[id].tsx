@@ -36,8 +36,9 @@ import {
   type ShoppingItem,
 } from '../../service/shoppingList';
 import { searchIngredients } from '../../service/market';
-import { getAccess } from '../../utils/api';
+import { getAccess, uploadFileAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
+import * as ImagePicker from 'expo-image-picker';
 // Helper function to clear cache by pattern (using dynamic import)
 const clearCacheByPattern = async (pattern: string) => {
   try {
@@ -56,6 +57,7 @@ import GroupStatistics from '../../components/GroupStatistics';
 import { getChatMessages, sendChatMessage, type ChatMessage, type ChatMessagesResponse, connectChatSocket, disconnectChatSocket, joinChatRoom, leaveChatRoom, sendMessageWS, onNewMessage, onUserTyping, sendTyping, getChatSocket } from '../../service/chat';
 import { useScreenState } from '../../context/ScreenStateContext';
 import { pushNotificationService } from '../../service/pushNotifications';
+import { useShoppingList } from '@/context/ShoppingListContext';
 
 const defaultAvatar = require('../../assets/images/avatar.png');
 
@@ -254,6 +256,8 @@ export default function GroupDetailPage() {
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const chatLastIdRef = useRef<number | null>(null);
   const tempMessageIdRef = useRef<number>(-1); // Use negative IDs for temporary messages
   const pendingTempMessagesRef = useRef<Map<number, { tempId: number; message: string; timestamp: number }>>(new Map()); // Track pending temp messages
@@ -521,6 +525,128 @@ export default function GroupDetailPage() {
   useEffect(() => {
     fetchFamilyData();
   }, []);
+
+  // Real-time shopping list updates
+  const shoppingListContext = useShoppingList();
+
+  // Join family room for real-time updates
+  useEffect(() => {
+    if (familyId && shoppingListContext.isConnected) {
+      shoppingListContext.joinFamily(familyId);
+    }
+
+    return () => {
+      if (familyId) {
+        shoppingListContext.leaveFamily(familyId);
+      }
+    };
+  }, [familyId, shoppingListContext.isConnected]);
+
+  // Listen to shopping list events
+  useEffect(() => {
+    const unsubscribers: Array<() => void> = [];
+
+    // Shopping list created
+    unsubscribers.push(
+      shoppingListContext.onShoppingListCreated((data) => {
+        if (data.shoppingList?.family_id === familyId) {
+          fetchShoppingLists(true);
+        }
+      })
+    );
+
+    // Shopping list updated
+    unsubscribers.push(
+      shoppingListContext.onShoppingListUpdated((data) => {
+        if (data.shoppingList?.family_id === familyId) {
+          setShoppingLists((prevLists) => {
+            const index = prevLists.findIndex(
+              (list) => Number(list.id) === Number(data.shoppingList?.id)
+            );
+            if (index >= 0) {
+              const updated = [...prevLists];
+              updated[index] = { ...updated[index], ...data.shoppingList };
+              return updated;
+            }
+            // If not found, refresh the list
+            fetchShoppingLists(true);
+            return prevLists;
+          });
+        }
+      })
+    );
+
+    // Shopping list deleted
+    unsubscribers.push(
+      shoppingListContext.onShoppingListDeleted((data) => {
+        setShoppingLists((prevLists) =>
+          prevLists.filter((list) => Number(list.id) !== Number(data.listId))
+        );
+      })
+    );
+
+    // Shopping item added
+    unsubscribers.push(
+      shoppingListContext.onShoppingItemAdded((data) => {
+        setShoppingLists((prevLists) => {
+          return prevLists.map((list) => {
+            if (Number(list.id) === Number(data.listId)) {
+              const updatedItems = [...(list.items || []), data.item];
+              return { ...list, items: updatedItems };
+            }
+            return list;
+          });
+        });
+      })
+    );
+
+    // Shopping item updated
+    unsubscribers.push(
+      shoppingListContext.onShoppingItemUpdated((data) => {
+        setShoppingLists((prevLists) => {
+          return prevLists.map((list) => {
+            if (Number(list.id) === Number(data.listId)) {
+              const updatedItems = (list.items || []).map((item: any) =>
+                Number(item.id) === Number(data.item?.id) ? data.item : item
+              );
+              return { ...list, items: updatedItems };
+            }
+            return list;
+          });
+        });
+      })
+    );
+
+    // Shopping item deleted
+    unsubscribers.push(
+      shoppingListContext.onShoppingItemDeleted((data) => {
+        setShoppingLists((prevLists) => {
+          return prevLists.map((list) => {
+            if (Number(list.id) === Number(data.listId)) {
+              const updatedItems = (list.items || []).filter(
+                (item: any) => Number(item.id) !== Number(data.itemId)
+              );
+              return { ...list, items: updatedItems };
+            }
+            return list;
+          });
+        });
+      })
+    );
+
+    // Shopping list shared
+    unsubscribers.push(
+      shoppingListContext.onShoppingListShared((data) => {
+        if (data.shoppingList?.family_id === familyId) {
+          fetchShoppingLists(true);
+        }
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [familyId, shoppingListContext, fetchShoppingLists]);
 
   // Screen state management for push notifications
   const { setScreenState, clearScreenState } = useScreenState();
@@ -1396,8 +1522,109 @@ export default function GroupDetailPage() {
     }, 2000);
   }, [familyId, activeTab]);
 
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Quyền truy cập', 'Cần quyền truy cập thư viện ảnh để chọn ảnh.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setSelectedImageUri(imageUri);
+      }
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
+    }
+  };
+
+  const uploadImage = async (imageUri: string): Promise<string | null> => {
+    setUploadingImage(true);
+    try {
+      // Keep URI as-is for React Native
+      const normalizedUri = imageUri;
+      
+      // Extract file extension from URI
+      const uriParts = normalizedUri.split('.');
+      let fileType = uriParts[uriParts.length - 1]?.toLowerCase() || 'jpg';
+      
+      // Remove query parameters if present
+      if (fileType.includes('?')) {
+        fileType = fileType.split('?')[0];
+      }
+      
+      // Default to jpeg if extension is unclear
+      if (!fileType || !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileType)) {
+        fileType = 'jpg';
+      }
+      
+      // Determine correct MIME type
+      let mimeType = 'image/jpeg'; // default
+      if (fileType === 'jpg' || fileType === 'jpeg') {
+        mimeType = 'image/jpeg';
+      } else if (fileType === 'png') {
+        mimeType = 'image/png';
+      } else if (fileType === 'gif') {
+        mimeType = 'image/gif';
+      } else if (fileType === 'webp') {
+        mimeType = 'image/webp';
+      }
+      
+      // Create FormData with proper React Native file object structure
+      const formData = new FormData();
+      formData.append('file', {
+        uri: normalizedUri,
+        name: `chat-image.${fileType}`,
+        type: mimeType,
+      } as any);
+
+      const response = await uploadFileAccess(formData, 'chat');
+      
+      if (response && response.success && response.data) {
+        const imageUrl = response.data.url || response.data.secure_url || response.data;
+        if (imageUrl) {
+          return imageUrl;
+        }
+      }
+      
+      throw new Error(response?.message || 'Upload failed');
+    } catch (error: any) {
+      console.error('Upload image error:', error);
+      let errorMessage = 'Không thể upload ảnh. Vui lòng thử lại.';
+      const errorData = error?.response?.data;
+      
+      // Handle network errors
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'Upload quá lâu. Vui lòng kiểm tra kết nối mạng và thử lại.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error') || error.message?.includes('Network request failed')) {
+        errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra:\n- Kết nối internet\n- Backend server đang chạy\n- Địa chỉ API đúng';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+      } else if (error.response?.status === 400) {
+        errorMessage = errorData?.message || 'File không hợp lệ hoặc quá lớn (tối đa 10MB).';
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Lỗi', errorMessage);
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || sendingMessage) return;
+    if ((!newMessage.trim() && !selectedImageUri) || sendingMessage) return;
 
     // Stop typing indicator when sending message
     if (typingTimeoutRef.current) {
@@ -1408,18 +1635,36 @@ export default function GroupDetailPage() {
     lastTypingSentRef.current = 0;
 
     const messageText = newMessage.trim();
+    let imageUrl: string | null = null;
+    
+    // Upload image if selected
+    if (selectedImageUri) {
+      imageUrl = await uploadImage(selectedImageUri);
+      if (!imageUrl) {
+        // Upload failed, don't send message
+        return;
+      }
+    }
+
     const tempId = tempMessageIdRef.current--;
     const timestamp = Date.now();
     
     // Track this temp message
     pendingTempMessagesRef.current.set(timestamp, { tempId, message: messageText, timestamp });
     
+    // Prepare data object with image URL if exists
+    const messageData: Record<string, any> = {};
+    if (imageUrl) {
+      messageData.imageUrl = imageUrl;
+    }
+    
     // Add message immediately with "sending" status
     const tempMessage: LocalChatMessage = {
       id: tempId,
       userId: currentUserId!,
       title: 'Tin nhắn',
-      message: messageText,
+      message: messageText || (imageUrl ? '📷' : ''),
+      data: Object.keys(messageData).length > 0 ? messageData : undefined,
       isRead: false,
       familyId,
       createdAt: new Date().toISOString(),
@@ -1428,6 +1673,7 @@ export default function GroupDetailPage() {
 
     setChatMessages((prev) => [...prev, tempMessage]);
     setNewMessage('');
+    setSelectedImageUri(null);
     
     // Scroll to bottom immediately
     shouldScrollToEndRef.current = true;
@@ -1441,7 +1687,8 @@ export default function GroupDetailPage() {
       const result = await sendMessageWS({
         familyId,
         title: 'Tin nhắn',
-        message: messageText,
+        message: messageText || (imageUrl ? '📷' : ''),
+        data: Object.keys(messageData).length > 0 ? messageData : undefined,
       });
 
       if (result.success) {
@@ -1469,7 +1716,8 @@ export default function GroupDetailPage() {
           const sentMessage = await sendChatMessage({
             familyId,
             title: 'Tin nhắn',
-            message: messageText,
+            message: messageText || (imageUrl ? '📷' : ''),
+            data: Object.keys(messageData).length > 0 ? messageData : undefined,
           });
           
           // Replace temp message with real one
@@ -1690,6 +1938,9 @@ export default function GroupDetailPage() {
 
 
 
+    // Get image URL from data field
+    const imageUrl = item.data?.imageUrl;
+
     // Own message: align right, no avatar header
     if (isOwnMessage) {
       return (
@@ -1700,7 +1951,20 @@ export default function GroupDetailPage() {
           {item.title && item.title !== 'Tin nhắn' && (
             <Text style={groupStyles.chatMessageTitle}>{item.title}</Text>
           )}
-          <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
+          {imageUrl && (
+            <TouchableOpacity
+              style={groupStyles.chatMessageImageContainer}
+              onPress={() => {
+                // Could add image viewer modal here
+                Alert.alert('Ảnh', 'Nhấn và giữ để xem ảnh lớn');
+              }}
+            >
+              <Image source={{ uri: imageUrl }} style={groupStyles.chatMessageImage} />
+            </TouchableOpacity>
+          )}
+          {item.message && item.message !== '📷' && (
+            <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
+          )}
           <Text style={[groupStyles.chatMessageTime, { textAlign: 'right', marginTop: 6 }]}>
             {formatChatTime(item.createdAt, item.status)}
           </Text>
@@ -1744,7 +2008,20 @@ export default function GroupDetailPage() {
         {item.title && item.title !== 'Tin nhắn' && (
           <Text style={groupStyles.chatMessageTitle}>{item.title}</Text>
         )}
-        <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
+        {imageUrl && (
+          <TouchableOpacity
+            style={groupStyles.chatMessageImageContainer}
+            onPress={() => {
+              // Could add image viewer modal here
+              Alert.alert('Ảnh', 'Nhấn và giữ để xem ảnh lớn');
+            }}
+          >
+            <Image source={{ uri: imageUrl }} style={groupStyles.chatMessageImage} />
+          </TouchableOpacity>
+        )}
+        {item.message && item.message !== '📷' && (
+          <Text style={groupStyles.chatMessageContent}>{item.message}</Text>
+        )}
       </View>
     );
   };
@@ -1841,28 +2118,55 @@ export default function GroupDetailPage() {
         {typingUsers.size > 0 && <TypingIndicator typingUsers={typingUsers} getMemberByUserId={getMemberByUserId} />}
 
         <View style={[groupStyles.chatInputContainer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
-          <View style={groupStyles.chatInputWrapper}>
-            <TextInput
-              style={groupStyles.chatInput}
-              placeholder="Nhập tin nhắn..."
-              placeholderTextColor={COLORS.grey}
-              value={newMessage}
-              onChangeText={handleMessageChange}
-              multiline
-              maxLength={1000}
-              editable={!sendingMessage}
-            />
+          {selectedImageUri && (
+            <View style={groupStyles.chatImagePreview}>
+              <Image source={{ uri: selectedImageUri }} style={groupStyles.chatImagePreviewImage} />
+              <TouchableOpacity
+                style={groupStyles.chatImagePreviewRemove}
+                onPress={() => setSelectedImageUri(null)}
+              >
+                <Ionicons name="close-circle" size={24} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={groupStyles.chatInputRow}>
+            <View style={groupStyles.chatInputWrapper}>
+              <TextInput
+                style={groupStyles.chatInput}
+                placeholder="Nhập tin nhắn..."
+                placeholderTextColor={COLORS.grey}
+                value={newMessage}
+                onChangeText={handleMessageChange}
+                multiline
+                maxLength={1000}
+                editable={!sendingMessage && !uploadingImage}
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                groupStyles.chatImageButton,
+                (uploadingImage || sendingMessage) && groupStyles.chatImageButtonDisabled,
+              ]}
+              onPress={pickImage}
+              disabled={uploadingImage || sendingMessage}
+            >
+              {uploadingImage ? (
+                <ActivityIndicator size="small" color={COLORS.purple} />
+              ) : (
+                <Ionicons name="image-outline" size={22} color={COLORS.purple} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                groupStyles.chatSendButton,
+                ((!newMessage.trim() && !selectedImageUri) || sendingMessage || uploadingImage) && groupStyles.chatSendButtonDisabled,
+              ]}
+              onPress={handleSendMessage}
+              disabled={(!newMessage.trim() && !selectedImageUri) || sendingMessage || uploadingImage}
+            >
+              <Ionicons name="send" size={20} color={COLORS.white} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[
-              groupStyles.chatSendButton,
-              (!newMessage.trim() || sendingMessage) && groupStyles.chatSendButtonDisabled,
-            ]}
-            onPress={handleSendMessage}
-            disabled={!newMessage.trim() || sendingMessage}
-          >
-            <Ionicons name="send" size={20} color={COLORS.white} />
-          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     );
@@ -2021,25 +2325,46 @@ export default function GroupDetailPage() {
               return prevLists.filter(l => l.id !== listId);
             });
 
-            try {
-              // Delete from server
-              await deleteShoppingList(listId);
-              
-              // Invalidate cache to ensure fresh data on next fetch
-              await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
-              
-              // Silently refresh in background without blocking UI
-              // The list is already removed optimistically, so no need to refetch immediately
-              fetchShoppingLists(false).catch(() => {
-                // Silently fail background refresh
+            // Delete from server (don't await to keep UI responsive)
+            // The list is already removed optimistically, so we handle response in background
+            deleteShoppingList(listId)
+              .then((response) => {
+                // Check if response indicates failure
+                // If response is undefined or has success: true, consider it success
+                if (response && response.success === false) {
+                  // Rollback on explicit failure
+                  if (deletedList) {
+                    setShoppingLists(prevLists => [...prevLists, deletedList!]);
+                  }
+                  const errorMessage = response.message || response.resultMessage?.vn || 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.';
+                  Alert.alert('Lỗi', errorMessage);
+                  return;
+                }
+                
+                // Success - invalidate cache and refresh in background
+                clearCacheByPattern(`group:family:${familyId}:shopping-lists`).catch(() => {});
+                fetchShoppingLists(false).catch(() => {
+                  // Silently fail background refresh
+                });
+              })
+              .catch((error: any) => {
+                // Rollback on error: restore the deleted list
+                if (deletedList) {
+                  setShoppingLists(prevLists => [...prevLists, deletedList!]);
+                }
+                
+                // Extract error message from backend response
+                let errorMessage = 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.';
+                
+                if (error?.response?.data) {
+                  const errorData = error.response.data;
+                  errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+                } else if (error?.message) {
+                  errorMessage = error.message;
+                }
+                
+                Alert.alert('Lỗi', errorMessage);
               });
-            } catch (error) {
-              // Rollback on error: restore the deleted list
-              if (deletedList) {
-                setShoppingLists(prevLists => [...prevLists, deletedList!]);
-              }
-              Alert.alert('Lỗi', 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.');
-            }
           },
         },
       ]

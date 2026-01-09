@@ -14,6 +14,8 @@ export default function register() {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('');
   const [repassword, setRePassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRePassword, setShowRePassword] = useState(false);
   const [loading, setLoading] = useState(false)
   const route = useRouter()
 
@@ -163,10 +165,21 @@ export default function register() {
                 onBlur={() => setFocusedInput(null)} 
                 placeholder='Nhập mật khẩu của bạn' 
                 placeholderTextColor={COLORS.grey}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 selectionColor={COLORS.primary}
                 value={password}
                 onChangeText={setPassword} />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={{ padding: 8 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                size={20} 
+                color={COLORS.grey} 
+              />
+            </TouchableOpacity>
         </View>
         <View style={styles.label}>
             <Text style={styles.labelText}>Nhập lại mật khẩu</Text>
@@ -179,10 +192,21 @@ export default function register() {
                 onBlur={() => setFocusedInput(null)} 
                 placeholder='Nhập lại mật khẩu của bạn' 
                 placeholderTextColor={COLORS.grey}
-                secureTextEntry
+                secureTextEntry={!showRePassword}
                 selectionColor={COLORS.primary}
                 value={repassword}
                 onChangeText={setRePassword} />
+            <TouchableOpacity
+              onPress={() => setShowRePassword(!showRePassword)}
+              style={{ padding: 8 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={showRePassword ? "eye-outline" : "eye-off-outline"} 
+                size={20} 
+                color={COLORS.grey} 
+              />
+            </TouchableOpacity>
         </View>
         <TouchableOpacity 
           style={styles.loginButton} 

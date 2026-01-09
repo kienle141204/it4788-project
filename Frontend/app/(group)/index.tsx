@@ -259,13 +259,39 @@ export default function GroupPage() {
 
       // Process families data
       await processFamiliesData(response);
+      
+      // Mark initial load as done (processFamiliesData already set families)
+      setInitialLoadDone(true);
+      
+      // If response is empty array, clear any error (it's not an error - user just hasn't joined any groups)
+      if (Array.isArray(response) && response.length === 0) {
+        setError(null);
+      }
     } catch (err: any) {
       if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
         handleSessionExpired();
         return;
       }
-      setError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
-      setFamilies([]);
+      
+      // Check if it's a 404 or empty response - not an actual error
+      const statusCode = err?.response?.status || err?.response?.data?.statusCode || err?.statusCode;
+      const errorMessage = err?.response?.data?.message || err?.message || '';
+      
+      // If 404 or message indicates no groups, treat as empty list, not error
+      if (statusCode === 404 || 
+          errorMessage.includes('chưa tham gia') ||
+          errorMessage.includes('chưa có nhóm') ||
+          errorMessage.includes('Not Found') ||
+          errorMessage.includes('not found')) {
+        setError(null);
+        setFamilies([]);
+        setInitialLoadDone(true);
+      } else {
+        // Actual error - show error message
+        setError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
+        setFamilies([]);
+        setInitialLoadDone(true);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -793,7 +819,7 @@ export default function GroupPage() {
             <View style={groupStyles.emptyState}>
               <Ionicons name="people-outline" size={48} color={COLORS.grey} />
               <Text style={groupStyles.emptyStateText}>
-                Chưa có nhóm nào
+                Bạn chưa tham gia nhóm nào
               </Text>
               <Text style={groupStyles.emptyStateSubtext}>
                 Tạo hoặc tham gia nhóm để bắt đầu mua sắm cùng nhau
@@ -802,18 +828,20 @@ export default function GroupPage() {
           ) : (
             <>
               {families.map(renderFamilyCard)}
-
-              {/* Floating Action Button */}
-              <TouchableOpacity
-                style={groupStyles.fab}
-                onPress={handleAddFamily}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add" size={28} color={COLORS.white} />
-              </TouchableOpacity>
             </>
           )}
         </ScrollView>
+      )}
+
+      {/* Floating Action Button - Always visible when not loading */}
+      {!loading && (
+        <TouchableOpacity
+          style={groupStyles.fab}
+          onPress={handleAddFamily}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color={COLORS.white} />
+        </TouchableOpacity>
       )}
 
       {/* Header Menu */}

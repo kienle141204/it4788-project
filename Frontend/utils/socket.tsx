@@ -257,3 +257,438 @@ export const sendTyping = (familyId: number, isTyping: boolean) => {
         chatSocket.emit('typing', { familyId, isTyping });
     }
 };
+
+// ==================== Shopping List Socket ====================
+
+let shoppingListSocket: Socket | null = null;
+
+/**
+ * Kết nối đến shopping-list namespace với JWT authentication
+ */
+export const connectShoppingListSocket = async (): Promise<Socket> => {
+    if (shoppingListSocket?.connected) {
+        return shoppingListSocket;
+    }
+
+    const token = await AsyncStorage.getItem('access_token');
+    const cleanToken = token?.startsWith('Bearer ') ? token.substring(7) : token;
+
+    shoppingListSocket = io(`${SOCKET_URL}/shopping-list`, {
+        auth: {
+            token: cleanToken,
+        },
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        rememberUpgrade: true,
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: false,
+    });
+
+    return new Promise((resolve, reject) => {
+        if (!shoppingListSocket) {
+            reject(new Error('Socket not initialized'));
+            return;
+        }
+
+        let hasConnected = false;
+        let connectionError: Error | null = null;
+
+        shoppingListSocket.on('connect', () => {
+            hasConnected = true;
+            connectionError = null;
+            console.log('[Socket] Connected to shopping-list namespace');
+            // Auto subscribe when connected
+            shoppingListSocket?.emit('subscribe');
+            resolve(shoppingListSocket!);
+        });
+
+        shoppingListSocket.on('connect_error', (error) => {
+            connectionError = error;
+            console.error('[Socket] Shopping list connection error:', error.message);
+        });
+
+        shoppingListSocket.on('disconnect', (reason) => {
+            console.log('[Socket] Shopping list disconnected:', reason);
+        });
+
+        shoppingListSocket.on('reconnect', () => {
+            console.log('[Socket] Shopping list reconnected');
+            shoppingListSocket?.emit('subscribe');
+        });
+
+        const timeoutId = setTimeout(() => {
+            if (!hasConnected && !shoppingListSocket?.connected) {
+                const errorMsg = connectionError 
+                    ? `Socket connection timeout: ${connectionError.message}`
+                    : 'Socket connection timeout';
+                reject(new Error(errorMsg));
+            }
+        }, 30000);
+
+        shoppingListSocket.once('connect', () => {
+            clearTimeout(timeoutId);
+        });
+    });
+};
+
+/**
+ * Ngắt kết nối shopping-list socket
+ */
+export const disconnectShoppingListSocket = () => {
+    if (shoppingListSocket) {
+        shoppingListSocket.disconnect();
+        shoppingListSocket = null;
+        console.log('[Socket] Shopping list socket disconnected');
+    }
+};
+
+/**
+ * Lấy shopping-list socket instance
+ */
+export const getShoppingListSocket = (): Socket | null => {
+    return shoppingListSocket;
+};
+
+/**
+ * Join vào family room cho shopping-list
+ */
+export const joinShoppingListFamily = (familyId: number): Promise<{ success: boolean; message?: string; error?: string }> => {
+    return new Promise((resolve) => {
+        if (!shoppingListSocket?.connected) {
+            resolve({ success: false, error: 'Socket not connected' });
+            return;
+        }
+
+        shoppingListSocket.emit('join_family', { familyId }, (response: any) => {
+            console.log('[Socket] Join shopping family room response:', response);
+            resolve(response || { success: true });
+        });
+    });
+};
+
+/**
+ * Rời khỏi family room cho shopping-list
+ */
+export const leaveShoppingListFamily = (familyId: number): Promise<{ success: boolean; message?: string }> => {
+    return new Promise((resolve) => {
+        if (!shoppingListSocket?.connected) {
+            resolve({ success: false });
+            return;
+        }
+
+        shoppingListSocket.emit('leave_family', { familyId }, (response: any) => {
+            console.log('[Socket] Leave shopping family room response:', response);
+            resolve(response || { success: true });
+        });
+    });
+};
+
+/**
+ * Đăng ký lắng nghe shopping list events
+ */
+export const onShoppingListEvent = (eventName: string, callback: (data: any) => void): (() => void) => {
+    if (!shoppingListSocket) {
+        return () => { };
+    }
+
+    shoppingListSocket.on(eventName, callback);
+
+    return () => {
+        shoppingListSocket?.off(eventName, callback);
+    };
+};
+
+// ==================== Refrigerator Socket ====================
+
+let refrigeratorSocket: Socket | null = null;
+
+/**
+ * Kết nối đến refrigerator namespace với JWT authentication
+ */
+export const connectRefrigeratorSocket = async (): Promise<Socket> => {
+    if (refrigeratorSocket?.connected) {
+        return refrigeratorSocket;
+    }
+
+    const token = await AsyncStorage.getItem('access_token');
+    const cleanToken = token?.startsWith('Bearer ') ? token.substring(7) : token;
+
+    refrigeratorSocket = io(`${SOCKET_URL}/refrigerator`, {
+        auth: {
+            token: cleanToken,
+        },
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        rememberUpgrade: true,
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: false,
+    });
+
+    return new Promise((resolve, reject) => {
+        if (!refrigeratorSocket) {
+            reject(new Error('Socket not initialized'));
+            return;
+        }
+
+        let hasConnected = false;
+        let connectionError: Error | null = null;
+
+        refrigeratorSocket.on('connect', () => {
+            hasConnected = true;
+            connectionError = null;
+            console.log('[Socket] Connected to refrigerator namespace');
+            // Auto subscribe when connected
+            refrigeratorSocket?.emit('subscribe');
+            resolve(refrigeratorSocket!);
+        });
+
+        refrigeratorSocket.on('connect_error', (error) => {
+            connectionError = error;
+            console.error('[Socket] Refrigerator connection error:', error.message);
+        });
+
+        refrigeratorSocket.on('disconnect', (reason) => {
+            console.log('[Socket] Refrigerator disconnected:', reason);
+        });
+
+        refrigeratorSocket.on('reconnect', () => {
+            console.log('[Socket] Refrigerator reconnected');
+            refrigeratorSocket?.emit('subscribe');
+        });
+
+        const timeoutId = setTimeout(() => {
+            if (!hasConnected && !refrigeratorSocket?.connected) {
+                const errorMsg = connectionError 
+                    ? `Socket connection timeout: ${connectionError.message}`
+                    : 'Socket connection timeout';
+                reject(new Error(errorMsg));
+            }
+        }, 30000);
+
+        refrigeratorSocket.once('connect', () => {
+            clearTimeout(timeoutId);
+        });
+    });
+};
+
+/**
+ * Ngắt kết nối refrigerator socket
+ */
+export const disconnectRefrigeratorSocket = () => {
+    if (refrigeratorSocket) {
+        refrigeratorSocket.disconnect();
+        refrigeratorSocket = null;
+        console.log('[Socket] Refrigerator socket disconnected');
+    }
+};
+
+/**
+ * Lấy refrigerator socket instance
+ */
+export const getRefrigeratorSocket = (): Socket | null => {
+    return refrigeratorSocket;
+};
+
+/**
+ * Join vào family room cho refrigerator
+ */
+export const joinRefrigeratorFamily = (familyId: number): Promise<{ success: boolean; message?: string; error?: string }> => {
+    return new Promise((resolve) => {
+        if (!refrigeratorSocket?.connected) {
+            resolve({ success: false, error: 'Socket not connected' });
+            return;
+        }
+
+        refrigeratorSocket.emit('join_family', { familyId }, (response: any) => {
+            console.log('[Socket] Join refrigerator family room response:', response);
+            resolve(response || { success: true });
+        });
+    });
+};
+
+/**
+ * Rời khỏi family room cho refrigerator
+ */
+export const leaveRefrigeratorFamily = (familyId: number): Promise<{ success: boolean; message?: string }> => {
+    return new Promise((resolve) => {
+        if (!refrigeratorSocket?.connected) {
+            resolve({ success: false });
+            return;
+        }
+
+        refrigeratorSocket.emit('leave_family', { familyId }, (response: any) => {
+            console.log('[Socket] Leave refrigerator family room response:', response);
+            resolve(response || { success: true });
+        });
+    });
+};
+
+/**
+ * Đăng ký lắng nghe refrigerator events
+ */
+export const onRefrigeratorEvent = (eventName: string, callback: (data: any) => void): (() => void) => {
+    if (!refrigeratorSocket) {
+        return () => { };
+    }
+
+    refrigeratorSocket.on(eventName, callback);
+
+    return () => {
+        refrigeratorSocket?.off(eventName, callback);
+    };
+};
+
+// ==================== Menu Socket ====================
+
+let menuSocket: Socket | null = null;
+
+/**
+ * Kết nối đến menu namespace với JWT authentication
+ */
+export const connectMenuSocket = async (): Promise<Socket> => {
+    if (menuSocket?.connected) {
+        return menuSocket;
+    }
+
+    const token = await AsyncStorage.getItem('access_token');
+    const cleanToken = token?.startsWith('Bearer ') ? token.substring(7) : token;
+
+    menuSocket = io(`${SOCKET_URL}/menu`, {
+        auth: {
+            token: cleanToken,
+        },
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        rememberUpgrade: true,
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: false,
+    });
+
+    return new Promise((resolve, reject) => {
+        if (!menuSocket) {
+            reject(new Error('Socket not initialized'));
+            return;
+        }
+
+        let hasConnected = false;
+        let connectionError: Error | null = null;
+
+        menuSocket.on('connect', () => {
+            hasConnected = true;
+            connectionError = null;
+            console.log('[Socket] Connected to menu namespace');
+            // Auto subscribe when connected
+            menuSocket?.emit('subscribe');
+            resolve(menuSocket!);
+        });
+
+        menuSocket.on('connect_error', (error) => {
+            connectionError = error;
+            console.error('[Socket] Menu connection error:', error.message);
+        });
+
+        menuSocket.on('disconnect', (reason) => {
+            console.log('[Socket] Menu disconnected:', reason);
+        });
+
+        menuSocket.on('reconnect', () => {
+            console.log('[Socket] Menu reconnected');
+            menuSocket?.emit('subscribe');
+        });
+
+        const timeoutId = setTimeout(() => {
+            if (!hasConnected && !menuSocket?.connected) {
+                const errorMsg = connectionError 
+                    ? `Socket connection timeout: ${connectionError.message}`
+                    : 'Socket connection timeout';
+                reject(new Error(errorMsg));
+            }
+        }, 30000);
+
+        menuSocket.once('connect', () => {
+            clearTimeout(timeoutId);
+        });
+    });
+};
+
+/**
+ * Ngắt kết nối menu socket
+ */
+export const disconnectMenuSocket = () => {
+    if (menuSocket) {
+        menuSocket.disconnect();
+        menuSocket = null;
+        console.log('[Socket] Menu socket disconnected');
+    }
+};
+
+/**
+ * Lấy menu socket instance
+ */
+export const getMenuSocket = (): Socket | null => {
+    return menuSocket;
+};
+
+/**
+ * Join vào family room cho menu
+ */
+export const joinMenuFamily = (familyId: number): Promise<{ success: boolean; message?: string; error?: string }> => {
+    return new Promise((resolve) => {
+        if (!menuSocket?.connected) {
+            resolve({ success: false, error: 'Socket not connected' });
+            return;
+        }
+
+        menuSocket.emit('join_family', { familyId }, (response: any) => {
+            console.log('[Socket] Join menu family room response:', response);
+            resolve(response || { success: true });
+        });
+    });
+};
+
+/**
+ * Rời khỏi family room cho menu
+ */
+export const leaveMenuFamily = (familyId: number): Promise<{ success: boolean; message?: string }> => {
+    return new Promise((resolve) => {
+        if (!menuSocket?.connected) {
+            resolve({ success: false });
+            return;
+        }
+
+        menuSocket.emit('leave_family', { familyId }, (response: any) => {
+            console.log('[Socket] Leave menu family room response:', response);
+            resolve(response || { success: true });
+        });
+    });
+};
+
+/**
+ * Đăng ký lắng nghe menu events
+ */
+export const onMenuEvent = (eventName: string, callback: (data: any) => void): (() => void) => {
+    if (!menuSocket) {
+        return () => { };
+    }
+
+    menuSocket.on(eventName, callback);
+
+    return () => {
+        menuSocket?.off(eventName, callback);
+    };
+};

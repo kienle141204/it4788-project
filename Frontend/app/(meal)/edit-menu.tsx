@@ -22,6 +22,7 @@ import { mealStyles } from '../../styles/meal.styles';
 import { getAccess, postAccess, patchAccess, deleteAccess } from '../../utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '../../utils/cachedApi';
 import { clearCacheByPattern } from '../../utils/cache';
+import { useMenu } from '../../context/MenuContext';
 
 interface Family {
   id: string;
@@ -136,6 +137,108 @@ export default function EditMenuPage() {
   useEffect(() => {
     fetchMenu();
   }, [fetchMenu]);
+
+  // Real-time menu updates
+  const menuContext = useMenu();
+
+  // Join family room for real-time updates
+  useEffect(() => {
+    if (family?.id && menuContext.isConnected) {
+      const familyId = typeof family.id === 'string' ? parseInt(family.id) : family.id;
+      if (!isNaN(familyId)) {
+        menuContext.joinFamily(familyId);
+      }
+    }
+
+    return () => {
+      if (family?.id) {
+        const familyId = typeof family.id === 'string' ? parseInt(family.id) : family.id;
+        if (!isNaN(familyId)) {
+          menuContext.leaveFamily(familyId);
+        }
+      }
+    };
+  }, [family?.id, menuContext.isConnected]);
+
+  // Listen to menu events
+  useEffect(() => {
+    if (!menuId) return;
+
+    const unsubscribers: Array<() => void> = [];
+
+    // Menu updated - refresh menu data
+    unsubscribers.push(
+      menuContext.onMenuUpdated((data) => {
+        if (String(data.menu?.id) === String(menuId)) {
+          fetchMenu();
+        }
+      })
+    );
+
+    // Menu dish added
+    unsubscribers.push(
+      menuContext.onDishAdded((data) => {
+        if (String(data.menuId) === String(menuId)) {
+          setSelectedDishes((prev) => {
+            const exists = prev.some(
+              (sd) => sd.menuDishId === String(data.menuDish?.id)
+            );
+            if (!exists && data.menuDish) {
+              return [
+                ...prev,
+                {
+                  menuDishId: String(data.menuDish.id),
+                  dish: data.menuDish.dish || { id: '', name: 'Món ăn', image_url: null },
+                  stock: data.menuDish.stock || 0,
+                  price: typeof data.menuDish.price === 'string' 
+                    ? parseFloat(data.menuDish.price) 
+                    : data.menuDish.price || 0,
+                },
+              ];
+            }
+            return prev;
+          });
+        }
+      })
+    );
+
+    // Menu dish updated
+    unsubscribers.push(
+      menuContext.onDishUpdated((data) => {
+        if (String(data.menuId) === String(menuId)) {
+          setSelectedDishes((prev) =>
+            prev.map((sd) =>
+              sd.menuDishId === String(data.menuDish?.id) && data.menuDish
+                ? {
+                    ...sd,
+                    stock: data.menuDish.stock || sd.stock,
+                    price:
+                      typeof data.menuDish.price === 'string'
+                        ? parseFloat(data.menuDish.price)
+                        : data.menuDish.price || sd.price,
+                  }
+                : sd
+            )
+          );
+        }
+      })
+    );
+
+    // Menu dish removed
+    unsubscribers.push(
+      menuContext.onDishRemoved((data) => {
+        if (String(data.menuId) === String(menuId)) {
+          setSelectedDishes((prev) =>
+            prev.filter((sd) => sd.menuDishId !== String(data.menuDishId))
+          );
+        }
+      })
+    );
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [menuId, menuContext, fetchMenu]);
 
   const fetchDishes = useCallback(
     async (pageNumber = 1, reset = false) => {
