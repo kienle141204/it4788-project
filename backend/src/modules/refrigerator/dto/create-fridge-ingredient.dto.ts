@@ -5,7 +5,8 @@ import {
     IsPositive,
     IsInt,
     Min,
-    IsDate
+    IsDate,
+    IsString
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -32,4 +33,8 @@ export class CreateFridgeIngredientDto {
     @Type(() => Date)
     @IsDate()
     expiration_date?: Date;
+
+    @IsOptional()
+    @IsString()
+    note?: string;
 }
