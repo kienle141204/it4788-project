@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,6 +9,7 @@ import { CreateFridgeDishDto } from '../dto/create-fridge-dish.dto';
 import { UpdateFridgeDishDto } from '../dto/update-fridge-dish.dto';
 import { PaginationDto } from '../dto/pagination.dto';
 import { JwtUser } from '../../../common/types/user.type';
+import { RefrigeratorGateway } from '../refrigerator.gateway';
 
 @Injectable()
 export class FridgeDishService {
@@ -19,6 +20,8 @@ export class FridgeDishService {
     private readonly refrigeratorRepo: Repository<Refrigerator>,
     @InjectRepository(Dish)
     private readonly dishRepo: Repository<Dish>,
+    @Inject(forwardRef(() => RefrigeratorGateway))
+    private readonly refrigeratorGateway: RefrigeratorGateway,
   ) { }
 
   /** Tạo mới món ăn trong tủ lạnh */
@@ -53,7 +56,16 @@ export class FridgeDishService {
       ...data,
     });
 
-    return await this.fridgeDishRepo.save(fridgeDish);
+    const savedDish = await this.fridgeDishRepo.save(fridgeDish);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.refrigeratorGateway.emitDishAdded(refrigerator_id, savedDish, user.id);
+    } catch (error) {
+      console.error('Error emitting dish added event:', error);
+    }
+
+    return savedDish;
   }
 
   /** Lấy toàn bộ món ăn trong tủ lạnh */
@@ -135,14 +147,34 @@ export class FridgeDishService {
   /** Cập nhật món ăn */
   async update(id: number, dto: UpdateFridgeDishDto, user: JwtUser): Promise<FridgeDish> {
     const item = await this.findOne(id, user); // đã check quyền
+    const refrigeratorId = item.refrigerator_id;
     Object.assign(item, dto);
-    return await this.fridgeDishRepo.save(item);
+    const savedItem = await this.fridgeDishRepo.save(item);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.refrigeratorGateway.emitDishUpdated(refrigeratorId, savedItem, user.id);
+    } catch (error) {
+      console.error('Error emitting dish updated event:', error);
+    }
+
+    return savedItem;
   }
 
   /** Xóa món ăn */
   async remove(id: number, user: JwtUser): Promise<void> {
     const item = await this.findOne(id, user); // đã check quyền
+    const refrigeratorId = item.refrigerator_id;
+    const dishId = item.id;
+
     await this.fridgeDishRepo.remove(item);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.refrigeratorGateway.emitDishDeleted(refrigeratorId, dishId, user.id);
+    } catch (error) {
+      console.error('Error emitting dish deleted event:', error);
+    }
   }
 
 }

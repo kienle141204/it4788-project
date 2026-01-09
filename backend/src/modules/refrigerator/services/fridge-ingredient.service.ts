@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,6 +9,7 @@ import { CreateFridgeIngredientDto } from '../dto/create-fridge-ingredient.dto';
 import { UpdateFridgeIngredientDto } from '../dto/update-fridge-ingredient.dto';
 import { PaginationDto } from '../dto/pagination.dto';
 import { JwtUser } from '../../../common/types/user.type';
+import { RefrigeratorGateway } from '../refrigerator.gateway';
 
 @Injectable()
 export class FridgeIngredientService {
@@ -21,6 +22,9 @@ export class FridgeIngredientService {
 
     @InjectRepository(Ingredient)
     private readonly ingredientRepo: Repository<Ingredient>,
+
+    @Inject(forwardRef(() => RefrigeratorGateway))
+    private readonly refrigeratorGateway: RefrigeratorGateway,
   ) { }
 
   /** Tạo mới nguyên liệu trong tủ lạnh */
@@ -61,7 +65,16 @@ export class FridgeIngredientService {
       ...data,
     });
 
-    return await this.fridgeIngredientRepo.save(fridgeIngredient);
+    const savedIngredient = await this.fridgeIngredientRepo.save(fridgeIngredient);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.refrigeratorGateway.emitIngredientAdded(refrigerator_id, savedIngredient, user.id);
+    } catch (error) {
+      console.error('Error emitting ingredient added event:', error);
+    }
+
+    return savedIngredient;
   }
 
   /** Lấy toàn bộ nguyên liệu trong tủ lạnh */
@@ -143,13 +156,33 @@ export class FridgeIngredientService {
   /** Cập nhật nguyên liệu */
   async update(id: number, dto: UpdateFridgeIngredientDto, user: JwtUser): Promise<FridgeIngredient> {
     const item = await this.findOne(id, user); // đã check quyền
+    const refrigeratorId = item.refrigerator_id;
     Object.assign(item, dto);
-    return await this.fridgeIngredientRepo.save(item);
+    const savedItem = await this.fridgeIngredientRepo.save(item);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.refrigeratorGateway.emitIngredientUpdated(refrigeratorId, savedItem, user.id);
+    } catch (error) {
+      console.error('Error emitting ingredient updated event:', error);
+    }
+
+    return savedItem;
   }
 
   /** Xóa nguyên liệu khỏi tủ */
   async remove(id: number, user: JwtUser): Promise<void> {
     const item = await this.findOne(id, user); // đã check quyền
+    const refrigeratorId = item.refrigerator_id;
+    const ingredientId = item.id;
+
     await this.fridgeIngredientRepo.remove(item);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.refrigeratorGateway.emitIngredientDeleted(refrigeratorId, ingredientId, user.id);
+    } catch (error) {
+      console.error('Error emitting ingredient deleted event:', error);
+    }
   }
 }
