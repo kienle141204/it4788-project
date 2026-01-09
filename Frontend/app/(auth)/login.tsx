@@ -19,6 +19,7 @@ export default function login() {
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const route = useRouter()
   const [loading, setLoading] = useState(false)
   const [biometricSupported, setBiometricSupported] = useState(false);
@@ -243,10 +244,21 @@ export default function login() {
                 onBlur={() => setFocusedInput(null)} 
                 placeholder='Nhập mật khẩu của bạn' 
                 placeholderTextColor={COLORS.grey}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 selectionColor={COLORS.primary}
                 value={password}
                 onChangeText={setPassword} />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={{ padding: 8 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                size={20} 
+                color={COLORS.grey} 
+              />
+            </TouchableOpacity>
         </View>
         <View style={styles.linkContainer}>
             <Link href="/forgotPassword" style={styles.linkText}>
