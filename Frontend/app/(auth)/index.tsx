@@ -14,10 +14,10 @@ export default function login() {
     const nextPage = () => {
         route.push('/(auth)/login')
     }
-    // Tạm thời cmt để code login 
+    
+    // Chỉ kiểm tra token, không tự động đăng nhập bằng vân tay
     useEffect(() => {
       const checkToken = async () => {
-        const key = await AsyncStorage.getItem('access_token')
         const token = await checkAsyncStorage();
         if (token) {
           route.replace('/(market)/market_screen');

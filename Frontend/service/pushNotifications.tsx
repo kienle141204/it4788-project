@@ -216,33 +216,53 @@ try {
       firebaseApp = firebaseAppModule.default;
       
       // Kiểm tra xem Firebase đã được khởi tạo chưa
-      if (!firebaseApp.apps.length) {
+      if (!firebaseApp || !firebaseApp.apps || !firebaseApp.apps.length) {
         console.log('[PushNotifications] ⚠️ Firebase app not initialized, it should auto-initialize from google-services.json');
         inAppLogger.log('⚠️ Firebase app not initialized', 'PushNotifications');
       } else {
         console.log('[PushNotifications] ✅ Firebase app initialized');
         inAppLogger.log('✅ Firebase app initialized', 'PushNotifications');
       }
-    } catch (firebaseAppError) {
-      console.warn('[PushNotifications] ⚠️ Could not load Firebase App module:', firebaseAppError);
-      inAppLogger.log('⚠️ Could not load Firebase App module', 'PushNotifications');
+    } catch (firebaseAppError: any) {
+      // Kiểm tra nếu là lỗi native module not found (chưa được build)
+      const errorMessage = firebaseAppError?.message || String(firebaseAppError);
+      if (errorMessage.includes('Native module') && errorMessage.includes('not found')) {
+        console.warn('[PushNotifications] ⚠️ Firebase native module not found - rebuild app required');
+        console.warn('[PushNotifications] ⚠️ This is normal in Expo Go or if native modules haven\'t been built');
+        inAppLogger.log('⚠️ Firebase native module not found - rebuild required', 'PushNotifications');
+      } else {
+        console.warn('[PushNotifications] ⚠️ Could not load Firebase App module:', errorMessage);
+        inAppLogger.log('⚠️ Could not load Firebase App module', 'PushNotifications');
+      }
     }
     
-    // Load Firebase Messaging
-    try {
-      messaging = require('@react-native-firebase/messaging').default;
-      
-      // Đăng ký background message handler
-      // QUAN TRỌNG: Phải đăng ký ở top level, không được trong try-catch
-      messaging().setBackgroundMessageHandler(handleBackgroundMessage);
-      console.log('[PushNotifications] ✅ Background message handler registered');
-      inAppLogger.log('✅ Background message handler registered', 'PushNotifications');
-      
-      console.log('[PushNotifications] ✅ Firebase Messaging initialized successfully');
-      inAppLogger.log('✅ Firebase Messaging initialized successfully', 'PushNotifications');
-    } catch (messagingError) {
-      console.warn('[PushNotifications] ⚠️ Could not load Firebase Messaging:', messagingError);
-      inAppLogger.log('⚠️ Could not load Firebase Messaging', 'PushNotifications');
+    // Load Firebase Messaging - chỉ nếu Firebase App đã được load thành công
+    if (firebaseApp) {
+      try {
+        messaging = require('@react-native-firebase/messaging').default;
+        
+        // Đăng ký background message handler
+        // QUAN TRỌNG: Phải đăng ký ở top level, không được trong try-catch
+        if (messaging && typeof messaging === 'function') {
+          messaging().setBackgroundMessageHandler(handleBackgroundMessage);
+          console.log('[PushNotifications] ✅ Background message handler registered');
+          inAppLogger.log('✅ Background message handler registered', 'PushNotifications');
+          
+          console.log('[PushNotifications] ✅ Firebase Messaging initialized successfully');
+          inAppLogger.log('✅ Firebase Messaging initialized successfully', 'PushNotifications');
+        }
+      } catch (messagingError: any) {
+        // Kiểm tra nếu là lỗi native module not found (chưa được build)
+        const errorMessage = messagingError?.message || String(messagingError);
+        if (errorMessage.includes('Native module') && errorMessage.includes('not found')) {
+          console.warn('[PushNotifications] ⚠️ Firebase Messaging native module not found - rebuild app required');
+          console.warn('[PushNotifications] ⚠️ This is normal in Expo Go or if native modules haven\'t been built');
+          inAppLogger.log('⚠️ Firebase Messaging native module not found - rebuild required', 'PushNotifications');
+        } else {
+          console.warn('[PushNotifications] ⚠️ Could not load Firebase Messaging:', errorMessage);
+          inAppLogger.log('⚠️ Could not load Firebase Messaging', 'PushNotifications');
+        }
+      }
     }
   } else if (isExpoGo) {
     console.warn('[PushNotifications] ⚠️ Skipping Firebase Messaging initialization (Expo Go detected)');

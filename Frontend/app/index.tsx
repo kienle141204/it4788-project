@@ -1,55 +1,98 @@
 import React, { useEffect, useState } from 'react';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View } from 'react-native';
 import { checkAsyncStorage } from '@/utils/checkAsyncStorage';
 import { pushNotificationService } from '@/service/pushNotifications';
+import { biometricService } from '@/service/biometric';
+import { loginUSer } from '@/service/auth';
+import { inAppLogger } from '@/utils/logger';
 
 export default function Index() {
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
 
   useEffect( () => {
     
     const checkLogin = async () => {
       try {
-        // Tạo Android notification channel trước (nếu là Android)
         await pushNotificationService.setupAndroidNotificationChannel();
         
         const token = await checkAsyncStorage();
-        setIsLoggedIn(token);
         
-        // Nếu đã đăng nhập, kiểm tra và yêu cầu permission notification
+
         if (token) {
+          setIsLoggedIn(true);
+          
+          // Kiểm tra và yêu cầu permission notification (không hiển thị lỗi nếu từ chối)
           try {
-            // Đợi một chút để đảm bảo app đã sẵn sàng
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Kiểm tra permission notification
             const hasPermission = await pushNotificationService.checkAndRequestNotificationPermission();
             
             if (hasPermission) {
               console.log('[Index] 🔔 Notification permission granted, registering token...');
-              // Đăng ký token với backend (có retry logic bên trong)
-              const registered = await pushNotificationService.registerTokenWithBackend();
-              if (registered) {
-                console.log('[Index] ✅ Push notification token registered successfully');
-              } else {
-                console.warn('[Index] ⚠️ Push notification token registration failed (check logs above)');
-                console.warn('[Index] ⚠️ This might be normal if:');
-                console.warn('[Index]   - Running on emulator/simulator');
-                console.warn('[Index]   - Firebase not configured properly');
-                console.warn('[Index]   - Network issues');
+              try {
+                await pushNotificationService.registerTokenWithBackend();
+              } catch (error: any) {
+                console.warn('[Index] ⚠️ Push notification token registration failed:', error?.message);
+                inAppLogger.log(`⚠️ Push notification registration failed: ${error?.message || 'Unknown error'}`, 'Index');
               }
             } else {
               console.log('[Index] ℹ️ Notification permission not granted, skipping token registration');
             }
           } catch (error: any) {
             console.error('[Index] ❌ Error checking notification permission:', error?.message || error);
-            // Không block app flow nếu có lỗi
+          }
+        } else {
+          // Nếu chưa có token, kiểm tra xem có thể dùng đăng nhập bằng vân tay không
+          const canUseBiometric = await biometricService.canUseBiometricLogin();
+          
+          if (canUseBiometric) {
+            // Tự động hiển thị dialog xác thực sinh trắc học
+            const authResult = await biometricService.authenticate('Xác thực để đăng nhập');
+            
+            if (authResult.success) {
+              try {
+                // Lấy thông tin đăng nhập đã lưu
+                const savedEmail = await biometricService.getSavedEmail();
+                const savedPassword = await biometricService.getSavedPassword();
+
+                if (savedEmail && savedPassword) {
+                  // Đăng nhập với thông tin đã lưu
+                  const res = await loginUSer({ email: savedEmail, password: savedPassword });
+
+                  if (res && !res.statusCode) {
+                    // Đăng nhập thành công
+                    const access = res?.access_token;
+                    const refresh = res?.refresh_token;
+
+                    if (access && refresh) {
+                      await AsyncStorage.setItem('access_token', access);
+                      await AsyncStorage.setItem('refresh_token', refresh);
+
+                      // Đăng ký push notification token (không hiển thị lỗi nếu thất bại)
+                      try {
+                        await pushNotificationService.registerTokenWithBackend();
+                      } catch (error: any) {
+                        console.warn('[Index] Push notification registration failed:', error?.message);
+                        inAppLogger.log(`⚠️ Push notification registration failed: ${error?.message || 'Unknown error'}`, 'Index');
+                      }
+
+                      setIsLoggedIn(true);
+                    }
+                  }
+                }
+              } catch (error: any) {
+                console.error('[Index] Biometric login error:', error);
+                // Không hiển thị alert, chỉ log lỗi
+              }
+            }
           }
         }
       } catch (e) {
+        console.error('[Index] Error in checkLogin:', e);
       } finally {
         setIsReady(true);
       }
