@@ -113,29 +113,30 @@ export class RecipeService {
 
   /**
    * Lấy công thức theo món ăn
+   * - Từ dishId → lấy recipe_id đầu tiên (mới nhất) từ bảng recipes
+   * - Từ recipe_id đó → lấy các recipe_steps từ bảng recipe_steps
+   * - Nếu có nhiều công thức, mặc định chỉ trả về công thức đầu tiên (mới nhất)
    * - Admin: xem tất cả công thức (public và private)
    * - User: xem tất cả công thức public và công thức private của chính họ
    */
-  async findByDishId(dishId: number, user: User): Promise<Recipe[]> {
+  async findByDishId(dishId: number, user: User): Promise<RecipeStep[]> {
     // Kiểm tra món ăn có tồn tại không
     const dish = await this.dishRepository.findOne({ where: { id: dishId } });
     if (!dish) {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00100]);
     }
 
-    const queryBuilder = this.recipeRepository
+    // Bước 1: Lấy recipe_id đầu tiên (mới nhất) từ bảng recipes theo dishId
+    const recipeQueryBuilder = this.recipeRepository
       .createQueryBuilder('recipe')
-      .leftJoinAndSelect('recipe.dish', 'dish')
-      .leftJoinAndSelect('recipe.owner', 'owner')
-      .leftJoinAndSelect('recipe.steps', 'steps')
-      .leftJoinAndSelect('steps.images', 'images')
+      .select('recipe.id', 'recipe_id')
       .where('recipe.dish_id = :dishId', { dishId })
       .orderBy('recipe.created_at', 'DESC')
-      .addOrderBy('steps.step_number', 'ASC');
+      .limit(1);
 
     // Admin có thể xem tất cả, user xem public recipes hoặc private recipes của chính họ
     if (user.role !== 'admin') {
-      queryBuilder.andWhere(
+      recipeQueryBuilder.andWhere(
         new Brackets((qb) => {
           qb.where('recipe.status = :publicStatus', { publicStatus: 'public' })
             .orWhere('(recipe.status = :privateStatus AND recipe.owner_id = :userId)', {
@@ -146,7 +147,25 @@ export class RecipeService {
       );
     }
 
-    return await queryBuilder.getMany();
+    const recipeResult = await recipeQueryBuilder.getRawOne();
+
+    // Nếu không có recipe nào, trả về mảng rỗng
+    if (!recipeResult || !recipeResult.recipe_id) {
+      return [];
+    }
+
+    const recipeId = recipeResult.recipe_id;
+
+    // Bước 2: Lấy tất cả recipe_steps từ bảng recipe_steps theo recipe_id đầu tiên
+    const recipeSteps = await this.recipeStepRepository.find({
+      where: { recipe_id: recipeId },
+      relations: ['images', 'recipe'],
+      order: { 
+        step_number: 'ASC' 
+      },
+    });
+
+    return recipeSteps;
   }
 
   /**

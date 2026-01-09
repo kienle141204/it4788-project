@@ -74,22 +74,22 @@ export class RecipeController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Lấy công thức theo món ăn',
-    description: 'API này trả về danh sách công thức của một món ăn cụ thể.'
+    description: 'API này lấy các recipe_id từ bảng recipes theo dishId, sau đó lấy tất cả recipe_steps từ bảng recipe_steps tương ứng và trả về danh sách các bước công thức của món ăn đó.'
   })
   @ApiParam({ name: 'dishId', type: 'number', example: 1, description: 'ID của món ăn' })
   @ApiResponse({
     status: 200,
-    description: 'Lấy danh sách công thức thành công',
+    description: 'Lấy danh sách các bước công thức thành công',
     example: {
       success: true,
-      message: 'Lấy 2 công thức cho món ăn ID 1',
+      message: 'Lấy công thức cho món ăn ID 1 thành công',
       data: []
     }
   })
   async findByDishId(@Param('dishId', ParseIntPipe) dishId: number, @Request() req) {
     const user: User = req.user;
-    const recipes = await this.recipeService.findByDishId(dishId, user);
-    return buildSuccessResponse(ResponseCode.C00120, recipes);
+    const recipeSteps = await this.recipeService.findByDishId(dishId, user);
+    return buildSuccessResponse(ResponseCode.C00120, recipeSteps);
   }
 
   /**
