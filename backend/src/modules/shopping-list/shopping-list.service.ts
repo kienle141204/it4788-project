@@ -12,6 +12,7 @@ import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FirebaseService } from '../../firebase/firebase.service';
 import { User } from '../../entities/user.entity';
+import { ShoppingListGateway } from './shopping-list.gateway';
 
 @Injectable()
 export class ShoppingListService {
@@ -30,6 +31,8 @@ export class ShoppingListService {
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
     private readonly firebaseService: FirebaseService,
+    @Inject(forwardRef(() => ShoppingListGateway))
+    private readonly shoppingListGateway: ShoppingListGateway,
   ) { }
 
 
@@ -78,6 +81,15 @@ export class ShoppingListService {
         } catch (error) {
           // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo shopping list
           console.error('Error sending notification for shopping list creation:', error);
+        }
+      }
+
+      // Emit WebSocket event to family members
+      if (savedList.family_id) {
+        try {
+          await this.shoppingListGateway.emitShoppingListCreated(savedList.family_id, savedList, user.id);
+        } catch (error) {
+          console.error('Error emitting shopping list created event:', error);
         }
       }
 
@@ -166,6 +178,15 @@ export class ShoppingListService {
         } catch (error) {
           console.error('Error sending notification for shopping list creation:', error);
         }
+      }
+    }
+
+    // Emit WebSocket event to family members
+    if (savedList.family_id) {
+      try {
+        await this.shoppingListGateway.emitShoppingListCreated(savedList.family_id, savedList, user.id);
+      } catch (error) {
+        console.error('Error emitting shopping list created event:', error);
       }
     }
 
@@ -304,6 +325,15 @@ export class ShoppingListService {
       }
     }
 
+    // Emit WebSocket event to family members
+    if (savedList.family_id) {
+      try {
+        await this.shoppingListGateway.emitShoppingListShared(savedList.family_id, savedList, user.id);
+      } catch (error) {
+        console.error('Error emitting shopping list shared event:', error);
+      }
+    }
+
     return savedList;
   }
 
@@ -314,56 +344,40 @@ export class ShoppingListService {
     const list = await this.findOne(id, user);
 
     Object.assign(list, updateDto);
-    return await this.shoppingListRepo.save(list);
+    const savedList = await this.shoppingListRepo.save(list);
+
+    // Emit WebSocket event to family members
+    if (savedList.family_id) {
+      try {
+        await this.shoppingListGateway.emitShoppingListUpdated(savedList.family_id, savedList, user.id);
+      } catch (error) {
+        console.error('Error emitting shopping list updated event:', error);
+      }
+    }
+
+    return savedList;
   }
 
   /** Xóa danh sách */
   async remove(id: number, user: JwtUser): Promise<void> {
-    // Lấy danh sách mà không kiểm tra quyền (để kiểm tra sau)
-    const list = await this.shoppingListRepo.findOne({
-      where: { id },
-      relations: ['family', 'items', 'items.ingredient'],
-    });
+    const list = await this.findOne(id, user);
+    const familyId = list.family_id;
+    const listId = list.id;
 
-    if (!list) {
-      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
-    }
+    // Xóa tất cả items trong list trước
+    await this.shoppingItemRepo.delete({ list_id: id });
 
-    // Kiểm tra quyền xóa: owner, admin, family owner, hoặc manager
-    const isOwner = list.owner_id === user.id;
-    const isAdmin = user.role === 'admin';
-    let isFamilyOwner = false;
-    let isManager = false;
+    // Sau đó xóa list
+    await this.shoppingListRepo.remove(list);
 
-    // Nếu danh sách thuộc về một family, kiểm tra quyền manager hoặc family owner
-    if (list.family_id && !isOwner && !isAdmin) {
-      const family = await this.familyService.getFamilyById(list.family_id);
-      isFamilyOwner = family.owner_id === user.id;
-
-      // Kiểm tra xem user có phải manager không (chỉ khi không phải family owner)
-      if (!isFamilyOwner) {
-        const members = await this.memberService.getMembersByFamily(list.family_id);
-        const currentMember = members.find(m => m.user_id === user.id);
-        isManager = currentMember?.role === 'manager';
+    // Emit WebSocket event to family members
+    if (familyId) {
+      try {
+        await this.shoppingListGateway.emitShoppingListDeleted(familyId, listId, user.id);
+      } catch (error) {
+        console.error('Error emitting shopping list deleted event:', error);
       }
     }
-
-    // Chỉ cho phép xóa nếu user là owner, admin, family owner, hoặc manager
-    if (!isOwner && !isAdmin && !isFamilyOwner && !isManager) {
-      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00269]);
-    }
-
-    // Xóa tất cả items trong list trước
-    await this.shoppingItemRepo.delete({ list_id: id });
-
-    // Sau đó xóa list
-    await this.shoppingListRepo.remove(list);
-
-    // Xóa tất cả items trong list trước
-    await this.shoppingItemRepo.delete({ list_id: id });
-
-    // Sau đó xóa list
-    await this.shoppingListRepo.remove(list);
   }
 
   /** Tính toán lại tổng chi phí của shopping list dựa trên items */

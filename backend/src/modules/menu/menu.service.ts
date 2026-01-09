@@ -10,6 +10,7 @@ import { CreateMenuDto, UpdateMenuDto, CreateMenuDishDto, UpdateMenuDishDto, Get
 import { ResponseCode, ResponseMessageVi } from 'src/common/errors/error-codes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../../entities/user.entity';
+import { MenuGateway } from './menu.gateway';
 
 @Injectable()
 export class MenuService {
@@ -28,6 +29,8 @@ export class MenuService {
     private userRepository: Repository<User>,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => MenuGateway))
+    private menuGateway: MenuGateway,
   ) { }
 
   /**
@@ -270,6 +273,13 @@ export class MenuService {
       console.error('Error sending notification for menu creation:', error);
     }
 
+    // Emit WebSocket event to family members
+    try {
+      await this.menuGateway.emitMenuCreated(familyId, savedMenu, userId);
+    } catch (error) {
+      console.error('Error emitting menu created event:', error);
+    }
+
     return savedMenu;
   }
 
@@ -317,7 +327,16 @@ export class MenuService {
       menu.created_at = updateMenuDto.date ? new Date(updateMenuDto.date) : new Date();
     }
 
-    return await this.menuRepository.save(menu);
+    const savedMenu = await this.menuRepository.save(menu);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.menuGateway.emitMenuUpdated(menu.family_id, savedMenu, userId);
+    } catch (error) {
+      console.error('Error emitting menu updated event:', error);
+    }
+
+    return savedMenu;
   }
 
   /**
@@ -375,7 +394,16 @@ export class MenuService {
       price: createMenuDishDto.price,
     });
 
-    return await this.menuDishRepository.save(menuDish);
+    const savedMenuDish = await this.menuDishRepository.save(menuDish);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.menuGateway.emitDishAddedToMenu(menu.family_id, menuId, savedMenuDish, userId);
+    } catch (error) {
+      console.error('Error emitting dish added to menu event:', error);
+    }
+
+    return savedMenuDish;
   }
 
   /**
@@ -426,6 +454,13 @@ export class MenuService {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00144]);
     }
 
+    // Emit WebSocket event to family members
+    try {
+      await this.menuGateway.emitMenuDishUpdated(menuDish.menu.family_id, menuDish.menu_id, updatedMenuDish, userId);
+    } catch (error) {
+      console.error('Error emitting menu dish updated event:', error);
+    }
+
     return updatedMenuDish;
   }
 
@@ -456,7 +491,17 @@ export class MenuService {
     }
     // Nếu role là admin, không cần kiểm tra quyền
 
+    const familyId = menuDish.menu.family_id;
+    const menuId = menuDish.menu_id;
+
     await this.menuDishRepository.delete(menuDishId);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.menuGateway.emitDishRemovedFromMenu(familyId, menuId, menuDishId, userId);
+    } catch (error) {
+      console.error('Error emitting dish removed from menu event:', error);
+    }
   }
 
   /**
@@ -484,9 +529,18 @@ export class MenuService {
         throw new ForbiddenException(ResponseMessageVi[ResponseCode.C00140]);
       }
     }
+    const familyId = menu.family_id;
+
     await this.menuDishRepository.delete({ menu_id: menuId });
 
     await this.menuRepository.delete(menuId);
+
+    // Emit WebSocket event to family members
+    try {
+      await this.menuGateway.emitMenuDeleted(familyId, menuId, userId);
+    } catch (error) {
+      console.error('Error emitting menu deleted event:', error);
+    }
   }
 
   /**
