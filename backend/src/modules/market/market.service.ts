@@ -11,13 +11,31 @@ export interface Market {
   distance?: number;
 }
 
+interface CachedResult {
+  markets: Market[];
+  timestamp: number;
+}
+
 @Injectable()
 export class MarketService implements OnModuleInit {
   private markets: Market[] = [];
   private readonly logger = new Logger(MarketService.name);
+  private locationCache = new Map<string, CachedResult>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 phút
 
   onModuleInit() {
     this.loadMarkets();
+    // Cleanup cache mỗi 10 phút để tránh memory leak
+    setInterval(() => this.cleanupCache(), 10 * 60 * 1000);
+  }
+
+  private cleanupCache() {
+    const now = Date.now();
+    for (const [key, value] of this.locationCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        this.locationCache.delete(key);
+      }
+    }
   }
 
   private loadMarkets() {
@@ -67,6 +85,17 @@ export class MarketService implements OnModuleInit {
   }
 
   findNearest(lat: number, lon: number, limit: number = 5): Market[] {
+    // Tạo cache key từ lat/lon (làm tròn đến 3 chữ số thập phân ~100m)
+    // Điều này cho phép cache cho các vị trí gần nhau
+    const cacheKey = `${Math.round(lat * 1000)},${Math.round(lon * 1000)}`;
+    const cached = this.locationCache.get(cacheKey);
+    
+    // Kiểm tra cache
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      this.logger.debug(`Cache hit for location ${lat}, ${lon}`);
+      return cached.markets.slice(0, limit);
+    }
+
     const radiusKm = 15; // Bán kính cố định 15km
     const cosLat = Math.cos(this.deg2rad(lat));
     
@@ -92,7 +121,16 @@ export class MarketService implements OnModuleInit {
     marketsWithinRadius.sort((a, b) => a.distance! - b.distance!);
 
     // STEP 4: Trả về top N (hoặc tất cả nếu ít hơn limit)
-    return marketsWithinRadius.slice(0, limit);
+    const result = marketsWithinRadius.slice(0, limit);
+    
+    // Lưu vào cache
+    this.locationCache.set(cacheKey, {
+      markets: result,
+      timestamp: Date.now()
+    });
+    
+    this.logger.debug(`Cache miss for location ${lat}, ${lon}, found ${result.length} markets`);
+    return result;
   }
 
   /**

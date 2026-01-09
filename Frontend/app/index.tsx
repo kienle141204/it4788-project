@@ -7,6 +7,7 @@ import { pushNotificationService } from '@/service/pushNotifications';
 import { biometricService } from '@/service/biometric';
 import { loginUSer } from '@/service/auth';
 import { inAppLogger } from '@/utils/logger';
+import { ensureTokenValid, logoutUser } from '@/utils/api';
 
 export default function Index() {
   const [isReady, setIsReady] = useState(false);
@@ -19,31 +20,42 @@ export default function Index() {
       try {
         await pushNotificationService.setupAndroidNotificationChannel();
         
-        const token = await checkAsyncStorage();
+        const hasToken = await checkAsyncStorage();
         
 
-        if (token) {
-          setIsLoggedIn(true);
-          
-          // Kiểm tra và yêu cầu permission notification (không hiển thị lỗi nếu từ chối)
+        if (hasToken) {
+          // Validate và refresh token nếu cần
           try {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await ensureTokenValid();
+            // Token hợp lệ hoặc đã được refresh thành công
+            setIsLoggedIn(true);
             
-            const hasPermission = await pushNotificationService.checkAndRequestNotificationPermission();
-            
-            if (hasPermission) {
-              console.log('[Index] 🔔 Notification permission granted, registering token...');
-              try {
-                await pushNotificationService.registerTokenWithBackend();
-              } catch (error: any) {
-                console.warn('[Index] ⚠️ Push notification token registration failed:', error?.message);
-                inAppLogger.log(`⚠️ Push notification registration failed: ${error?.message || 'Unknown error'}`, 'Index');
+            // Kiểm tra và yêu cầu permission notification (không hiển thị lỗi nếu từ chối)
+            try {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              const hasPermission = await pushNotificationService.checkAndRequestNotificationPermission();
+              
+              if (hasPermission) {
+                console.log('[Index] 🔔 Notification permission granted, registering token...');
+                try {
+                  await pushNotificationService.registerTokenWithBackend();
+                } catch (error: any) {
+                  console.warn('[Index] ⚠️ Push notification token registration failed:', error?.message);
+                  inAppLogger.log(`⚠️ Push notification registration failed: ${error?.message || 'Unknown error'}`, 'Index');
+                }
+              } else {
+                console.log('[Index] ℹ️ Notification permission not granted, skipping token registration');
               }
-            } else {
-              console.log('[Index] ℹ️ Notification permission not granted, skipping token registration');
+            } catch (error: any) {
+              console.error('[Index] ❌ Error checking notification permission:', error?.message || error);
             }
           } catch (error: any) {
-            console.error('[Index] ❌ Error checking notification permission:', error?.message || error);
+            // Token không hợp lệ hoặc không thể refresh
+            console.error('[Index] ❌ Token validation failed:', error?.message || error);
+            // Logout và xóa token
+            await logoutUser();
+            setIsLoggedIn(false);
           }
         } else {
           // Nếu chưa có token, kiểm tra xem có thể dùng đăng nhập bằng vân tay không
@@ -93,6 +105,13 @@ export default function Index() {
         }
       } catch (e) {
         console.error('[Index] Error in checkLogin:', e);
+        // Nếu có lỗi, đảm bảo logout để tránh trạng thái không nhất quán
+        try {
+          await logoutUser();
+        } catch (logoutError) {
+          console.error('[Index] Error during logout:', logoutError);
+        }
+        setIsLoggedIn(false);
       } finally {
         setIsReady(true);
       }

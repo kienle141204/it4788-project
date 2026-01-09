@@ -123,10 +123,18 @@ export default function ProfileScreen() {
       }
     } catch (err: any) {
       console.error('[Profile] Fetch error:', err);
-      const message =
-        err instanceof Error && err.message === 'SESSION_EXPIRED'
-          ? 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
-          : 'Không thể tải thông tin, vui lòng thử lại.';
+      // Xử lý lỗi SESSION_EXPIRED - redirect về login
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        try {
+          await logoutUser();
+          router.replace('/(auth)' as any);
+        } catch (logoutError) {
+          console.error('[Profile] Error during logout:', logoutError);
+          router.replace('/(auth)' as any);
+        }
+        return;
+      }
+      const message = 'Không thể tải thông tin, vui lòng thử lại.';
       setError(message);
     } finally {
       if (!silent) {
@@ -134,7 +142,7 @@ export default function ProfileScreen() {
       }
       setRefreshing(false);
     }
-  }, []);
+  }, [router]);
 
   // Lần đầu mount
   useEffect(() => {

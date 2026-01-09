@@ -16,7 +16,7 @@ import TaskSummaryCard from '@/components/TaskSummaryCard';
 import NotificationCard from '@/components/NotificationCard';
 import FeatureGrid from '@/components/FeatureGrid';
 import { COLORS } from '@/constants/themes';
-import { getAccess } from '@/utils/api';
+import { getAccess, logoutUser } from '@/utils/api';
 import { getCachedAccess, refreshCachedAccess, CACHE_TTL } from '@/utils/cachedApi';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getMyShoppingLists } from '@/service/shopping';
@@ -109,9 +109,20 @@ export default function HomePage() {
       const userData = response?.data || response;
       setProfile(userData);
     } catch (err: any) {
-      // Không hiển thị lỗi để không làm gián đoạn trải nghiệm người dùng
+      // Xử lý lỗi SESSION_EXPIRED - redirect về login
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        try {
+          await logoutUser();
+          router.replace('/(auth)' as any);
+        } catch (logoutError) {
+          console.error('[Home] Error during logout:', logoutError);
+          router.replace('/(auth)' as any);
+        }
+        return;
+      }
+      // Không hiển thị lỗi khác để không làm gián đoạn trải nghiệm người dùng
     }
-  }, []);
+  }, [router]);
 
   // Helper function to check if two dates are the same day
   const isSameDay = (date1: Date, date2: Date): boolean => {

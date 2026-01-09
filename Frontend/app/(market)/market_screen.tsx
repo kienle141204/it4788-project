@@ -270,9 +270,6 @@ export default function MarketScreen() {
                       style={marketStyles.image}
                       defaultSource={require('../../assets/images/logo.png')}
                     />
-                    <View style={marketStyles.favoriteButton}>
-                      <Ionicons name="heart-outline" size={18} color={COLORS.darkGrey} />
-                    </View>
                   </View>
                   <View style={marketStyles.cardContent}>
                     <Text style={marketStyles.name} numberOfLines={2}>{item.name}</Text>
