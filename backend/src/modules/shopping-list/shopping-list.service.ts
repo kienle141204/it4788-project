@@ -319,7 +319,45 @@ export class ShoppingListService {
 
   /** Xóa danh sách */
   async remove(id: number, user: JwtUser): Promise<void> {
-    const list = await this.findOne(id, user);
+    // Lấy danh sách mà không kiểm tra quyền (để kiểm tra sau)
+    const list = await this.shoppingListRepo.findOne({
+      where: { id },
+      relations: ['family', 'items', 'items.ingredient'],
+    });
+
+    if (!list) {
+      throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
+    }
+
+    // Kiểm tra quyền xóa: owner, admin, family owner, hoặc manager
+    const isOwner = list.owner_id === user.id;
+    const isAdmin = user.role === 'admin';
+    let isFamilyOwner = false;
+    let isManager = false;
+
+    // Nếu danh sách thuộc về một family, kiểm tra quyền manager hoặc family owner
+    if (list.family_id && !isOwner && !isAdmin) {
+      const family = await this.familyService.getFamilyById(list.family_id);
+      isFamilyOwner = family.owner_id === user.id;
+
+      // Kiểm tra xem user có phải manager không (chỉ khi không phải family owner)
+      if (!isFamilyOwner) {
+        const members = await this.memberService.getMembersByFamily(list.family_id);
+        const currentMember = members.find(m => m.user_id === user.id);
+        isManager = currentMember?.role === 'manager';
+      }
+    }
+
+    // Chỉ cho phép xóa nếu user là owner, admin, family owner, hoặc manager
+    if (!isOwner && !isAdmin && !isFamilyOwner && !isManager) {
+      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00269]);
+    }
+
+    // Xóa tất cả items trong list trước
+    await this.shoppingItemRepo.delete({ list_id: id });
+
+    // Sau đó xóa list
+    await this.shoppingListRepo.remove(list);
 
     // Xóa tất cả items trong list trước
     await this.shoppingItemRepo.delete({ list_id: id });

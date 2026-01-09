@@ -131,9 +131,6 @@ export default function IngredientDetailScreen() {
             style={styles.image}
             defaultSource={require('../../assets/images/logo.png')}
           />
-          <View style={styles.favoriteButton}>
-            <Ionicons name="heart-outline" size={24} color={COLORS.darkGrey} />
-          </View>
         </View>
 
         {/* Content */}
@@ -261,22 +258,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
-  },
-  favoriteButton: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: COLORS.shadow || "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
   },
   content: {
     padding: 20,

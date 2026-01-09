@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '../../constants/themes';
 
 interface Market {
@@ -13,6 +14,69 @@ interface Market {
     lon: number;
     distance: number;
 }
+
+const LOCATION_CACHE_KEY = 'nearest_market_location';
+const MARKETS_CACHE_KEY = 'nearest_markets_result';
+const CACHE_TIME = 5 * 60 * 1000; // 5 phút
+
+// Helper functions for caching
+const getCachedLocation = async (): Promise<{ lat: number; lon: number; timestamp: number } | null> => {
+    try {
+        const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
+        if (cached) {
+            const data = JSON.parse(cached);
+            if (Date.now() - data.timestamp < CACHE_TIME) {
+                return data;
+            }
+        }
+    } catch (error) {
+        // Ignore cache errors
+    }
+    return null;
+};
+
+const saveLocationCache = async (lat: number, lon: number) => {
+    try {
+        await AsyncStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
+            lat,
+            lon,
+            timestamp: Date.now()
+        }));
+    } catch (error) {
+        // Ignore cache errors
+    }
+};
+
+const getCachedMarkets = async (lat: number, lon: number): Promise<Market[] | null> => {
+    try {
+        const cached = await AsyncStorage.getItem(MARKETS_CACHE_KEY);
+        if (cached) {
+            const data = JSON.parse(cached);
+            // Kiểm tra nếu vị trí gần nhau (trong vòng 100m) và cache còn hợp lệ
+            const distance = Math.sqrt(
+                Math.pow(data.location.lat - lat, 2) + Math.pow(data.location.lon - lon, 2)
+            );
+            if (distance < 0.001 && Date.now() - data.timestamp < CACHE_TIME) {
+                return data.markets;
+            }
+        }
+    } catch (error) {
+        // Ignore cache errors
+    }
+    return null;
+};
+
+const saveMarketsCache = async (lat: number, lon: number, markets: Market[]) => {
+    try {
+        await AsyncStorage.setItem(MARKETS_CACHE_KEY, JSON.stringify({
+            location: { lat, lon },
+            markets,
+            timestamp: Date.now()
+        }));
+    } catch (error) {
+        // Ignore cache errors
+    }
+};
 
 export default function NearestMarketScreen() {
     const router = useRouter();
@@ -38,32 +102,117 @@ export default function NearestMarketScreen() {
                 return;
             }
 
-            // Get current location
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            });
+            // Thử lấy vị trí từ cache trước
+            const cachedLocation = await getCachedLocation();
+            if (cachedLocation) {
+                setCurrentLocation({ lat: cachedLocation.lat, lon: cachedLocation.lon });
+                
+                // Thử lấy kết quả từ cache
+                const cachedMarkets = await getCachedMarkets(cachedLocation.lat, cachedLocation.lon);
+                if (cachedMarkets && cachedMarkets.length > 0) {
+                    setMarkets(cachedMarkets);
+                    setLoading(false);
+                    // Fetch GPS mới ở background để update cache
+                    fetchFreshLocationInBackground();
+                    return;
+                }
+                
+                // Nếu có location cache nhưng không có markets cache, fetch markets ngay
+                await fetchNearestMarkets(cachedLocation.lat, cachedLocation.lon);
+                
+                // Fetch GPS mới ở background
+                fetchFreshLocationInBackground();
+                return;
+            }
 
-            setCurrentLocation({ lat: location.coords.latitude, lon: location.coords.longitude });
-            await fetchNearestMarkets(location.coords.latitude, location.coords.longitude);
+            // Nếu không có cache, fetch GPS với timeout
+            const location = await Promise.race([
+                Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Lowest, // Nhanh hơn Balanced
+                    maximumAge: 60000, // Chấp nhận vị trí cũ trong 1 phút
+                }),
+                new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error('Location timeout')), 5000)
+                )
+            ]) as Location.LocationObject;
+
+            const lat = location.coords.latitude;
+            const lon = location.coords.longitude;
+            
+            setCurrentLocation({ lat, lon });
+            await saveLocationCache(lat, lon);
+            await fetchNearestMarkets(lat, lon);
         } catch (error: any) {
-            setErrorMsg('Không thể lấy vị trí của bạn');
+            if (error.message === 'Location timeout') {
+                setErrorMsg('Lấy vị trí quá lâu. Vui lòng thử lại.');
+            } else {
+                setErrorMsg('Không thể lấy vị trí của bạn');
+            }
             setLoading(false);
+        }
+    };
+
+    const fetchFreshLocationInBackground = async () => {
+        try {
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Lowest,
+                maximumAge: 60000,
+            });
+            const lat = location.coords.latitude;
+            const lon = location.coords.longitude;
+            await saveLocationCache(lat, lon);
+            setCurrentLocation({ lat, lon });
+            // Cập nhật markets nếu vị trí thay đổi đáng kể
+            await fetchNearestMarkets(lat, lon);
+        } catch (error) {
+            // Silently fail background update
         }
     };
 
     const fetchNearestMarkets = async (lat: number, lon: number) => {
         try {
+            // Thử lấy từ cache trước
+            const cachedMarkets = await getCachedMarkets(lat, lon);
+            if (cachedMarkets && cachedMarkets.length > 0) {
+                setMarkets(cachedMarkets);
+                setLoading(false);
+                // Fetch fresh data ở background
+                fetchFreshMarketsInBackground(lat, lon);
+                return;
+            }
+
             const backendUrl = 'https://it4788-deploy-8.onrender.com';
             const response = await axios.get(`${backendUrl}/api/markets/nearest`, {
-                params: { lat, lon, limit: 5 }
+                params: { lat, lon, limit: 5 },
+                timeout: 10000, // 10 giây timeout
             });
 
             const top5Markets = (response.data || []).slice(0, 5);
             setMarkets(top5Markets);
-        } catch (err) {
-            setErrorMsg('Không thể tải danh sách chợ');
+            await saveMarketsCache(lat, lon, top5Markets);
+        } catch (err: any) {
+            if (err.code === 'ECONNABORTED') {
+                setErrorMsg('Kết nối quá lâu. Vui lòng thử lại.');
+            } else {
+                setErrorMsg('Không thể tải danh sách chợ');
+            }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchFreshMarketsInBackground = async (lat: number, lon: number) => {
+        try {
+            const backendUrl = 'https://it4788-deploy-8.onrender.com';
+            const response = await axios.get(`${backendUrl}/api/markets/nearest`, {
+                params: { lat, lon, limit: 5 },
+                timeout: 10000,
+            });
+            const top5Markets = (response.data || []).slice(0, 5);
+            setMarkets(top5Markets);
+            await saveMarketsCache(lat, lon, top5Markets);
+        } catch (error) {
+            // Silently fail background update
         }
     };
 
