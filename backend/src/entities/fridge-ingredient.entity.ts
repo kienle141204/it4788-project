@@ -42,6 +42,9 @@ export class FridgeIngredient {
   @Column({ name: 'expiration_date', type: 'date', nullable: true })
   expiration_date: Date | null;
 
+  @Column({ name: 'note', type: 'text', nullable: true })
+  note: string | null;
+
   // -----------------------
   // Relations
   // -----------------------
