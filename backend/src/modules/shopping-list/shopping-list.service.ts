@@ -246,11 +246,24 @@ export class ShoppingListService {
       throw new NotFoundException(ResponseMessageVi[ResponseCode.C00260]);
     }
 
-    if (user.role !== 'admin' && list.owner_id !== user.id) {
-      throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00269]);
+    // Admin và owner luôn có quyền
+    if (user.role === 'admin' || list.owner_id === user.id) {
+      return list;
     }
 
-    return list;
+    // Kiểm tra nếu user là manager của family
+    if (list.family_id) {
+      const members = await this.memberService.getMembersByFamily(list.family_id);
+      const currentMember = members.find(member => member.user_id === user.id);
+      const isManager = currentMember?.role === 'manager';
+      
+      if (isManager) {
+        return list;
+      }
+    }
+
+    // Nếu không phải admin, owner, hoặc manager thì không có quyền
+    throw new UnauthorizedException(ResponseMessageVi[ResponseCode.C00269]);
   }
 
   // Share danh sách mua sắm

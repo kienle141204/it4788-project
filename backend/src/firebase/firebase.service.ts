@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { getMessaging } from 'firebase-admin/messaging';
-import { join } from 'path';
+import { join, normalize } from 'path';
 import { readFileSync } from 'fs';
 
 // Interface để tránh circular dependency
@@ -38,9 +38,11 @@ export class FirebaseService implements OnModuleInit {
             } else if (serviceAccountKeyPath) {
                 console.log('[FirebaseService] 🔧 Using FIREBASE_ACCOUNT_KEY:', serviceAccountKeyPath);
                 // Cho phép dùng đường dẫn (relative hoặc absolute)
-                const absolutePath = serviceAccountKeyPath.startsWith('/')
-                    ? serviceAccountKeyPath
-                    : join(process.cwd(), serviceAccountKeyPath);
+                // Normalize path để xử lý cả backslash và forward slash
+                const normalizedPath = serviceAccountKeyPath.replace(/\\/g, '/');
+                const absolutePath = normalizedPath.startsWith('/')
+                    ? normalize(normalizedPath)
+                    : normalize(join(process.cwd(), normalizedPath));
                 try {
                     serviceAccountJson = readFileSync(absolutePath, 'utf8');
                 } catch (fileError: any) {

@@ -216,6 +216,8 @@ export default function GroupDetailPage() {
   // Create list states
   const [showAssignMemberDropdown, setShowAssignMemberDropdown] = useState<boolean>(false);
   const [assignedOwner, setAssignedOwner] = useState<Member | null>(null);
+  const [creatingListIds, setCreatingListIds] = useState<Set<number>>(new Set());
+  const [deletingListIds, setDeletingListIds] = useState<Set<number>>(new Set());
 
   // Ingredient search states
   const [ingredientSearchTerm, setIngredientSearchTerm] = useState<string>('');
@@ -2281,6 +2283,9 @@ export default function GroupDetailPage() {
 
     // Add optimistic list to state immediately
     setShoppingLists(prevLists => [...prevLists, optimisticList]);
+    
+    // Mark list as creating
+    setCreatingListIds(prev => new Set(prev).add(tempId));
 
     // Make API call in background
     try {
@@ -2291,18 +2296,40 @@ export default function GroupDetailPage() {
       
       // Fetch fresh data from API to ensure consistency
       await fetchShoppingLists(true);
+      
+      // Remove all tempIds (negative IDs) from creating list after successful creation
+      // This ensures cleanup even if the tempId doesn't match exactly
+      setCreatingListIds(prev => {
+        const newSet = new Set(prev);
+        // Remove the specific tempId
+        newSet.delete(tempId);
+        // Also remove any other negative IDs (tempIds) that might be left
+        prev.forEach(id => {
+          if (id < 0) {
+            newSet.delete(id);
+          }
+        });
+        return newSet;
+      });
     } catch (error) {
       // Remove optimistic list on error
       setShoppingLists(prevLists => 
         prevLists.filter(list => list.id !== tempId)
       );
       
+      // Remove from creating list on error
+      setCreatingListIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tempId);
+        return newSet;
+      });
+      
       // Show error notification
       Alert.alert('Lỗi', 'Không thể tạo danh sách mua sắm. Vui lòng thử lại.');
     }
   };
 
-  // Handle delete shopping list (optimized with optimistic update)
+  // Handle delete shopping list (with loading indicator)
   const handleDeleteShoppingList = async (listId: number) => {
     Alert.alert(
       'Xác nhận xóa',
@@ -2313,58 +2340,63 @@ export default function GroupDetailPage() {
           text: 'Xóa',
           style: 'destructive',
           onPress: async () => {
-            // Store deleted list for rollback
-            let deletedList: ShoppingList | null = null;
+            // Mark list as deleting (show loading indicator)
+            setDeletingListIds(prev => new Set(prev).add(listId));
 
-            // Optimistic update: Remove list immediately from UI
-            setShoppingLists(prevLists => {
-              const listToDelete = prevLists.find(l => l.id === listId);
-              if (listToDelete) {
-                deletedList = { ...listToDelete };
-              }
-              return prevLists.filter(l => l.id !== listId);
-            });
-
-            // Delete from server (don't await to keep UI responsive)
-            // The list is already removed optimistically, so we handle response in background
-            deleteShoppingList(listId)
-              .then((response) => {
-                // Check if response indicates failure
-                // If response is undefined or has success: true, consider it success
-                if (response && response.success === false) {
-                  // Rollback on explicit failure
-                  if (deletedList) {
-                    setShoppingLists(prevLists => [...prevLists, deletedList!]);
-                  }
-                  const errorMessage = response.message || response.resultMessage?.vn || 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.';
-                  Alert.alert('Lỗi', errorMessage);
-                  return;
-                }
-                
-                // Success - invalidate cache and refresh in background
-                clearCacheByPattern(`group:family:${familyId}:shopping-lists`).catch(() => {});
-                fetchShoppingLists(false).catch(() => {
-                  // Silently fail background refresh
+            // Delete from server
+            try {
+              const response = await deleteShoppingList(listId);
+              
+              // Check if response indicates failure
+              if (response && response.success === false) {
+                // Remove from deleting list on failure
+                setDeletingListIds(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(listId);
+                  return newSet;
                 });
-              })
-              .catch((error: any) => {
-                // Rollback on error: restore the deleted list
-                if (deletedList) {
-                  setShoppingLists(prevLists => [...prevLists, deletedList!]);
-                }
-                
-                // Extract error message from backend response
-                let errorMessage = 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.';
-                
-                if (error?.response?.data) {
-                  const errorData = error.response.data;
-                  errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
-                } else if (error?.message) {
-                  errorMessage = error.message;
-                }
-                
+                const errorMessage = response.message || response.resultMessage?.vn || 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.';
                 Alert.alert('Lỗi', errorMessage);
+                return;
+              }
+              
+              // Success - clear cache FIRST to prevent fetching stale data
+              await clearCacheByPattern(`group:family:${familyId}:shopping-lists`);
+              
+              // Remove list from UI immediately (this will unmount the component)
+              setShoppingLists(prevLists => prevLists.filter(l => l.id !== listId));
+              
+              // Remove from deleting list after React has processed the removal
+              requestAnimationFrame(() => {
+                setDeletingListIds(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(listId);
+                  return newSet;
+                });
               });
+              
+              // Don't fetch shopping lists immediately after deletion to prevent
+              // the list from reappearing due to cache or API race conditions
+              // The cache is already cleared, so next fetch will get fresh data
+            } catch (error: any) {
+              // Remove from deleting list on error
+              setDeletingListIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(listId);
+                return newSet;
+              });
+              
+              // Extract error message from backend response
+              let errorMessage = 'Không thể xóa danh sách mua sắm. Vui lòng thử lại.';
+              if (error?.response?.data) {
+                const errorData = error.response.data;
+                errorMessage = errorData.resultMessage?.vn || errorData.message || errorData.resultMessage?.en || errorMessage;
+              } else if (error?.message) {
+                errorMessage = error.message;
+              }
+              
+              Alert.alert('Lỗi', errorMessage);
+            }
           },
         },
       ]
@@ -3104,8 +3136,36 @@ export default function GroupDetailPage() {
               </Text>
             </View>
           ) : (
-            filteredShoppingLists.map(list => (
+            filteredShoppingLists.map(list => {
+              const isCreating = creatingListIds.has(list.id);
+              const isDeleting = deletingListIds.has(list.id);
+              const isLoading = isCreating || isDeleting;
+              
+              return (
               <View key={list.id} style={groupStyles.shoppingListCard}>
+                {isLoading && (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    backgroundColor: COLORS.lightGrey,
+                    borderTopLeftRadius: 12,
+                    borderTopRightRadius: 12,
+                    marginBottom: 8,
+                  }}>
+                    <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
+                    <Text style={{
+                      fontSize: 14,
+                      color: COLORS.primary,
+                      fontWeight: '500',
+                    }}>
+                      {isCreating ? 'Đang tạo danh sách mua sắm' : 'Đang xóa danh sách mua sắm'}
+                    </Text>
+                  </View>
+                )}
+                
                 <View style={groupStyles.shoppingListHeader}>
                   <View>
                     <Text style={groupStyles.shoppingListTitle}>
@@ -3155,11 +3215,17 @@ export default function GroupDetailPage() {
                 </View>
 
                 <TouchableOpacity
-                  style={groupStyles.addItemButton}
+                  style={[
+                    groupStyles.addItemButton,
+                    isLoading && { opacity: 0.5 }
+                  ]}
                   onPress={() => {
-                    setSelectedListId(list.id);
-                    setShowAddItemModal(true);
+                    if (!isLoading) {
+                      setSelectedListId(list.id);
+                      setShowAddItemModal(true);
+                    }
                   }}
+                  disabled={isLoading}
                 >
                   <Ionicons name="add" size={20} color={COLORS.primary} />
                   <Text style={groupStyles.addItemButtonText}>
@@ -3168,8 +3234,16 @@ export default function GroupDetailPage() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={groupStyles.deleteListButton}
-                  onPress={() => handleDeleteShoppingList(list.id)}
+                  style={[
+                    groupStyles.deleteListButton,
+                    isLoading && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (!isLoading) {
+                      handleDeleteShoppingList(list.id);
+                    }
+                  }}
+                  disabled={isLoading}
                 >
                   <Ionicons name="trash-outline" size={18} color={COLORS.red} />
                   <Text style={groupStyles.deleteListButtonText}>
@@ -3177,7 +3251,8 @@ export default function GroupDetailPage() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            ))
+            );
+            })
           )}
         </View>
     );
