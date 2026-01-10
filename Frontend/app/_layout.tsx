@@ -14,6 +14,10 @@ import { Platform } from "react-native";
 import { subscribeToNetworkStatus, NetworkStatus } from "@/utils/network";
 import { processQueue, getQueueStatus } from "@/utils/requestQueue";
 import Toast from "react-native-toast-message";
+import * as SplashScreen from "expo-splash-screen";
+
+// Prevent the splash screen from auto-hiding before asset loading is complete
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const wasOfflineRef = useRef(false);

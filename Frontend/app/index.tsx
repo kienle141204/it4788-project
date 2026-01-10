@@ -8,6 +8,7 @@ import { biometricService } from '@/service/biometric';
 import { loginUSer } from '@/service/auth';
 import { inAppLogger } from '@/utils/logger';
 import { ensureTokenValid, logoutUser } from '@/utils/api';
+import * as SplashScreen from 'expo-splash-screen';
 
 export default function Index() {
   const [isReady, setIsReady] = useState(false);
@@ -114,6 +115,8 @@ export default function Index() {
         setIsLoggedIn(false);
       } finally {
         setIsReady(true);
+        // Hide splash screen when app is ready
+        await SplashScreen.hideAsync();
       }
     };
     checkLogin();
