@@ -59,6 +59,7 @@ interface FridgeDish {
   stock?: number;
   price?: number;
   expiration_date?: string | null;
+  note?: string;
   created_at?: string;
   dish?: {
     id: number;
@@ -76,6 +77,7 @@ interface FridgeIngredient {
   stock?: number;
   price?: number;
   expiration_date?: string | null;
+  note?: string;
   created_at?: string;
   ingredient?: {
     id: number;
@@ -143,6 +145,7 @@ export default function FridgeDetailPage() {
   const [dishStock, setDishStock] = useState('');
   const [dishPrice, setDishPrice] = useState('');
   const [dishExpirationDate, setDishExpirationDate] = useState<Date | null>(null);
+  const [dishNote, setDishNote] = useState('');
   const [showDishDatePicker, setShowDishDatePicker] = useState(false);
   const [addingDish, setAddingDish] = useState(false);
   const [showDishSelection, setShowDishSelection] = useState(true);
@@ -158,6 +161,7 @@ export default function FridgeDetailPage() {
   const [ingredientStock, setIngredientStock] = useState('');
   const [ingredientPrice, setIngredientPrice] = useState('');
   const [ingredientExpirationDate, setIngredientExpirationDate] = useState<Date | null>(null);
+  const [ingredientNote, setIngredientNote] = useState('');
   const [showIngredientDatePicker, setShowIngredientDatePicker] = useState(false);
   const [addingIngredient, setAddingIngredient] = useState(false);
   const [showIngredientSelection, setShowIngredientSelection] = useState(true);
@@ -170,10 +174,12 @@ export default function FridgeDetailPage() {
   const [editDishStock, setEditDishStock] = useState('');
   const [editDishPrice, setEditDishPrice] = useState('');
   const [editDishExpirationDate, setEditDishExpirationDate] = useState<Date | null>(null);
+  const [editDishNote, setEditDishNote] = useState('');
   const [showEditDishDatePicker, setShowEditDishDatePicker] = useState(false);
   const [editIngredientStock, setEditIngredientStock] = useState('');
   const [editIngredientPrice, setEditIngredientPrice] = useState('');
   const [editIngredientExpirationDate, setEditIngredientExpirationDate] = useState<Date | null>(null);
+  const [editIngredientNote, setEditIngredientNote] = useState('');
   const [showEditIngredientDatePicker, setShowEditIngredientDatePicker] = useState(false);
   const [updatingDish, setUpdatingDish] = useState(false);
   const [updatingIngredient, setUpdatingIngredient] = useState(false);
@@ -814,6 +820,7 @@ export default function FridgeDetailPage() {
       stock: stockValue,
       price: priceValue,
       expiration_date: dishExpirationDate ? dishExpirationDate.toISOString().split('T')[0] : null,
+      note: dishNote.trim() || undefined,
       created_at: new Date().toISOString(),
       dish: {
         id: selectedDish.id,
@@ -834,6 +841,7 @@ export default function FridgeDetailPage() {
     setDishStock('');
     setDishPrice('');
     setDishExpirationDate(null);
+    setDishNote('');
     setShowDishSelection(true);
 
     // Call API in background (don't await to keep UI responsive)
@@ -842,6 +850,7 @@ export default function FridgeDetailPage() {
       stock: stockValue,
       price: priceValue,
       expiration_date: dishExpirationDate ? dishExpirationDate.toISOString().split('T')[0] : undefined,
+      note: dishNote.trim() || undefined,
     })
       .then((newDish) => {
         clearCacheByPattern(`fridge:${refrigeratorId}`).catch(() => {});
@@ -916,6 +925,7 @@ export default function FridgeDetailPage() {
       stock: stockValue,
       price: priceValue,
       expiration_date: ingredientExpirationDate ? ingredientExpirationDate.toISOString().split('T')[0] : null,
+      note: ingredientNote.trim() || undefined,
       created_at: new Date().toISOString(),
       ingredient: {
         id: selectedIngredient.id,
@@ -935,6 +945,7 @@ export default function FridgeDetailPage() {
     setIngredientStock('');
     setIngredientPrice('');
     setIngredientExpirationDate(null);
+    setIngredientNote('');
     setShowIngredientSelection(true);
 
     // Call API in background (don't await to keep UI responsive)
@@ -943,6 +954,7 @@ export default function FridgeDetailPage() {
       stock: stockValue,
       price: priceValue,
       expiration_date: ingredientExpirationDate ? ingredientExpirationDate.toISOString().split('T')[0] : undefined,
+      note: ingredientNote.trim() || undefined,
     })
       .then((newIngredient) => {
         clearCacheByPattern(`fridge:${refrigeratorId}`).catch(() => {});
@@ -1080,6 +1092,7 @@ export default function FridgeDetailPage() {
                 stock: stockValue,
                 price: priceValue,
                 expiration_date: editDishExpirationDate ? editDishExpirationDate.toISOString().split('T')[0] : null,
+                note: editDishNote.trim() || undefined,
               }
             : dish
         )
@@ -1094,6 +1107,7 @@ export default function FridgeDetailPage() {
         stock: stockValue,
         price: priceValue,
         expiration_date: editDishExpirationDate ? editDishExpirationDate.toISOString().split('T')[0] : undefined,
+        note: editDishNote.trim() || undefined,
       });
 
       // Invalidate cache
@@ -1160,6 +1174,7 @@ export default function FridgeDetailPage() {
                 stock: stockValue,
                 price: priceValue,
                 expiration_date: editIngredientExpirationDate ? editIngredientExpirationDate.toISOString().split('T')[0] : null,
+                note: editIngredientNote.trim() || undefined,
               }
             : ingredient
         )
@@ -1174,6 +1189,7 @@ export default function FridgeDetailPage() {
         stock: stockValue,
         price: priceValue,
         expiration_date: editIngredientExpirationDate ? editIngredientExpirationDate.toISOString().split('T')[0] : undefined,
+        note: editIngredientNote.trim() || undefined,
       });
 
       // Invalidate cache
@@ -1346,6 +1362,11 @@ export default function FridgeDetailPage() {
           }
           return null;
         })()}
+        {item.note && (
+          <Text style={{ fontSize: 13, color: COLORS.grey, marginTop: 4, fontStyle: 'italic' }}>
+            📝 {item.note}
+          </Text>
+        )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TouchableOpacity
@@ -1354,6 +1375,7 @@ export default function FridgeDetailPage() {
             setEditDishStock(item.stock?.toString() || '');
             setEditDishPrice(item.price?.toString() || '');
             setEditDishExpirationDate(item.expiration_date ? new Date(item.expiration_date) : null);
+            setEditDishNote(item.note || '');
             setShowEditDishModal(true);
           }}
           style={{ padding: 8 }}
@@ -1433,6 +1455,11 @@ export default function FridgeDetailPage() {
           }
           return null;
         })()}
+        {item.note && (
+          <Text style={{ fontSize: 13, color: COLORS.grey, marginTop: 4, fontStyle: 'italic' }}>
+            📝 {item.note}
+          </Text>
+        )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TouchableOpacity
@@ -1441,6 +1468,7 @@ export default function FridgeDetailPage() {
             setEditIngredientStock(item.stock?.toString() || '');
             setEditIngredientPrice(item.price?.toString() || '');
             setEditIngredientExpirationDate(item.expiration_date ? new Date(item.expiration_date) : null);
+            setEditIngredientNote(item.note || '');
             setShowEditIngredientModal(true);
           }}
           style={{ padding: 8 }}
@@ -1658,7 +1686,7 @@ export default function FridgeDetailPage() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background || COLORS.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
       {/* Header */}
@@ -1668,7 +1696,7 @@ export default function FridgeDetailPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
-          paddingTop: Math.max(insets.top, 16) + 10,
+          paddingTop: 8,
           paddingBottom: 16,
           backgroundColor: COLORS.white,
           borderBottomWidth: 1,
@@ -1964,6 +1992,7 @@ export default function FridgeDetailPage() {
                       setDishStock('');
                       setDishPrice('');
                       setDishExpirationDate(null);
+                      setDishNote('');
                     }}>
                       <Ionicons name="close" size={24} color={COLORS.darkGrey} />
                     </TouchableOpacity>
@@ -2110,6 +2139,30 @@ export default function FridgeDetailPage() {
                       }}
                     />
                   )}
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                      Ghi chú (tùy chọn)
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: COLORS.white,
+                        borderRadius: 12,
+                        padding: 16,
+                        fontSize: 16,
+                        borderWidth: 1,
+                        borderColor: COLORS.background || '#E5E5E5',
+                        minHeight: 80,
+                        textAlignVertical: 'top',
+                      }}
+                      placeholder="Nhập ghi chú..."
+                      value={dishNote}
+                      onChangeText={setDishNote}
+                      multiline
+                      numberOfLines={3}
+                      placeholderTextColor={COLORS.grey}
+                    />
+                  </View>
 
                   <TouchableOpacity
                     style={{
@@ -2277,6 +2330,7 @@ export default function FridgeDetailPage() {
                       setIngredientStock('');
                       setIngredientPrice('');
                       setIngredientExpirationDate(null);
+                      setIngredientNote('');
                     }}>
                       <Ionicons name="close" size={24} color={COLORS.darkGrey} />
                     </TouchableOpacity>
@@ -2409,32 +2463,56 @@ export default function FridgeDetailPage() {
                     )}
                   </View>
 
-                  {showIngredientDatePicker && (
-                    <DateTimePicker
-                      value={ingredientExpirationDate || new Date()}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      minimumDate={new Date()}
-                      onChange={(event, selectedDate) => {
-                        setShowIngredientDatePicker(Platform.OS === 'ios');
-                        if (event.type === 'set' && selectedDate) {
-                          setIngredientExpirationDate(selectedDate);
-                        }
-                      }}
-                    />
-                  )}
+                    {showIngredientDatePicker && (
+                      <DateTimePicker
+                        value={ingredientExpirationDate || new Date()}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        minimumDate={new Date()}
+                        onChange={(event, selectedDate) => {
+                          setShowIngredientDatePicker(Platform.OS === 'ios');
+                          if (event.type === 'set' && selectedDate) {
+                            setIngredientExpirationDate(selectedDate);
+                          }
+                        }}
+                      />
+                    )}
 
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: COLORS.primary,
-                      borderRadius: 12,
-                      padding: 16,
-                      alignItems: 'center',
-                      marginTop: 8,
-                    }}
-                    onPress={handleSubmitIngredient}
-                    disabled={addingIngredient}
-                  >
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                        Ghi chú (tùy chọn)
+                      </Text>
+                      <TextInput
+                        style={{
+                          backgroundColor: COLORS.white,
+                          borderRadius: 12,
+                          padding: 16,
+                          fontSize: 16,
+                          borderWidth: 1,
+                          borderColor: COLORS.background || '#E5E5E5',
+                          minHeight: 80,
+                          textAlignVertical: 'top',
+                        }}
+                        placeholder="Nhập ghi chú..."
+                        value={ingredientNote}
+                        onChangeText={setIngredientNote}
+                        multiline
+                        numberOfLines={3}
+                        placeholderTextColor={COLORS.grey}
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: COLORS.primary,
+                        borderRadius: 12,
+                        padding: 16,
+                        alignItems: 'center',
+                        marginTop: 8,
+                      }}
+                      onPress={handleSubmitIngredient}
+                      disabled={addingIngredient}
+                    >
                     {addingIngredient ? (
                       <ActivityIndicator color={COLORS.white} />
                     ) : (
@@ -2465,6 +2543,7 @@ export default function FridgeDetailPage() {
                 <TouchableOpacity onPress={() => {
                   setShowEditDishModal(false);
                   setEditingDish(null);
+                  setEditDishNote('');
                 }}>
                   <Ionicons name="close" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
@@ -2597,6 +2676,30 @@ export default function FridgeDetailPage() {
                 />
               )}
 
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Ghi chú (tùy chọn)
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                    minHeight: 80,
+                    textAlignVertical: 'top',
+                  }}
+                  placeholder="Nhập ghi chú..."
+                  value={editDishNote}
+                  onChangeText={setEditDishNote}
+                  multiline
+                  numberOfLines={3}
+                  placeholderTextColor={COLORS.grey}
+                />
+              </View>
+
               <TouchableOpacity
                 style={{
                   backgroundColor: COLORS.primary,
@@ -2637,6 +2740,7 @@ export default function FridgeDetailPage() {
                 <TouchableOpacity onPress={() => {
                   setShowEditIngredientModal(false);
                   setEditingIngredient(null);
+                  setEditIngredientNote('');
                 }}>
                   <Ionicons name="close" size={24} color={COLORS.darkGrey} />
                 </TouchableOpacity>
@@ -2768,6 +2872,30 @@ export default function FridgeDetailPage() {
                   }}
                 />
               )}
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.darkGrey, marginBottom: 8 }}>
+                  Ghi chú (tùy chọn)
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: COLORS.white,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: COLORS.background || '#E5E5E5',
+                    minHeight: 80,
+                    textAlignVertical: 'top',
+                  }}
+                  placeholder="Nhập ghi chú..."
+                  value={editIngredientNote}
+                  onChangeText={setEditIngredientNote}
+                  multiline
+                  numberOfLines={3}
+                  placeholderTextColor={COLORS.grey}
+                />
+              </View>
 
               <TouchableOpacity
                 style={{

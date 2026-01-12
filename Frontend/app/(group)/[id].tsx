@@ -259,10 +259,12 @@ export default function GroupDetailPage() {
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const chatLastIdRef = useRef<number | null>(null);
   const tempMessageIdRef = useRef<number>(-1); // Use negative IDs for temporary messages
-  const pendingTempMessagesRef = useRef<Map<number, { tempId: number; message: string; timestamp: number }>>(new Map()); // Track pending temp messages
+  const pendingTempMessagesRef = useRef<Map<number, { tempId: number; message: string; imageUrl?: string; timestamp: number }>>(new Map()); // Track pending temp messages
 
   // Typing indicator states
   const [typingUsers, setTypingUsers] = useState<Map<number, { userId: number; email: string; timestamp: number }>>(new Map());
@@ -1160,7 +1162,39 @@ export default function GroupDetailPage() {
           ).then((freshResult) => {
             if (freshResult.updated) {
               const freshResponse = freshResult.data;
-              setChatMessages((freshResponse.data || []).map((msg): LocalChatMessage => ({ ...msg, status: 'sent' })));
+              // Merge fresh messages with existing temp messages to avoid duplicates
+              setChatMessages((prev) => {
+                const freshMessages = (freshResponse.data || []).map((msg): LocalChatMessage => ({ ...msg, status: 'sent' }));
+                // Preserve temp messages (negative IDs) that are still sending
+                const tempMessages = prev.filter((m) => m.id < 0 && m.status === 'sending');
+                // Combine fresh messages with temp messages, avoiding duplicates
+                const combined = [...tempMessages];
+                for (const freshMsg of freshMessages) {
+                  // Check if message already exists by ID
+                  const existsById = prev.some((m) => m.id === freshMsg.id && m.id > 0);
+                  if (existsById) {
+                    continue; // Skip if already exists
+                  }
+                  
+                  // Check for duplicate image messages (by imageUrl and userId)
+                  const isDuplicateImage = freshMsg.data?.imageUrl && 
+                    prev.some((m) => {
+                      // Check if there's a message with same imageUrl and userId
+                      if (m.data?.imageUrl === freshMsg.data?.imageUrl && m.userId === freshMsg.userId) {
+                        // Check if timestamps are close (within 10 seconds) - likely same message
+                        const mTime = new Date(m.createdAt).getTime();
+                        const freshTime = new Date(freshMsg.createdAt).getTime();
+                        return Math.abs(mTime - freshTime) < 10000;
+                      }
+                      return false;
+                    });
+                  
+                  if (!isDuplicateImage) {
+                    combined.push(freshMsg);
+                  }
+                }
+                return combined;
+              });
               setHasMoreMessages(freshResponse.pagination?.hasMore || false);
               chatLastIdRef.current = freshResponse.pagination?.lastId || null;
             }
@@ -1227,8 +1261,19 @@ export default function GroupDetailPage() {
             const currentUserIdValue = currentUserIdRef.current;
             const isOwnMessage = String(message.userId) === String(currentUserIdValue);
             
-            // First check: avoid duplicates by message ID
-            if (prev.some((m) => m.id === message.id && m.id > 0)) {
+            // First check: avoid duplicates by message ID or by imageUrl for image messages
+            const messageImageUrl = message.data?.imageUrl;
+            if (prev.some((m) => {
+              if (m.id === message.id && m.id > 0) return true;
+              // Also check for duplicate image messages by imageUrl
+              if (messageImageUrl && m.data?.imageUrl === messageImageUrl && m.userId === message.userId) {
+                // Only consider it duplicate if timestamps are very close (within 5 seconds)
+                const mTime = new Date(m.createdAt).getTime();
+                const msgTime = new Date(message.createdAt).getTime();
+                return Math.abs(mTime - msgTime) < 5000;
+              }
+              return false;
+            })) {
               return prev;
             }
             
@@ -1236,28 +1281,56 @@ export default function GroupDetailPage() {
               // Try to find and replace temporary message
               // Check pending temp messages first for more accurate matching
               let tempMessageIndex = -1;
-              let matchedPendingEntry: { tempId: number; message: string; timestamp: number } | null = null;
+              let matchedPendingEntry: { tempId: number; message: string; imageUrl?: string; timestamp: number } | null = null;
               
               // Find matching pending temp message
+              // For image messages, prioritize imageUrl matching over message text
               for (const [timestamp, pending] of pendingTempMessagesRef.current.entries()) {
-                if (pending.message === message.message && pending.tempId < 0) {
-                  matchedPendingEntry = pending;
-                  // Find the temp message in the list
-                  tempMessageIndex = prev.findIndex((m) => m.id === pending.tempId);
-                  if (tempMessageIndex !== -1) {
-                    break;
+                // If both have imageUrl, match by imageUrl (most reliable)
+                if (messageImageUrl && pending.imageUrl) {
+                  if (messageImageUrl === pending.imageUrl && pending.tempId < 0) {
+                    matchedPendingEntry = pending;
+                    tempMessageIndex = prev.findIndex((m) => m.id === pending.tempId);
+                    if (tempMessageIndex !== -1) {
+                      break;
+                    }
+                  }
+                } 
+                // If no images, match by message text
+                else if (!messageImageUrl && !pending.imageUrl) {
+                  const messageMatches = pending.message === message.message;
+                  if (messageMatches && pending.tempId < 0) {
+                    matchedPendingEntry = pending;
+                    tempMessageIndex = prev.findIndex((m) => m.id === pending.tempId);
+                    if (tempMessageIndex !== -1) {
+                      break;
+                    }
                   }
                 }
+                // If one has image and other doesn't, skip (different messages)
               }
               
               // If not found via pending map, try fallback matching
+              // Prioritize imageUrl matching for image messages
               if (tempMessageIndex === -1) {
-                tempMessageIndex = prev.findIndex(
-                  (m) => m.status === 'sending' && 
-                  m.userId === message.userId && 
-                  m.message === message.message &&
-                  m.id < 0 // Only match temporary messages (negative IDs)
-                );
+                if (messageImageUrl) {
+                  // For image messages, match by imageUrl first
+                  tempMessageIndex = prev.findIndex(
+                    (m) => m.status === 'sending' && 
+                    m.userId === message.userId && 
+                    m.id < 0 && // Only match temporary messages (negative IDs)
+                    m.data?.imageUrl === messageImageUrl
+                  );
+                } else {
+                  // For text messages, match by message text
+                  tempMessageIndex = prev.findIndex(
+                    (m) => m.status === 'sending' && 
+                    m.userId === message.userId && 
+                    m.message === message.message &&
+                    m.id < 0 && // Only match temporary messages (negative IDs)
+                    !m.data?.imageUrl // No image in temp message
+                  );
+                }
               }
               
               if (tempMessageIndex !== -1) {
@@ -1286,6 +1359,42 @@ export default function GroupDetailPage() {
                 }
                 
                 return updated;
+              }
+              
+              // Last resort: if we have an image message and couldn't match, 
+              // try to find any sending message with same imageUrl (in case message text doesn't match)
+              if (messageImageUrl && tempMessageIndex === -1) {
+                tempMessageIndex = prev.findIndex(
+                  (m) => m.status === 'sending' && 
+                  m.userId === message.userId && 
+                  m.id < 0 && // Only match temporary messages
+                  m.data?.imageUrl === messageImageUrl
+                );
+                
+                if (tempMessageIndex !== -1) {
+                  // Replace the temporary message
+                  const updated = [...prev];
+                  updated[tempMessageIndex] = {
+                    id: message.id,
+                    userId: message.userId,
+                    title: message.title,
+                    message: message.message,
+                    data: message.data,
+                    isRead: false,
+                    familyId: message.familyId,
+                    createdAt: message.createdAt,
+                    status: 'sent',
+                  };
+                  
+                  // Clean up any pending temp messages with this imageUrl
+                  for (const [timestamp, pending] of pendingTempMessagesRef.current.entries()) {
+                    if (pending.imageUrl === messageImageUrl) {
+                      pendingTempMessagesRef.current.delete(timestamp);
+                    }
+                  }
+                  
+                  return updated;
+                }
               }
             }
             
@@ -1534,8 +1643,7 @@ export default function GroupDetailPage() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false, // Không bắt crop ảnh
         quality: 0.8,
       });
 
@@ -1651,8 +1759,8 @@ export default function GroupDetailPage() {
     const tempId = tempMessageIdRef.current--;
     const timestamp = Date.now();
     
-    // Track this temp message
-    pendingTempMessagesRef.current.set(timestamp, { tempId, message: messageText, timestamp });
+    // Track this temp message (include imageUrl for accurate matching)
+    pendingTempMessagesRef.current.set(timestamp, { tempId, message: messageText, imageUrl: imageUrl || undefined, timestamp });
     
     // Prepare data object with image URL if exists
     const messageData: Record<string, any> = {};
@@ -1957,8 +2065,8 @@ export default function GroupDetailPage() {
             <TouchableOpacity
               style={groupStyles.chatMessageImageContainer}
               onPress={() => {
-                // Could add image viewer modal here
-                Alert.alert('Ảnh', 'Nhấn và giữ để xem ảnh lớn');
+                setViewingImageUrl(imageUrl);
+                setImageViewerVisible(true);
               }}
             >
               <Image source={{ uri: imageUrl }} style={groupStyles.chatMessageImage} />
@@ -2014,8 +2122,8 @@ export default function GroupDetailPage() {
           <TouchableOpacity
             style={groupStyles.chatMessageImageContainer}
             onPress={() => {
-              // Could add image viewer modal here
-              Alert.alert('Ảnh', 'Nhấn và giữ để xem ảnh lớn');
+              setViewingImageUrl(imageUrl);
+              setImageViewerVisible(true);
             }}
           >
             <Image source={{ uri: imageUrl }} style={groupStyles.chatMessageImage} />
@@ -4188,6 +4296,36 @@ export default function GroupDetailPage() {
               </View>
             </View>
           </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Image Viewer Modal */}
+      <Modal
+        visible={imageViewerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <TouchableOpacity
+          style={groupStyles.imageViewerOverlay}
+          activeOpacity={1}
+          onPress={() => setImageViewerVisible(false)}
+        >
+          <View style={groupStyles.imageViewerContainer}>
+            {viewingImageUrl && (
+              <Image
+                source={{ uri: viewingImageUrl }}
+                style={groupStyles.imageViewerImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={groupStyles.imageViewerCloseButton}
+              onPress={() => setImageViewerVisible(false)}
+            >
+              <Ionicons name="close" size={28} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
     </View>

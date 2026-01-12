@@ -83,6 +83,7 @@ export const addDishToRefrigerator = async (
     stock?: number;
     price?: number;
     expiration_date?: string | Date;
+    note?: string;
   }
 ) => {
   const res = await postAccess(`fridge/${refrigeratorId}/dishes`, data);
@@ -97,6 +98,7 @@ export const updateFridgeDish = async (
     stock?: number;
     price?: number;
     expiration_date?: string | Date;
+    note?: string;
   }
 ) => {
   const res = await patchAccess(`fridge/dishes/${dishId}`, data);
@@ -126,6 +128,7 @@ export const addIngredientToRefrigerator = async (
     stock?: number;
     price?: number;
     expiration_date?: string | Date;
+    note?: string;
   }
 ) => {
   const res = await postAccess(`fridge/${refrigeratorId}/ingredients`, data);
@@ -141,6 +144,7 @@ export const updateFridgeIngredient = async (
     stock?: number;
     price?: number;
     expiration_date?: string | Date;
+    note?: string;
   }
 ) => {
   const res = await patchAccess(`fridge/ingredients/${ingredientId}`, data);
